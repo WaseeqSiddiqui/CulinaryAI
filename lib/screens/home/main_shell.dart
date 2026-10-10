@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/chef_name_formatter.dart';
 import '../../models/pantry_item_model.dart';
 import '../../models/recipe_recommendation_model.dart';
 import '../../models/user_model.dart';
@@ -8,7 +12,12 @@ import '../../providers/auth_provider.dart';
 import '../../providers/pantry_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../services/recipe_recommendation_service.dart';
+import '../../services/nutrition_calculator_service.dart';
+import '../../widgets/recipe_nutrition_panel.dart';
+import '../chat/chatbot_screen.dart';
+import '../cooking/guided_cooking_screen.dart';
 import '../pantry/pantry_screen.dart';
+import '../profile/profile_screen.dart';
 import '../scanner/receipt_scanner_screen.dart';
 
 class MainShell extends StatefulWidget {
@@ -43,14 +52,19 @@ class _MainShellState extends State<MainShell> {
       activeIcon: Icons.kitchen_rounded,
     ),
     _NavItem(
-      label: 'Recipes',
-      icon: Icons.restaurant_menu_outlined,
-      activeIcon: Icons.restaurant_menu_rounded,
+      label: 'Chef Chat',
+      icon: Icons.chat_bubble_outline_rounded,
+      activeIcon: Icons.chat_bubble_rounded,
     ),
     _NavItem(
       label: 'Restock',
       icon: Icons.shopping_bag_outlined,
       activeIcon: Icons.shopping_bag_rounded,
+    ),
+    _NavItem(
+      label: 'Profile',
+      icon: Icons.person_outline_rounded,
+      activeIcon: Icons.person_rounded,
     ),
   ];
 
@@ -66,6 +80,7 @@ class _MainShellState extends State<MainShell> {
           PantryScreen(),
           _RecipesPlaceholderTab(),
           _RestockPlaceholderTab(),
+          ProfileScreen(),
         ],
       ),
       bottomNavigationBar: Container(
@@ -86,14 +101,17 @@ class _MainShellState extends State<MainShell> {
           ],
         ),
         child: NavigationBar(
+          height: 60,
           selectedIndex: _currentIndex,
           onDestinationSelected: (idx) => setState(() => _currentIndex = idx),
           destinations: _navItems
-              .map((item) => NavigationDestination(
-                    icon: Icon(item.icon),
-                    selectedIcon: Icon(item.activeIcon),
-                    label: item.label,
-                  ))
+              .map(
+                (item) => NavigationDestination(
+                  icon: Icon(item.icon),
+                  selectedIcon: Icon(item.activeIcon),
+                  label: item.label,
+                ),
+              )
               .toList(),
         ),
       ),
@@ -105,13 +123,46 @@ class _NavItem {
   final String label;
   final IconData icon;
   final IconData activeIcon;
-  const _NavItem({required this.label, required this.icon, required this.activeIcon});
+  const _NavItem({
+    required this.label,
+    required this.icon,
+    required this.activeIcon,
+  });
 }
 
 // ── Dashboard Tab (Commercial Food App Architecture) ──────────────────────────
 
-class _DashboardTab extends StatelessWidget {
+class _DashboardTab extends StatefulWidget {
   const _DashboardTab();
+
+  @override
+  State<_DashboardTab> createState() => _DashboardTabState();
+}
+
+class _DashboardTabState extends State<_DashboardTab> {
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _openChefChat([String? question]) {
+    final cleanQuestion = question?.trim();
+    FocusScope.of(context).unfocus();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatbotScreen(
+          initialQuestion: cleanQuestion == null || cleanQuestion.isEmpty
+              ? null
+              : cleanQuestion,
+        ),
+      ),
+    );
+    _searchController.clear();
+  }
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(
@@ -143,6 +194,7 @@ class _DashboardTab extends StatelessWidget {
     final pantry = context.watch<PantryProvider>();
     final themeProvider = context.watch<ThemeProvider>();
     final user = authProvider.currentUser;
+    final chefName = ChefNameFormatter.fromUser(user);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -171,7 +223,9 @@ class _DashboardTab extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundColor: AppTheme.primaryFlame.withValues(alpha: 0.15),
+                  backgroundColor: AppTheme.primaryFlame.withValues(
+                    alpha: 0.15,
+                  ),
                   backgroundImage: const NetworkImage(
                     'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=160&q=80',
                   ),
@@ -189,7 +243,11 @@ class _DashboardTab extends StatelessWidget {
                         width: 1.5,
                       ),
                     ),
-                    child: const Icon(Icons.restaurant, color: Colors.white, size: 10),
+                    child: const Icon(
+                      Icons.restaurant,
+                      color: Colors.white,
+                      size: 10,
+                    ),
                   ),
                 ),
               ],
@@ -201,14 +259,16 @@ class _DashboardTab extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Chef ${user?.name ?? "Alex"}',
+                    'Chef $chefName',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.3,
-                      color: isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary,
+                      color: isDark
+                          ? AppTheme.textDarkPrimary
+                          : AppTheme.textLightPrimary,
                     ),
                   ),
                   Row(
@@ -229,7 +289,9 @@ class _DashboardTab extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 11,
-                            color: isDark ? AppTheme.textDarkSecondary : AppTheme.textLightSecondary,
+                            color: isDark
+                                ? AppTheme.textDarkSecondary
+                                : AppTheme.textLightSecondary,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -269,64 +331,68 @@ class _DashboardTab extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Search / Ask AI Pill
-            GestureDetector(
-              onTap: () {
-                context.findAncestorStateOfType<_MainShellState>()?.switchToTab(1);
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: isDark ? AppTheme.surfaceDark : AppTheme.creamSurface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isDark ? AppTheme.borderDark : AppTheme.creamBorder,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
+            // Search / Ask Chef Chat
+            Container(
+              height: 44,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.surfaceDark : AppTheme.creamSurface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? AppTheme.borderDark : AppTheme.creamBorder,
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.search_rounded,
-                        color: AppTheme.primaryFlame, size: 22),
-                    const SizedBox(width: 12),
-                    Text(
-                      'What would you like to cook today?',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: isDark ? AppTheme.textDarkMuted : AppTheme.textLightMuted,
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: TextField(
+                key: const Key('dashboardChefSearch'),
+                controller: _searchController,
+                textInputAction: TextInputAction.search,
+                onSubmitted: _openChefChat,
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'Ask what you can cook today…',
+                  isDense: true,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: false,
+                  prefixIcon: const Icon(
+                    Icons.search_rounded,
+                    color: AppTheme.primaryFlame,
+                    size: 20,
+                  ),
+                  prefixIconConstraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
+                  suffixIcon: IconButton(
+                    key: const Key('dashboardChefSearchButton'),
+                    tooltip: 'Ask Chef Chat',
+                    onPressed: () => _openChefChat(_searchController.text),
+                    icon: Container(
+                      padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryFlame.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(9),
                       ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.auto_awesome_rounded,
-                              size: 13, color: AppTheme.primaryFlame),
-                          SizedBox(width: 4),
-                          Text(
-                            'AI',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.primaryFlame,
-                            ),
-                          ),
-                        ],
+                      child: const Icon(
+                        Icons.arrow_upward_rounded,
+                        size: 16,
+                        color: AppTheme.primaryFlame,
                       ),
                     ),
-                  ],
+                  ),
+                  suffixIconConstraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
             ),
@@ -334,13 +400,7 @@ class _DashboardTab extends StatelessWidget {
             const SizedBox(height: 20),
 
             // Hero Interactive Recipe Inspiration Card (With Real Food Photography)
-            _HeroRecipeCard(
-              isDark: isDark,
-              pantry: pantry,
-              onCookTap: () {
-                context.findAncestorStateOfType<_MainShellState>()?.switchToTab(2);
-              },
-            ),
+            _HeroRecipeCard(isDark: isDark, pantry: pantry),
 
             const SizedBox(height: 26),
 
@@ -354,12 +414,16 @@ class _DashboardTab extends StatelessWidget {
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.3,
-                    color: isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary,
+                    color: isDark
+                        ? AppTheme.textDarkPrimary
+                        : AppTheme.textLightPrimary,
                   ),
                 ),
                 GestureDetector(
                   onTap: () {
-                    context.findAncestorStateOfType<_MainShellState>()?.switchToTab(1);
+                    context
+                        .findAncestorStateOfType<_MainShellState>()
+                        ?.switchToTab(1);
                   },
                   child: const Row(
                     children: [
@@ -371,8 +435,11 @@ class _DashboardTab extends StatelessWidget {
                           color: AppTheme.primaryFlame,
                         ),
                       ),
-                      Icon(Icons.chevron_right_rounded,
-                          size: 18, color: AppTheme.primaryFlame),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 18,
+                        color: AppTheme.primaryFlame,
+                      ),
                     ],
                   ),
                 ),
@@ -395,28 +462,36 @@ class _DashboardTab extends StatelessWidget {
             const SizedBox(height: 26),
 
             // Section 3: Ingredients Expiring / Low Stock (Interactive Carousel)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.bolt_rounded,
-                        color: AppTheme.warmSaffron, size: 20),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Pantry Attention & Low Stock',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
-                        color: isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary,
+            if (pantry.lowStockCount > 0) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.bolt_rounded,
+                        color: AppTheme.warmSaffron,
+                        size: 20,
                       ),
-                    ),
-                  ],
-                ),
-                if (pantry.lowStockCount > 0)
+                      const SizedBox(width: 6),
+                      Text(
+                        'Pantry Attention & Low Stock',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          color: isDark
+                              ? AppTheme.textDarkPrimary
+                              : AppTheme.textLightPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.warmSaffron.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
@@ -430,12 +505,12 @@ class _DashboardTab extends StatelessWidget {
                       ),
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _AttentionItemsCarousel(isDark: isDark),
-
-            const SizedBox(height: 26),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _AttentionItemsCarousel(isDark: isDark),
+              const SizedBox(height: 26),
+            ],
 
             // Section 4: What You Can Cook Tonight (Interactive Photo Cards)
             Row(
@@ -447,10 +522,16 @@ class _DashboardTab extends StatelessWidget {
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.3,
-                    color: isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary,
+                    color: isDark
+                        ? AppTheme.textDarkPrimary
+                        : AppTheme.textLightPrimary,
                   ),
                 ),
-                const Icon(Icons.tune_rounded, size: 18, color: AppTheme.primaryFlame),
+                const Icon(
+                  Icons.tune_rounded,
+                  size: 18,
+                  color: AppTheme.primaryFlame,
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -467,13 +548,8 @@ class _DashboardTab extends StatelessWidget {
 class _HeroRecipeCard extends StatefulWidget {
   final bool isDark;
   final PantryProvider pantry;
-  final VoidCallback onCookTap;
 
-  const _HeroRecipeCard({
-    required this.isDark,
-    required this.pantry,
-    required this.onCookTap,
-  });
+  const _HeroRecipeCard({required this.isDark, required this.pantry});
 
   @override
   State<_HeroRecipeCard> createState() => _HeroRecipeCardState();
@@ -482,7 +558,10 @@ class _HeroRecipeCard extends StatefulWidget {
 class _HeroRecipeCardState extends State<_HeroRecipeCard> {
   int _cycleOffset = 0;
 
-  void _showRecipeDetails(BuildContext context, RecipeRecommendationModel recipe) {
+  void _showRecipeDetails(
+    BuildContext context,
+    RecipeRecommendationModel recipe,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -493,7 +572,12 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
         isDark: widget.isDark,
         onStartCooking: () {
           Navigator.pop(ctx);
-          widget.onCookTap();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => GuidedCookingScreen(recipe: recipe),
+            ),
+          );
         },
       ),
     );
@@ -535,7 +619,9 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                   'assets/images/hero_dish.jpg',
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
-                    color: widget.isDark ? const Color(0xFF1C1917) : AppTheme.creamBeige,
+                    color: widget.isDark
+                        ? const Color(0xFF1C1917)
+                        : AppTheme.creamBeige,
                   ),
                 ),
               ),
@@ -564,13 +650,18 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
                           decoration: BoxDecoration(
                             color: AppTheme.primaryFlame,
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: AppTheme.primaryFlame.withValues(alpha: 0.4),
+                                color: AppTheme.primaryFlame.withValues(
+                                  alpha: 0.4,
+                                ),
                                 blurRadius: 8,
                               ),
                             ],
@@ -578,10 +669,16 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.auto_awesome, color: Colors.white, size: 12),
+                              const Icon(
+                                Icons.auto_awesome,
+                                color: Colors.white,
+                                size: 12,
+                              ),
                               const SizedBox(width: 4),
                               Text(
-                                _cycleOffset == 0 ? "Today's Best Match" : 'Option #${_cycleOffset + 1}',
+                                _cycleOffset == 0
+                                    ? "Today's Best Match"
+                                    : 'Option #${_cycleOffset + 1}',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 11,
@@ -593,13 +690,19 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: 0.4),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: (matchPct >= 80 ? const Color(0xFF6EE7B7) : AppTheme.warmSaffron)
-                                  .withValues(alpha: 0.7),
+                              color:
+                                  (matchPct >= 80
+                                          ? const Color(0xFF6EE7B7)
+                                          : AppTheme.warmSaffron)
+                                      .withValues(alpha: 0.7),
                               width: 1,
                             ),
                           ),
@@ -607,8 +710,12 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                matchPct >= 80 ? Icons.check_circle_rounded : Icons.pie_chart_rounded,
-                                color: matchPct >= 80 ? const Color(0xFF6EE7B7) : AppTheme.warmSaffron,
+                                matchPct >= 80
+                                    ? Icons.check_circle_rounded
+                                    : Icons.pie_chart_rounded,
+                                color: matchPct >= 80
+                                    ? const Color(0xFF6EE7B7)
+                                    : AppTheme.warmSaffron,
                                 size: 12,
                               ),
                               const SizedBox(width: 4),
@@ -632,7 +739,10 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                             });
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 5,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.22),
                               borderRadius: BorderRadius.circular(20),
@@ -644,7 +754,11 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.sync_rounded, color: Colors.white, size: 13),
+                                Icon(
+                                  Icons.sync_rounded,
+                                  color: Colors.white,
+                                  size: 13,
+                                ),
                                 SizedBox(width: 4),
                               ],
                             ),
@@ -657,7 +771,10 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.22),
                             borderRadius: BorderRadius.circular(6),
@@ -700,14 +817,20 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                     // Metadata + Cook Now Button
                     Row(
                       children: [
-                        _RecipeMetaChip(icon: Icons.timer_outlined, label: '${recipe.cookTimeMinutes}m'),
+                        _RecipeMetaChip(
+                          icon: Icons.timer_outlined,
+                          label: '${recipe.cookTimeMinutes}m',
+                        ),
                         const SizedBox(width: 4),
                         _RecipeMetaChip(
-                            icon: Icons.local_fire_department_outlined, label: '${recipe.calories}kcal'),
+                          icon: Icons.local_fire_department_outlined,
+                          label: '${recipe.calories}kcal',
+                        ),
                         const SizedBox(width: 4),
                         _RecipeMetaChip(
                           icon: Icons.kitchen_rounded,
-                          label: '$matchedCount/${recipe.ingredients.length} items',
+                          label:
+                              '$matchedCount/${recipe.ingredients.length} items',
                         ),
                         const Spacer(),
                         ElevatedButton(
@@ -715,7 +838,10 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primaryFlame,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 9),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 9,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
@@ -724,8 +850,13 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text('Cook',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                              Text(
+                                'Cook',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                               SizedBox(width: 4),
                               Icon(Icons.arrow_forward_rounded, size: 14),
                             ],
@@ -764,6 +895,10 @@ class _RecipeDetailModal extends StatelessWidget {
     final matchPct = recipe.matchPercentage(pantryItems);
     final inPantry = recipe.inPantryIngredients(pantryItems);
     final missing = recipe.missingIngredients(pantryItems);
+    final nutrition = NutritionCalculatorService.calculate(
+      ingredients: recipe.ingredientDetails,
+      servings: recipe.servings,
+    );
 
     return DraggableScrollableSheet(
       initialChildSize: 0.88,
@@ -800,7 +935,10 @@ class _RecipeDetailModal extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.primaryFlame.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(20),
@@ -825,7 +963,10 @@ class _RecipeDetailModal extends StatelessWidget {
             Expanded(
               child: ListView(
                 controller: scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
                 children: [
                   // Hero Photo
                   ClipRRect(
@@ -839,10 +980,15 @@ class _RecipeDetailModal extends StatelessWidget {
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Container(
                             height: 200,
-                            color: isDark ? AppTheme.cardDark : AppTheme.creamBeige,
+                            color: isDark
+                                ? AppTheme.cardDark
+                                : AppTheme.creamBeige,
                             child: const Center(
-                              child: Icon(Icons.restaurant_rounded,
-                                  size: 48, color: AppTheme.primaryFlame),
+                              child: Icon(
+                                Icons.restaurant_rounded,
+                                size: 48,
+                                color: AppTheme.primaryFlame,
+                              ),
                             ),
                           ),
                         ),
@@ -850,7 +996,10 @@ class _RecipeDetailModal extends StatelessWidget {
                           top: 12,
                           right: 12,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.75),
                               borderRadius: BorderRadius.circular(16),
@@ -858,8 +1007,12 @@ class _RecipeDetailModal extends StatelessWidget {
                             child: Row(
                               children: [
                                 Icon(
-                                  matchPct >= 80 ? Icons.check_circle : Icons.pie_chart,
-                                  color: matchPct >= 80 ? const Color(0xFF6EE7B7) : AppTheme.warmSaffron,
+                                  matchPct >= 80
+                                      ? Icons.check_circle
+                                      : Icons.pie_chart,
+                                  color: matchPct >= 80
+                                      ? const Color(0xFF6EE7B7)
+                                      : AppTheme.warmSaffron,
                                   size: 14,
                                 ),
                                 const SizedBox(width: 5),
@@ -885,7 +1038,9 @@ class _RecipeDetailModal extends StatelessWidget {
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.4,
-                      color: isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary,
+                      color: isDark
+                          ? AppTheme.textDarkPrimary
+                          : AppTheme.textLightPrimary,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -894,7 +1049,9 @@ class _RecipeDetailModal extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       height: 1.4,
-                      color: isDark ? AppTheme.textDarkSecondary : AppTheme.textLightSecondary,
+                      color: isDark
+                          ? AppTheme.textDarkSecondary
+                          : AppTheme.textLightSecondary,
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -911,19 +1068,23 @@ class _RecipeDetailModal extends StatelessWidget {
                       const SizedBox(width: 10),
                       _specCard(
                         icon: Icons.local_fire_department_outlined,
-                        title: 'Calories',
-                        value: '${recipe.calories}',
+                        title: 'Per serving',
+                        value: '${nutrition.perServing.calories.round()} kcal',
                         isDark: isDark,
                       ),
                       const SizedBox(width: 10),
                       _specCard(
                         icon: Icons.kitchen_rounded,
                         title: 'Available',
-                        value: '${inPantry.length}/${recipe.ingredients.length}',
+                        value:
+                            '${inPantry.length}/${recipe.ingredients.length}',
                         isDark: isDark,
                       ),
                     ],
                   ),
+                  const SizedBox(height: 18),
+
+                  RecipeNutritionPanel(recipe: recipe, isDark: isDark),
                   const SizedBox(height: 18),
 
                   // Why This Dish Banner (Explaining the daily rotation and inventory algorithm)
@@ -935,14 +1096,19 @@ class _RecipeDetailModal extends StatelessWidget {
                           : AppTheme.creamBeige.withValues(alpha: 0.6),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: isDark ? AppTheme.borderDark : AppTheme.creamBorder,
+                        color: isDark
+                            ? AppTheme.borderDark
+                            : AppTheme.creamBorder,
                       ),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.auto_awesome_rounded,
-                            color: AppTheme.primaryFlame, size: 20),
+                        const Icon(
+                          Icons.auto_awesome_rounded,
+                          color: AppTheme.primaryFlame,
+                          size: 20,
+                        ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
@@ -983,7 +1149,9 @@ class _RecipeDetailModal extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
-                      color: isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary,
+                      color: isDark
+                          ? AppTheme.textDarkPrimary
+                          : AppTheme.textLightPrimary,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -995,7 +1163,8 @@ class _RecipeDetailModal extends StatelessWidget {
                         color: const Color(0xFF10B981).withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                          color: const Color(0xFF10B981)
+                              .withValues(alpha: 0.25),
                         ),
                       ),
                       child: Column(
@@ -1003,8 +1172,11 @@ class _RecipeDetailModal extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.check_circle_rounded,
-                                  color: Color(0xFF10B981), size: 16),
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                color: Color(0xFF10B981),
+                                size: 16,
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 'Ready in Your Pantry (${inPantry.length})',
@@ -1021,30 +1193,34 @@ class _RecipeDetailModal extends StatelessWidget {
                             spacing: 8,
                             runSpacing: 8,
                             children: inPantry
-                                .map((item) => Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 5),
-                                      decoration: BoxDecoration(
+                                .map(
+                                  (item) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? AppTheme.surfaceDark
+                                          : Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: const Color(0xFF10B981)
+                                            .withValues(alpha: 0.3),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      item,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
                                         color: isDark
-                                            ? AppTheme.surfaceDark
-                                            : Colors.white,
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
-                                          color: const Color(0xFF10B981)
-                                              .withValues(alpha: 0.3),
-                                        ),
+                                            ? AppTheme.textDarkPrimary
+                                            : AppTheme.textLightPrimary,
                                       ),
-                                      child: Text(
-                                        item,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: isDark
-                                              ? AppTheme.textDarkPrimary
-                                              : AppTheme.textLightPrimary,
-                                        ),
-                                      ),
-                                    ))
+                                    ),
+                                  ),
+                                )
                                 .toList(),
                           ),
                         ],
@@ -1069,8 +1245,11 @@ class _RecipeDetailModal extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.shopping_cart_outlined,
-                                  color: AppTheme.warmSaffron, size: 16),
+                              const Icon(
+                                Icons.shopping_cart_outlined,
+                                color: AppTheme.warmSaffron,
+                                size: 16,
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 'Missing Ingredients (${missing.length})',
@@ -1087,30 +1266,35 @@ class _RecipeDetailModal extends StatelessWidget {
                             spacing: 8,
                             runSpacing: 8,
                             children: missing
-                                .map((item) => Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 5),
-                                      decoration: BoxDecoration(
+                                .map(
+                                  (item) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? AppTheme.surfaceDark
+                                          : Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: AppTheme.warmSaffron.withValues(
+                                          alpha: 0.3,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      item,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
                                         color: isDark
-                                            ? AppTheme.surfaceDark
-                                            : Colors.white,
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
-                                          color: AppTheme.warmSaffron
-                                              .withValues(alpha: 0.3),
-                                        ),
+                                            ? AppTheme.textDarkPrimary
+                                            : AppTheme.textLightPrimary,
                                       ),
-                                      child: Text(
-                                        item,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: isDark
-                                              ? AppTheme.textDarkPrimary
-                                              : AppTheme.textLightPrimary,
-                                        ),
-                                      ),
-                                    ))
+                                    ),
+                                  ),
+                                )
                                 .toList(),
                           ),
                         ],
@@ -1125,7 +1309,9 @@ class _RecipeDetailModal extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
-                      color: isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary,
+                      color: isDark
+                          ? AppTheme.textDarkPrimary
+                          : AppTheme.textLightPrimary,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -1192,7 +1378,10 @@ class _RecipeDetailModal extends StatelessWidget {
                         SizedBox(width: 8),
                         Text(
                           'Start Guided Cooking',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ],
                     ),
@@ -1217,7 +1406,9 @@ class _RecipeDetailModal extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
-          color: isDark ? AppTheme.cardDark : AppTheme.creamBeige.withValues(alpha: 0.5),
+          color: isDark
+              ? AppTheme.cardDark
+              : AppTheme.creamBeige.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isDark ? AppTheme.borderDark : AppTheme.creamBorder,
@@ -1232,7 +1423,9 @@ class _RecipeDetailModal extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
-                color: isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary,
+                color: isDark
+                    ? AppTheme.textDarkPrimary
+                    : AppTheme.textLightPrimary,
               ),
             ),
             const SizedBox(height: 2),
@@ -1240,7 +1433,9 @@ class _RecipeDetailModal extends StatelessWidget {
               title,
               style: TextStyle(
                 fontSize: 11,
-                color: isDark ? AppTheme.textDarkMuted : AppTheme.textLightMuted,
+                color: isDark
+                    ? AppTheme.textDarkMuted
+                    : AppTheme.textLightMuted,
               ),
             ),
           ],
@@ -1272,7 +1467,10 @@ class _RecipeMetaChip extends StatelessWidget {
           Text(
             label,
             style: const TextStyle(
-                color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -1294,37 +1492,33 @@ class _PantryZonesGrid extends StatelessWidget {
     final zones = [
       _ZoneCardData(
         title: 'Fridge',
-        count: pantry.itemsByZone['Fridge']?.length ?? 4,
+        count: pantry.itemsByZone['Fridge']?.length ?? 0,
         subtitle: 'Chilled • 3.2°C',
-        imageUrl:
-            'https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?w=400&q=80',
+        imageUrl: 'https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?w=400&q=80',
         color: AppTheme.zoneFridge,
         icon: Icons.kitchen_rounded,
       ),
       _ZoneCardData(
         title: 'Freezer',
-        count: pantry.itemsByZone['Freezer']?.length ?? 3,
+        count: pantry.itemsByZone['Freezer']?.length ?? 0,
         subtitle: 'Deep Freeze • -18°C',
-        imageUrl:
-            'https://images.unsplash.com/photo-1497034825429-c343d7c6a68f?w=400&q=80',
+        imageUrl: 'https://images.unsplash.com/photo-1497034825429-c343d7c6a68f?w=400&q=80',
         color: AppTheme.zoneFreezer,
         icon: Icons.ac_unit_rounded,
       ),
       _ZoneCardData(
         title: 'Pantry Shelf',
-        count: pantry.itemsByZone['Pantry Shelf']?.length ?? 5,
+        count: pantry.itemsByZone['Pantry Shelf']?.length ?? 0,
         subtitle: 'Grains & Staples',
-        imageUrl:
-            'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=80',
+        imageUrl: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=80',
         color: AppTheme.zonePantry,
         icon: Icons.shelves,
       ),
       _ZoneCardData(
         title: 'Spice Rack',
-        count: pantry.itemsByZone['Spice Rack']?.length ?? 4,
+        count: pantry.itemsByZone['Spice Rack']?.length ?? 0,
         subtitle: 'Seasonings & Herbs',
-        imageUrl:
-            'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&q=80',
+        imageUrl: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&q=80',
         color: AppTheme.zoneSpice,
         icon: Icons.grass_rounded,
       ),
@@ -1344,9 +1538,10 @@ class _PantryZonesGrid extends StatelessWidget {
         final zone = zones[i];
         return GestureDetector(
           onTap: () {
-            context
-                .findAncestorStateOfType<_MainShellState>()
-                ?.switchToTab(1, zoneFilter: zone.title);
+            context.findAncestorStateOfType<_MainShellState>()?.switchToTab(
+              1,
+              zoneFilter: zone.title,
+            );
           },
           child: Container(
             decoration: BoxDecoration(
@@ -1364,10 +1559,7 @@ class _PantryZonesGrid extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(
-                    zone.imageUrl,
-                    fit: BoxFit.cover,
-                  ),
+                  Image.network(zone.imageUrl, fit: BoxFit.cover),
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -1394,19 +1586,26 @@ class _PantryZonesGrid extends StatelessWidget {
                                 color: zone.color.withValues(alpha: 0.25),
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                    color: zone.color.withValues(alpha: 0.5)),
+                                  color: zone.color.withValues(alpha: 0.5),
+                                ),
                               ),
-                              child: Icon(zone.icon, color: Colors.white, size: 14),
+                              child: Icon(
+                                zone.icon,
+                                color: Colors.white,
+                                size: 14,
+                              ),
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 7, vertical: 3),
+                                horizontal: 7,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Text(
-                                '${zone.count} items',
+                                '${zone.count} ${zone.count == 1 ? 'item' : 'items'}',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 10,
@@ -1521,8 +1720,11 @@ class _ReceiptScanBanner extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                   color: Colors.black.withValues(alpha: 0.35),
                 ),
-                child: const Icon(Icons.document_scanner_rounded,
-                    color: Colors.white, size: 24),
+                child: const Icon(
+                  Icons.document_scanner_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
               ),
             ),
             const SizedBox(width: 14),
@@ -1545,7 +1747,9 @@ class _ReceiptScanBanner extends StatelessWidget {
                       const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppTheme.freshHerb.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
@@ -1580,8 +1784,11 @@ class _ReceiptScanBanner extends StatelessWidget {
                 color: AppTheme.primaryFlame.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.arrow_forward_ios_rounded,
-                  size: 14, color: AppTheme.primaryFlame),
+              child: const Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: AppTheme.primaryFlame,
+              ),
             ),
           ],
         ),
@@ -1646,8 +1853,10 @@ class _AttentionItemsCarousel extends StatelessWidget {
                       width: 48,
                       height: 48,
                       color: AppTheme.primaryFlame.withValues(alpha: 0.1),
-                      child: const Icon(Icons.restaurant,
-                          color: AppTheme.primaryFlame),
+                      child: const Icon(
+                        Icons.restaurant,
+                        color: AppTheme.primaryFlame,
+                      ),
                     ),
                   ),
                 ),
@@ -1684,7 +1893,9 @@ class _AttentionItemsCarousel extends StatelessWidget {
                       const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: item.isLowStock
                               ? AppTheme.warmSaffron.withValues(alpha: 0.15)
@@ -1748,9 +1959,12 @@ class _RecommendedMealsCarousel extends StatelessWidget {
                   isDark: isDark,
                   onStartCooking: () {
                     Navigator.pop(modalCtx);
-                    context
-                        .findAncestorStateOfType<_MainShellState>()
-                        ?.switchToTab(2);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => GuidedCookingScreen(recipe: recipe),
+                      ),
+                    );
                   },
                 ),
               );
@@ -1785,7 +1999,9 @@ class _RecommendedMealsCarousel extends StatelessWidget {
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Container(
                             height: 110,
-                            color: isDark ? AppTheme.cardDark : AppTheme.creamBeige,
+                            color: isDark
+                                ? AppTheme.cardDark
+                                : AppTheme.creamBeige,
                           ),
                         ),
                         Positioned(
@@ -1793,7 +2009,9 @@ class _RecommendedMealsCarousel extends StatelessWidget {
                           right: 8,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.72),
                               borderRadius: BorderRadius.circular(12),
@@ -1832,11 +2050,13 @@ class _RecommendedMealsCarousel extends StatelessWidget {
                           const SizedBox(height: 4),
                           Row(
                             children: [
-                              Icon(Icons.schedule,
-                                  size: 12,
-                                  color: isDark
-                                      ? AppTheme.textDarkMuted
-                                      : AppTheme.textLightMuted),
+                              Icon(
+                                Icons.schedule,
+                                size: 12,
+                                color: isDark
+                                    ? AppTheme.textDarkMuted
+                                    : AppTheme.textLightMuted,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 '${recipe.cookTimeMinutes} min',
@@ -1848,11 +2068,13 @@ class _RecommendedMealsCarousel extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              Icon(Icons.local_fire_department,
-                                  size: 12,
-                                  color: isDark
-                                      ? AppTheme.textDarkMuted
-                                      : AppTheme.textLightMuted),
+                              Icon(
+                                Icons.local_fire_department,
+                                size: 12,
+                                color: isDark
+                                    ? AppTheme.textDarkMuted
+                                    : AppTheme.textLightMuted,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 '${recipe.calories} kcal',
@@ -1901,108 +2123,109 @@ class _RecipesPlaceholderTab extends StatelessWidget {
   const _RecipesPlaceholderTab();
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('AI Recipe Assistant')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 90,
-                height: 90,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  image: const DecorationImage(
-                    image: NetworkImage(
-                      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=240&q=80',
-                    ),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'AI-Powered Guided Cooking',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Recommends dishes matching currently available pantry stock and provides interactive voice & step-by-step cooking instructions.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.5,
-                  color: isDark ? AppTheme.textDarkSecondary : AppTheme.textLightSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const ChatbotScreen();
 }
 
 class _RestockPlaceholderTab extends StatelessWidget {
   const _RestockPlaceholderTab();
 
+  Future<void> _openStore(
+    BuildContext context,
+    String itemName, {
+    required bool daraz,
+  }) async {
+    final baseUrl = daraz
+        ? AppConstants.darazMartBaseUrl
+        : AppConstants.foodpandaMartBaseUrl;
+    final uri = Uri.parse(baseUrl).replace(queryParameters: {'q': itemName});
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the store app.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pantry = context.watch<PantryProvider>();
+    final lowStock = pantry.allItems.where((item) => item.isLowStock).toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Smart Restock Hub')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 90,
-                height: 90,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  image: const DecorationImage(
-                    image: NetworkImage(
-                      'https://images.unsplash.com/photo-1542838132-92c53300491e?w=240&q=80',
+      appBar: AppBar(title: const Text('Shopping list')),
+      body: lowStock.isEmpty
+          ? const Center(child: Text('Everything is stocked'))
+          : ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+              itemCount: lowStock.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final item = lowStock[index];
+                return Card(
+                  elevation: 0,
+                  color: isDark ? AppTheme.surfaceDark : Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.warning_amber_rounded,
+                              color: AppTheme.warmAmber,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${item.quantity} ${item.unit} remaining',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () =>
+                                    _openStore(context, item.name, daraz: true),
+                                child: const Text('Daraz'),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: () => _openStore(
+                                  context,
+                                  item.name,
+                                  daraz: false,
+                                ),
+                                child: const Text('Pandamart'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    fit: BoxFit.cover,
                   ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                '1-Tap Grocery Replenishment',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Monitors low inventory and auto-generates your grocery list with 1-tap deep links to Daraz Mart and Pandamart.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.5,
-                  color: isDark ? AppTheme.textDarkSecondary : AppTheme.textLightSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+                );
+              },
+            ),
     );
   }
 }
@@ -2028,10 +2251,12 @@ class _KitchenDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     final shell = MainShell.of(context);
     final drawerBg = isDark ? AppTheme.bgDark : Colors.white;
-    final itemColor =
-        isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary;
-    final subColor =
-        isDark ? AppTheme.textDarkSecondary : AppTheme.textLightSecondary;
+    final itemColor = isDark
+        ? AppTheme.textDarkPrimary
+        : AppTheme.textLightPrimary;
+    final subColor = isDark
+        ? AppTheme.textDarkSecondary
+        : AppTheme.textLightSecondary;
     final borderColor = isDark ? AppTheme.borderDark : AppTheme.borderLight;
 
     return Drawer(
@@ -2070,8 +2295,9 @@ class _KitchenDrawer extends StatelessWidget {
                         children: [
                           CircleAvatar(
                             radius: 25,
-                            backgroundColor:
-                                AppTheme.primaryFlame.withValues(alpha: 0.15),
+                            backgroundColor: AppTheme.primaryFlame.withValues(
+                              alpha: 0.15,
+                            ),
                             backgroundImage: const NetworkImage(
                               'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=160&q=80',
                             ),
@@ -2085,8 +2311,11 @@ class _KitchenDrawer extends StatelessWidget {
                                 color: AppTheme.primaryFlame,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.restaurant,
-                                  color: Colors.white, size: 9),
+                              child: const Icon(
+                                Icons.restaurant,
+                                color: Colors.white,
+                                size: 9,
+                              ),
                             ),
                           ),
                         ],
@@ -2097,7 +2326,7 @@ class _KitchenDrawer extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Chef ${user?.name ?? "Alex"}',
+                              'Chef ${ChefNameFormatter.fromUser(user)}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -2124,7 +2353,9 @@ class _KitchenDrawer extends StatelessWidget {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 9, vertical: 4),
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppTheme.freshHerb.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
@@ -2132,8 +2363,11 @@ class _KitchenDrawer extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.inventory_2_outlined,
-                                size: 12, color: AppTheme.freshHerb),
+                            const Icon(
+                              Icons.inventory_2_outlined,
+                              size: 12,
+                              color: AppTheme.freshHerb,
+                            ),
                             const SizedBox(width: 5),
                             Text(
                               '${pantry.totalCount} items stocked',
@@ -2150,7 +2384,9 @@ class _KitchenDrawer extends StatelessWidget {
                       if (pantry.lowStockCount > 0)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: AppTheme.warmAmber.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
@@ -2173,13 +2409,15 @@ class _KitchenDrawer extends StatelessWidget {
             // Navigation List Items
             Expanded(
               child: ListView(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 children: [
                   _DrawerNavTile(
                     icon: Icons.cottage_rounded,
-                    title: 'Kitchen Dashboard',
-                    subtitle: 'Overview & recommended meals',
+                    title: 'Home',
+                    subtitle: 'Overview',
                     isDark: isDark,
                     onTap: () {
                       Navigator.pop(context);
@@ -2188,10 +2426,8 @@ class _KitchenDrawer extends StatelessWidget {
                   ),
                   _DrawerNavTile(
                     icon: Icons.kitchen_rounded,
-                    title: 'My Pantry Inventory',
-                    subtitle: 'Storage zones & stock counters',
-                    badge: '${pantry.totalCount}',
-                    badgeColor: AppTheme.freshHerb,
+                    title: 'Pantry',
+                    subtitle: '${pantry.totalCount} items',
                     isDark: isDark,
                     onTap: () {
                       Navigator.pop(context);
@@ -2200,10 +2436,8 @@ class _KitchenDrawer extends StatelessWidget {
                   ),
                   _DrawerNavTile(
                     icon: Icons.restaurant_menu_rounded,
-                    title: 'Smart Recipe Studio',
-                    subtitle: 'Match ingredients to gourmet meals',
-                    badge: 'AI Chef',
-                    badgeColor: AppTheme.primaryFlame,
+                    title: 'Recipes',
+                    subtitle: 'Find something to cook',
                     isDark: isDark,
                     onTap: () {
                       Navigator.pop(context);
@@ -2212,10 +2446,8 @@ class _KitchenDrawer extends StatelessWidget {
                   ),
                   _DrawerNavTile(
                     icon: Icons.shopping_bag_rounded,
-                    title: '1-Tap Restock & Orders',
-                    subtitle: 'Daraz Mart & Pandamart delivery',
-                    badge: 'Grocery',
-                    badgeColor: AppTheme.warmSaffron,
+                    title: 'Shopping list',
+                    subtitle: 'Items to pick up',
                     isDark: isDark,
                     onTap: () {
                       Navigator.pop(context);
@@ -2224,10 +2456,8 @@ class _KitchenDrawer extends StatelessWidget {
                   ),
                   _DrawerNavTile(
                     icon: Icons.receipt_long_rounded,
-                    title: 'Optical Receipt Scanner',
-                    subtitle: 'OCR Vision paper receipt scan',
-                    badge: 'Vision AI',
-                    badgeColor: AppTheme.primaryFlame,
+                    title: 'Scan receipt',
+                    subtitle: 'Add items from a receipt',
                     isDark: isDark,
                     onTap: () {
                       Navigator.pop(context);
@@ -2239,6 +2469,16 @@ class _KitchenDrawer extends StatelessWidget {
                       );
                     },
                   ),
+                  _DrawerNavTile(
+                    icon: Icons.person_rounded,
+                    title: 'Profile',
+                    subtitle: 'Account and preferences',
+                    isDark: isDark,
+                    onTap: () {
+                      Navigator.pop(context);
+                      shell?.switchToTab(4);
+                    },
+                  ),
 
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 8),
@@ -2248,8 +2488,10 @@ class _KitchenDrawer extends StatelessWidget {
                   // Mode Switcher inside Drawer
                   Container(
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: isDark ? AppTheme.surfaceDark2 : AppTheme.bgLight,
                       borderRadius: BorderRadius.circular(14),
@@ -2272,7 +2514,7 @@ class _KitchenDrawer extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'App Theme Mode',
+                                'Appearance',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -2281,10 +2523,9 @@ class _KitchenDrawer extends StatelessWidget {
                               ),
                               Text(
                                 themeProvider.isDarkMode
-                                    ? 'Warm Obsidian Dark'
-                                    : 'Fresh Crisp Light',
-                                style:
-                                    TextStyle(fontSize: 11, color: subColor),
+                                    ? 'Dark mode'
+                                    : 'Light mode',
+                                style: TextStyle(fontSize: 11, color: subColor),
                               ),
                             ],
                           ),
@@ -2292,8 +2533,9 @@ class _KitchenDrawer extends StatelessWidget {
                         Switch(
                           value: themeProvider.isDarkMode,
                           activeThumbColor: AppTheme.warmSaffron,
-                          activeTrackColor:
-                              AppTheme.warmSaffron.withValues(alpha: 0.3),
+                          activeTrackColor: AppTheme.warmSaffron.withValues(
+                            alpha: 0.3,
+                          ),
                           onChanged: (_) => themeProvider.toggleTheme(),
                         ),
                       ],
@@ -2326,11 +2568,14 @@ class _KitchenDrawer extends StatelessWidget {
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.logout_rounded,
-                              size: 18, color: AppTheme.errorRed),
+                          Icon(
+                            Icons.logout_rounded,
+                            size: 18,
+                            color: AppTheme.errorRed,
+                          ),
                           SizedBox(width: 8),
                           Text(
-                            'Sign Out of Kitchen',
+                            'Sign out',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
@@ -2364,8 +2609,6 @@ class _DrawerNavTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-  final String? badge;
-  final Color? badgeColor;
   final bool isDark;
   final VoidCallback onTap;
 
@@ -2373,67 +2616,35 @@ class _DrawerNavTile extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
-    this.badge,
-    this.badgeColor,
     required this.isDark,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      child: ListTile(
-        dense: true,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        leading: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color:
-                (badgeColor ?? AppTheme.primaryFlame).withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child:
-              Icon(icon, size: 18, color: badgeColor ?? AppTheme.primaryFlame),
+    return ListTile(
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      leading: Icon(icon, size: 22),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary,
         ),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(
-            fontSize: 11,
-            color: isDark
-                ? AppTheme.textDarkSecondary
-                : AppTheme.textLightSecondary,
-          ),
-        ),
-        trailing: badge != null
-            ? Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: (badgeColor ?? AppTheme.primaryFlame)
-                      .withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  badge!,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: badgeColor ?? AppTheme.primaryFlame,
-                  ),
-                ),
-              )
-            : const Icon(Icons.chevron_right_rounded, size: 18),
-        onTap: onTap,
       ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          fontSize: 11,
+          color: isDark
+              ? AppTheme.textDarkSecondary
+              : AppTheme.textLightSecondary,
+        ),
+      ),
+      onTap: onTap,
     );
   }
 }

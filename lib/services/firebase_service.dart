@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
+import '../firebase_options.dart';
 
 class FirebaseService {
   static bool _isInitialized = false;
@@ -7,7 +8,9 @@ class FirebaseService {
 
   static Future<void> initialize() async {
     try {
-      await Firebase.initializeApp();
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
       _isInitialized = true;
       if (kDebugMode) {
         print('Firebase successfully initialized.');
@@ -16,7 +19,7 @@ class FirebaseService {
       _isInitialized = false;
       if (kDebugMode) {
         print('Firebase initialization notice: $e');
-        print('Running with resilient local authentication mode until google-services.json is configured.');
+        print('Running with resilient local authentication mode.');
       }
     }
   }

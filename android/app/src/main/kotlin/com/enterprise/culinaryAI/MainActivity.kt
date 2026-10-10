@@ -1,4 +1,4 @@
-package com.example.culinary_ai
+package com.enterprise.culinaryAI
 
 import io.flutter.embedding.android.FlutterActivity
 

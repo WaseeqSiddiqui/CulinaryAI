@@ -1,140 +1,129 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+
 import '../models/pantry_item_model.dart';
+import '../services/pantry_service.dart';
 
 class PantryProvider extends ChangeNotifier {
-  static const _uuid = Uuid();
+  PantryProvider({PantryService? service})
+    : _service = service ?? PantryService();
 
-  // Storage zones
+  static const _uuid = Uuid();
   static const List<String> zones = [
     'Fridge',
     'Freezer',
     'Pantry Shelf',
     'Spice Rack',
   ];
-
-  // Units
   static const List<String> units = [
-    'pcs', 'g', 'kg', 'ml', 'L', 'cups', 'tbsp', 'tsp', 'dozen',
+    'pcs',
+    'g',
+    'kg',
+    'ml',
+    'L',
+    'cups',
+    'tbsp',
+    'tsp',
+    'dozen',
   ];
 
-  final List<PantryItemModel> _items = [
-    PantryItemModel(
-      id: '1', householdId: 'hh_demo', name: 'Whole Milk',
-      quantity: 2.0, unit: 'L', location: 'Fridge',
-      lowStockThreshold: 0.5, updatedAt: DateTime.now(),
-    ),
-    PantryItemModel(
-      id: '2', householdId: 'hh_demo', name: 'Eggs',
-      quantity: 6, unit: 'pcs', location: 'Fridge',
-      lowStockThreshold: 4, updatedAt: DateTime.now(),
-    ),
-    PantryItemModel(
-      id: '3', householdId: 'hh_demo', name: 'Greek Yogurt',
-      quantity: 1.0, unit: 'kg', location: 'Fridge',
-      lowStockThreshold: 0.2, updatedAt: DateTime.now(),
-    ),
-    PantryItemModel(
-      id: '4', householdId: 'hh_demo', name: 'Cheddar Cheese',
-      quantity: 250, unit: 'g', location: 'Fridge',
-      lowStockThreshold: 100, updatedAt: DateTime.now(),
-    ),
-    PantryItemModel(
-      id: '5', householdId: 'hh_demo', name: 'Chicken Breast',
-      quantity: 500, unit: 'g', location: 'Freezer',
-      lowStockThreshold: 200, updatedAt: DateTime.now(),
-    ),
-    PantryItemModel(
-      id: '6', householdId: 'hh_demo', name: 'Frozen Peas',
-      quantity: 300, unit: 'g', location: 'Freezer',
-      lowStockThreshold: 100, updatedAt: DateTime.now(),
-    ),
-    PantryItemModel(
-      id: '7', householdId: 'hh_demo', name: 'Ice Cream',
-      quantity: 0.5, unit: 'L', location: 'Freezer',
-      lowStockThreshold: 0.3, updatedAt: DateTime.now(),
-    ),
-    PantryItemModel(
-      id: '8', householdId: 'hh_demo', name: 'Basmati Rice',
-      quantity: 2.5, unit: 'kg', location: 'Pantry Shelf',
-      lowStockThreshold: 0.5, updatedAt: DateTime.now(),
-    ),
-    PantryItemModel(
-      id: '9', householdId: 'hh_demo', name: 'Cooking Oil',
-      quantity: 0.3, unit: 'L', location: 'Pantry Shelf',
-      lowStockThreshold: 0.5, updatedAt: DateTime.now(),
-    ),
-    PantryItemModel(
-      id: '10', householdId: 'hh_demo', name: 'Garlic Cloves',
-      quantity: 8, unit: 'pcs', location: 'Pantry Shelf',
-      lowStockThreshold: 4, updatedAt: DateTime.now(),
-    ),
-    PantryItemModel(
-      id: '11', householdId: 'hh_demo', name: 'Lentils (Masoor Dal)',
-      quantity: 1.0, unit: 'kg', location: 'Pantry Shelf',
-      lowStockThreshold: 0.2, updatedAt: DateTime.now(),
-    ),
-    PantryItemModel(
-      id: '12', householdId: 'hh_demo', name: 'Cumin Seeds',
-      quantity: 50, unit: 'g', location: 'Spice Rack',
-      lowStockThreshold: 15, updatedAt: DateTime.now(),
-    ),
-    PantryItemModel(
-      id: '13', householdId: 'hh_demo', name: 'Turmeric Powder',
-      quantity: 15, unit: 'g', location: 'Spice Rack',
-      lowStockThreshold: 20, updatedAt: DateTime.now(),
-    ),
-    PantryItemModel(
-      id: '14', householdId: 'hh_demo', name: 'Red Chili Powder',
-      quantity: 60, unit: 'g', location: 'Spice Rack',
-      lowStockThreshold: 20, updatedAt: DateTime.now(),
-    ),
-    PantryItemModel(
-      id: '15', householdId: 'hh_demo', name: 'Garam Masala',
-      quantity: 8, unit: 'g', location: 'Spice Rack',
-      lowStockThreshold: 15, updatedAt: DateTime.now(),
-    ),
-  ];
-
+  final PantryService _service;
+  final List<PantryItemModel> _items = [];
+  StreamSubscription<List<PantryItemModel>>? _subscription;
+  String? _householdId;
   String _searchQuery = '';
-  String? _selectedZone; // null = all zones
-
-  // ── Getters ────────────────────────────────────────────────────────────────
+  String? _selectedZone;
+  bool _isLoading = false;
+  bool _receivedRemoteSnapshot = false;
+  String? _errorMessage;
 
   String get searchQuery => _searchQuery;
   String? get selectedZone => _selectedZone;
-
+  String? get householdId => _householdId;
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
   List<PantryItemModel> get allItems => List.unmodifiable(_items);
 
   List<PantryItemModel> get filteredItems {
     return _items.where((item) {
-      final matchesZone = _selectedZone == null || item.location == _selectedZone;
-      final matchesSearch = _searchQuery.isEmpty ||
+      final matchesZone =
+          _selectedZone == null || item.location == _selectedZone;
+      final matchesSearch =
+          _searchQuery.isEmpty ||
           item.name.toLowerCase().contains(_searchQuery.toLowerCase());
       return matchesZone && matchesSearch;
-    }).toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+    }).toList()..sort((a, b) => a.name.compareTo(b.name));
   }
 
-  /// Items grouped by zone, respecting active filters.
   Map<String, List<PantryItemModel>> get itemsByZone {
-    final filtered = filteredItems;
-    final Map<String, List<PantryItemModel>> grouped = {};
+    final grouped = <String, List<PantryItemModel>>{};
     for (final zone in zones) {
-      final zoneItems = filtered.where((i) => i.location == zone).toList()
-        ..sort((a, b) => a.name.compareTo(b.name));
-      if (zoneItems.isNotEmpty) {
-        grouped[zone] = zoneItems;
-      }
+      final zoneItems = filteredItems
+          .where((item) => item.location == zone)
+          .toList();
+      if (zoneItems.isNotEmpty) grouped[zone] = zoneItems;
     }
     return grouped;
   }
 
   int get totalCount => _items.length;
+  int get lowStockCount => _items.where((item) => item.isLowStock).length;
 
-  int get lowStockCount => _items.where((i) => i.isLowStock).length;
+  void bindHousehold(String? householdId) {
+    if (_householdId == householdId) return;
+    _householdId = householdId;
+    _items.clear();
+    _subscription?.cancel();
+    _subscription = null;
+    _receivedRemoteSnapshot = false;
+    if (householdId == null) {
+      _isLoading = false;
+      return;
+    }
+    Future.microtask(() => _startSync(householdId));
+  }
 
-  // ── Search & Filter ────────────────────────────────────────────────────────
+  Future<void> _startSync(String householdId) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    final localItems = await _service.loadLocal(householdId);
+    if (_householdId != householdId) return;
+    _items
+      ..clear()
+      ..addAll(localItems);
+    _isLoading = false;
+    notifyListeners();
+
+    _subscription = _service
+        .watch(householdId)
+        .listen(
+          (remoteItems) async {
+            if (_householdId != householdId) return;
+            if (!_receivedRemoteSnapshot &&
+                remoteItems.isEmpty &&
+                _items.isNotEmpty) {
+              _receivedRemoteSnapshot = true;
+              for (final item in _items) {
+                unawaited(_service.upsert(item));
+              }
+              return;
+            }
+            _receivedRemoteSnapshot = true;
+            _items
+              ..clear()
+              ..addAll(remoteItems);
+            await _service.saveLocal(householdId, _items);
+            notifyListeners();
+          },
+          onError: (Object error) {
+            _errorMessage = 'Using the offline pantry copy.';
+            notifyListeners();
+          },
+        );
+  }
 
   void setSearch(String query) {
     _searchQuery = query;
@@ -146,8 +135,6 @@ class PantryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── CRUD ───────────────────────────────────────────────────────────────────
-
   void addItem({
     required String householdId,
     required String name,
@@ -158,9 +145,10 @@ class PantryProvider extends ChangeNotifier {
     String? customImageUrl,
     String addedVia = 'manual',
   }) {
+    final scopeId = _householdId ?? householdId;
     final item = PantryItemModel(
       id: _uuid.v4(),
-      householdId: householdId,
+      householdId: scopeId,
       name: name.trim(),
       quantity: quantity,
       unit: unit,
@@ -171,27 +159,96 @@ class PantryProvider extends ChangeNotifier {
       customImageUrl: customImageUrl,
     );
     _items.add(item);
+    _persistAndSync(item);
     notifyListeners();
   }
 
   void updateItem(PantryItemModel updated) {
-    final idx = _items.indexWhere((i) => i.id == updated.id);
-    if (idx == -1) return;
-    _items[idx] = updated.copyWith(updatedAt: DateTime.now());
+    final index = _items.indexWhere((item) => item.id == updated.id);
+    if (index == -1) return;
+    final item = updated.copyWith(
+      householdId: _householdId ?? updated.householdId,
+      updatedAt: DateTime.now(),
+    );
+    _items[index] = item;
+    _persistAndSync(item);
     notifyListeners();
   }
 
   void deleteItem(String id) {
-    _items.removeWhere((i) => i.id == id);
+    final householdId = _householdId;
+    if (householdId == null) return;
+    _items.removeWhere((item) => item.id == id);
+    unawaited(_service.saveLocal(householdId, _items));
+    unawaited(_service.delete(householdId, id));
     notifyListeners();
   }
 
   void adjustQuantity(String id, double delta) {
-    final idx = _items.indexWhere((i) => i.id == id);
-    if (idx == -1) return;
-    final current = _items[idx];
-    final newQty = (current.quantity + delta).clamp(0.0, double.infinity).toDouble();
-    _items[idx] = current.copyWith(quantity: newQty, updatedAt: DateTime.now());
+    final index = _items.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    final current = _items[index];
+    final quantity = (current.quantity + delta)
+        .clamp(0.0, double.infinity)
+        .toDouble();
+    final updated = current.copyWith(
+      quantity: quantity,
+      updatedAt: DateTime.now(),
+    );
+    _items[index] = updated;
+    _persistAndSync(updated);
     notifyListeners();
+  }
+
+  int deductIngredients(List<String> ingredientNames) {
+    final changed = <PantryItemModel>[];
+    final usedIds = <String>{};
+    for (final ingredientName in ingredientNames) {
+      final required = ingredientName.toLowerCase();
+      final index = _items.indexWhere((item) {
+        if (usedIds.contains(item.id) || item.quantity <= 0) return false;
+        final available = item.name.toLowerCase();
+        return available.contains(required) || required.contains(available);
+      });
+      if (index == -1) continue;
+      final current = _items[index];
+      final amount = _recipeUseAmount(current.unit);
+      final updated = current.copyWith(
+        quantity: (current.quantity - amount)
+            .clamp(0.0, double.infinity)
+            .toDouble(),
+        updatedAt: DateTime.now(),
+      );
+      _items[index] = updated;
+      usedIds.add(updated.id);
+      changed.add(updated);
+    }
+    for (final item in changed) {
+      _persistAndSync(item);
+    }
+    if (changed.isNotEmpty) notifyListeners();
+    return changed.length;
+  }
+
+  double _recipeUseAmount(String unit) {
+    return switch (unit.toLowerCase()) {
+      'g' || 'ml' => 100,
+      'kg' || 'l' || 'litres' => 0.2,
+      'dozen' => 0.25,
+      _ => 1,
+    };
+  }
+
+  void _persistAndSync(PantryItemModel item) {
+    final householdId = _householdId;
+    if (householdId == null) return;
+    unawaited(_service.saveLocal(householdId, _items));
+    unawaited(_service.upsert(item));
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 }

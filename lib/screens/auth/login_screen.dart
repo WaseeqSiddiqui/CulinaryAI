@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/auth_validators.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import 'register_screen.dart';
@@ -42,7 +44,9 @@ class _LoginScreenState extends State<LoginScreen> {
           content: Text(authProvider.errorMessage!),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     }
@@ -60,7 +64,9 @@ class _LoginScreenState extends State<LoginScreen> {
           content: Text(authProvider.errorMessage!),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     }
@@ -87,6 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
             child: Form(
               key: _formKey,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -100,11 +107,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: isDark ? AppTheme.surfaceDark2 : Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                            color: isDark
+                                ? AppTheme.borderDark
+                                : AppTheme.borderLight,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+                              color: Colors.black.withValues(
+                                alpha: isDark ? 0.3 : 0.05,
+                              ),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -116,14 +127,21 @@ class _LoginScreenState extends State<LoginScreen> {
                             borderRadius: BorderRadius.circular(20),
                             onTap: () => themeProvider.toggleTheme(),
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 7,
+                              ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                                    isDark
+                                        ? Icons.light_mode_rounded
+                                        : Icons.dark_mode_rounded,
                                     size: 16,
-                                    color: isDark ? AppTheme.warmSaffron : AppTheme.primaryFlame,
+                                    color: isDark
+                                        ? AppTheme.warmSaffron
+                                        : AppTheme.primaryFlame,
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
@@ -131,7 +149,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
-                                      color: isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary,
+                                      color: isDark
+                                          ? AppTheme.textDarkPrimary
+                                          : AppTheme.textLightPrimary,
                                     ),
                                   ),
                                 ],
@@ -151,17 +171,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       height: 84,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [
-                            AppTheme.primaryFlame,
-                            AppTheme.warmSaffron,
-                          ],
+                          colors: [AppTheme.primaryFlame, AppTheme.warmSaffron],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: AppTheme.primaryFlame.withValues(alpha: 0.35),
+                            color: AppTheme.primaryFlame.withValues(
+                              alpha: 0.35,
+                            ),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
@@ -183,10 +202,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     'CulinaryAI',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
-                        ),
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -194,7 +213,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
-                      color: isDark ? AppTheme.textDarkSecondary : AppTheme.textLightSecondary,
+                      color: isDark
+                          ? AppTheme.textDarkSecondary
+                          : AppTheme.textLightSecondary,
                     ),
                   ),
                   const SizedBox(height: 28),
@@ -212,7 +233,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+                          color: Colors.black.withValues(
+                            alpha: isDark ? 0.3 : 0.05,
+                          ),
                           blurRadius: 18,
                           offset: const Offset(0, 4),
                         ),
@@ -223,9 +246,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         Text(
                           'Sign In',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 18),
 
@@ -233,20 +255,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextFormField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [
+                            AutofillHints.username,
+                            AutofillHints.email,
+                          ],
+                          autocorrect: false,
                           decoration: const InputDecoration(
                             labelText: 'Email Address',
                             prefixIcon: Icon(Icons.email_outlined),
                             hintText: 'name@kitchen.com',
                           ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Please enter your email';
-                            }
-                            if (!value.contains('@') || !value.contains('.')) {
-                              return 'Please enter a valid email';
-                            }
-                            return null;
-                          },
+                          validator: AuthValidators.email,
                         ),
                         const SizedBox(height: 16),
 
@@ -254,6 +274,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextFormField(
                           controller: _passwordController,
                           obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [AutofillHints.password],
+                          enableSuggestions: false,
+                          autocorrect: false,
+                          onFieldSubmitted: (_) {
+                            if (!authProvider.isLoading) _handleLogin();
+                          },
                           decoration: InputDecoration(
                             labelText: 'Password',
                             prefixIcon: const Icon(Icons.lock_outline),
@@ -270,21 +297,15 @@ class _LoginScreenState extends State<LoginScreen> {
                               },
                             ),
                           ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your password';
-                            }
-                            if (value.length < 6) {
-                              return 'Password must be at least 6 characters';
-                            }
-                            return null;
-                          },
+                          validator: AuthValidators.loginPassword,
                         ),
                         const SizedBox(height: 22),
 
                         // Sign In Button
                         ElevatedButton(
-                          onPressed: authProvider.isLoading ? null : _handleLogin,
+                          onPressed: authProvider.isLoading
+                              ? null
+                              : _handleLogin,
                           child: authProvider.isLoading
                               ? const SizedBox(
                                   height: 20,
@@ -304,11 +325,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
                             Expanded(
                               child: Divider(
-                                color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                                color: isDark
+                                    ? AppTheme.borderDark
+                                    : AppTheme.borderLight,
                               ),
                             ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
                               child: Text(
                                 'OR',
                                 style: TextStyle(
@@ -323,7 +348,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             Expanded(
                               child: Divider(
-                                color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                                color: isDark
+                                    ? AppTheme.borderDark
+                                    : AppTheme.borderLight,
                               ),
                             ),
                           ],
@@ -333,14 +360,20 @@ class _LoginScreenState extends State<LoginScreen> {
 
                         // Google Sign In Button
                         OutlinedButton(
-                          onPressed: authProvider.isLoading ? null : _handleGoogleLogin,
+                          onPressed: authProvider.isLoading
+                              ? null
+                              : _handleGoogleLogin,
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             side: BorderSide(
-                              color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                              color: isDark
+                                  ? AppTheme.borderDark
+                                  : AppTheme.borderLight,
                               width: 1.2,
                             ),
-                            backgroundColor: isDark ? AppTheme.surfaceDark2 : Colors.white,
+                            backgroundColor: isDark
+                                ? AppTheme.surfaceDark2
+                                : Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
@@ -352,7 +385,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/480px-Google_%22G%22_logo.svg.png',
                                 width: 20,
                                 height: 20,
-                                errorBuilder: (_, __, ___) => const Icon(
+                                errorBuilder: (_, _, _) => const Icon(
                                   Icons.g_mobiledata_rounded,
                                   size: 24,
                                   color: Color(0xFF4285F4),
@@ -380,7 +413,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Demo Credentials Shortcut
                   TextButton.icon(
                     onPressed: _fillDemoCredentials,
-                    icon: const Icon(Icons.flash_on_rounded, size: 18, color: AppTheme.warmSaffron),
+                    icon: const Icon(
+                      Icons.flash_on_rounded,
+                      size: 18,
+                      color: AppTheme.warmSaffron,
+                    ),
                     label: const Text(
                       'Use Demo Credentials (Quick Test)',
                       style: TextStyle(
@@ -399,7 +436,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(
                         "Don't have a kitchen account? ",
                         style: TextStyle(
-                          color: isDark ? AppTheme.textDarkSecondary : AppTheme.textLightSecondary,
+                          color: isDark
+                              ? AppTheme.textDarkSecondary
+                              : AppTheme.textLightSecondary,
                         ),
                       ),
                       GestureDetector(

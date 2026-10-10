@@ -1,0 +1,28 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "culinaryai-518b3",
+          "appId": "1:62395915069:android:f8c5b3d5275d37b4a90354",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "culinaryai-518b3",
+          "configurations": {
+            "android": "1:62395915069:android:f8c5b3d5275d37b4a90354",
+            "ios": "1:62395915069:ios:2ebb1102197294dca90354",
+            "macos": "1:62395915069:ios:2ebb1102197294dca90354",
+            "web": "1:62395915069:web:e181493d41ae3001a90354",
+            "windows": "1:62395915069:web:1fbe22f9e7bd547ea90354"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,6 +1,13 @@
-# culinary_ai
+# CulinaryAI
 
-A new Flutter project.
+A Flutter cooking assistant with Firebase-backed pantry features and a FastAPI
+meal-planning service.
+
+## Project services
+
+- Flutter app: run `flutter pub get`, then `flutter run`.
+- Person C backend: see [backend/README.md](backend/README.md) for setup, API
+  examples, and tests.
 
 ## Getting Started
 

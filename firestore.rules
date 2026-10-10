@@ -1,0 +1,45 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function householdMember(householdId) {
+      return signedIn() && request.auth.uid in
+        get(/databases/$(database)/documents/households/$(householdId)).data.member_ids;
+    }
+
+    match /users/{userId} {
+      allow read, create, update: if signedIn() && request.auth.uid == userId;
+    }
+
+    match /households/{householdId} {
+      allow create: if signedIn()
+        && request.resource.data.owner_id == request.auth.uid
+        && request.auth.uid in request.resource.data.member_ids;
+      allow read: if householdMember(householdId);
+      allow update: if signedIn()
+        && (request.auth.uid in resource.data.member_ids
+          || (
+            request.auth.uid in request.resource.data.member_ids
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['member_ids'])
+            && exists(/databases/$(database)/documents/household_invites/$(resource.data.invite_code))
+            && get(/databases/$(database)/documents/household_invites/$(resource.data.invite_code)).data.household_id == householdId
+          ));
+
+      match /pantry/{itemId} {
+        allow read, write: if householdMember(householdId);
+      }
+    }
+
+    match /household_invites/{inviteCode} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.owner_id == request.auth.uid;
+    }
+  }
+}

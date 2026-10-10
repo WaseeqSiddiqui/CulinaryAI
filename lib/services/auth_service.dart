@@ -1,10 +1,17 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
 import '../models/user_model.dart';
 import 'firebase_service.dart';
 
 class AuthService {
-  final FirebaseAuth? _firebaseAuth =
-      FirebaseService.isInitialized ? FirebaseAuth.instance : null;
+  static final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  static Future<void>? _googleSignInInitialization;
+
+  final FirebaseAuth? _firebaseAuth = FirebaseService.isInitialized
+      ? FirebaseAuth.instance
+      : null;
 
   // Local fallback cache for demo testing when Firebase native config is pending
   UserModel? _mockCurrentUser;
@@ -18,6 +25,7 @@ class AuthService {
         id: user.uid,
         name: user.displayName ?? user.email?.split('@').first ?? 'Chef',
         email: user.email ?? '',
+        photoUrl: user.photoURL,
       );
     }
     return _mockCurrentUser;
@@ -31,6 +39,7 @@ class AuthService {
           id: user.uid,
           name: user.displayName ?? user.email?.split('@').first ?? 'Chef',
           email: user.email ?? '',
+          photoUrl: user.photoURL,
         );
       });
     } else {
@@ -55,6 +64,7 @@ class AuthService {
           id: user.uid,
           name: user.displayName ?? user.email?.split('@').first ?? 'Chef',
           email: user.email ?? cleanEmail,
+          photoUrl: user.photoURL,
         );
       } on FirebaseAuthException catch (e) {
         throw _mapFirebaseAuthError(e);
@@ -98,11 +108,7 @@ class AuthService {
         );
         final user = credential.user!;
         await user.updateDisplayName(cleanName);
-        return UserModel(
-          id: user.uid,
-          name: cleanName,
-          email: cleanEmail,
-        );
+        return UserModel(id: user.uid, name: cleanName, email: cleanEmail);
       } on FirebaseAuthException catch (e) {
         throw _mapFirebaseAuthError(e);
       } catch (e) {
@@ -126,37 +132,55 @@ class AuthService {
   }
 
   Future<UserModel> signInWithGoogle() async {
-    if (_firebaseAuth != null) {
-      try {
+    if (_firebaseAuth == null) {
+      throw 'Google sign-in is unavailable because Firebase could not be initialized.';
+    }
+
+    try {
+      UserCredential credential;
+
+      if (kIsWeb) {
         final googleProvider = GoogleAuthProvider();
         googleProvider.addScope('email');
         googleProvider.addScope('profile');
-        final credential = await _firebaseAuth.signInWithPopup(googleProvider);
-        final user = credential.user!;
-        return UserModel(
-          id: user.uid,
-          name: user.displayName ?? 'Google Chef',
-          email: user.email ?? 'google.chef@culinary.ai',
+        credential = await _firebaseAuth.signInWithPopup(googleProvider);
+      } else {
+        _googleSignInInitialization ??= _googleSignIn.initialize();
+        await _googleSignInInitialization;
+
+        if (!_googleSignIn.supportsAuthenticate()) {
+          throw 'Google sign-in is not supported on this platform.';
+        }
+
+        final googleUser = await _googleSignIn.authenticate();
+        final idToken = googleUser.authentication.idToken;
+        if (idToken == null) {
+          throw 'Google did not return a valid sign-in token. Please try again.';
+        }
+
+        final googleCredential = GoogleAuthProvider.credential(
+          idToken: idToken,
         );
-      } catch (e) {
-        // Resilient fallback for web environments without OAuth credentials configured
-        await Future.delayed(const Duration(milliseconds: 700));
-        _mockCurrentUser = UserModel(
-          id: 'usr_google_${DateTime.now().millisecondsSinceEpoch}',
-          name: 'Chef Alex Harrison',
-          email: 'alex.culinary@gmail.com',
-        );
-        return _mockCurrentUser!;
+        credential = await _firebaseAuth.signInWithCredential(googleCredential);
       }
-    } else {
-      // Local demo mode
-      await Future.delayed(const Duration(milliseconds: 700));
-      _mockCurrentUser = UserModel(
-        id: 'usr_google_demo',
-        name: 'Chef Alex Harrison',
-        email: 'alex.culinary@gmail.com',
+
+      final user = credential.user;
+      if (user == null) {
+        throw 'Google sign-in completed without returning a user.';
+      }
+      return UserModel(
+        id: user.uid,
+        name: user.displayName ?? user.email?.split('@').first ?? 'Chef',
+        email: user.email ?? '',
+        photoUrl: user.photoURL,
       );
-      return _mockCurrentUser!;
+    } on GoogleSignInException catch (e) {
+      throw _mapGoogleSignInError(e);
+    } on FirebaseAuthException catch (e) {
+      throw _mapFirebaseAuthError(e);
+    } catch (e) {
+      if (e is String) rethrow;
+      throw 'Google sign-in failed. Please try again.';
     }
   }
 
@@ -164,7 +188,44 @@ class AuthService {
     if (_firebaseAuth != null) {
       await _firebaseAuth.signOut();
     }
+    if (!kIsWeb && _googleSignInInitialization != null) {
+      await _googleSignInInitialization;
+      await _googleSignIn.signOut();
+    }
     _mockCurrentUser = null;
+  }
+
+  Future<void> updateDisplayName(String name) async {
+    final cleanName = name.trim();
+    final currentUser = _firebaseAuth?.currentUser;
+    if (currentUser != null) {
+      try {
+        await currentUser.updateDisplayName(cleanName);
+      } on FirebaseAuthException catch (error) {
+        if (kDebugMode) {
+          debugPrint('Firebase display name sync skipped: ${error.code}');
+        }
+      }
+    }
+    if (_mockCurrentUser != null) {
+      _mockCurrentUser = _mockCurrentUser!.copyWith(name: cleanName);
+    }
+  }
+
+  String _mapGoogleSignInError(GoogleSignInException e) {
+    switch (e.code) {
+      case GoogleSignInExceptionCode.canceled:
+        return 'Google sign-in was cancelled.';
+      case GoogleSignInExceptionCode.interrupted:
+        return 'Google sign-in was interrupted. Please try again.';
+      case GoogleSignInExceptionCode.clientConfigurationError:
+      case GoogleSignInExceptionCode.providerConfigurationError:
+        return 'Google sign-in is not configured correctly for this app.';
+      case GoogleSignInExceptionCode.uiUnavailable:
+        return 'Google sign-in is currently unavailable on this device.';
+      default:
+        return e.description ?? 'Google sign-in failed. Please try again.';
+    }
   }
 
   String _mapFirebaseAuthError(FirebaseAuthException e) {

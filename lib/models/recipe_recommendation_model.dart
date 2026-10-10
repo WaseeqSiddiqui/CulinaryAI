@@ -1,4 +1,5 @@
 import 'pantry_item_model.dart';
+import 'recipe_ingredient.dart';
 
 /// Model representing a culinary recipe recommendation
 class RecipeRecommendationModel {
@@ -10,7 +11,8 @@ class RecipeRecommendationModel {
   final int calories;
   final String difficulty;
   final String mealType;
-  final List<String> requiredIngredients;
+  final int servings;
+  final List<RecipeIngredient> ingredientDetails;
   final List<String> instructions;
 
   const RecipeRecommendationModel({
@@ -22,12 +24,15 @@ class RecipeRecommendationModel {
     required this.calories,
     required this.difficulty,
     required this.mealType,
-    required this.requiredIngredients,
+    required this.servings,
+    required this.ingredientDetails,
     required this.instructions,
   });
 
   String get description => subtitle;
   String get cuisine => mealType;
+  List<String> get requiredIngredients =>
+      ingredientDetails.map((ingredient) => ingredient.name).toList();
   List<String> get ingredients => requiredIngredients;
 
   /// Computes how many of the recipe's required ingredients exist in the pantry

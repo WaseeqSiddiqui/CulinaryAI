@@ -1,8 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:culinary_ai/main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  testWidgets('CulinaryAI app boots to login screen test', (WidgetTester tester) async {
+  testWidgets('CulinaryAI app boots to login screen test', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const CulinaryAiApp());
     await tester.pumpAndSettle();
 

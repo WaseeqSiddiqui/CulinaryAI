@@ -1,0 +1,90 @@
+{
+  "project_info": {
+    "project_number": "62395915069",
+    "project_id": "culinaryai-518b3",
+    "storage_bucket": "culinaryai-518b3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:62395915069:android:f8c5b3d5275d37b4a90354",
+        "android_client_info": {
+          "package_name": "com.enterprise.culinaryAI"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "62395915069-45ej2tas63rj8dven02ehlntuup6h517.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.enterprise.culinaryAI",
+            "certificate_hash": "3e643044544e767c4e3f369103dff19571588a12"
+          }
+        },
+        {
+          "client_id": "62395915069-ituiakt5sth59nd4t4htse49cbf2avpb.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBB1ZjoVcooecSuWfnITu1ctLu_1mqw3zc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "62395915069-ituiakt5sth59nd4t4htse49cbf2avpb.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "62395915069-b30mbjc0uindrlnhdlscn0v02uskvajg.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.culinaryAi"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:62395915069:android:572008d5194de536a90354",
+        "android_client_info": {
+          "package_name": "com.example.culinary_ai"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "62395915069-ituiakt5sth59nd4t4htse49cbf2avpb.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBB1ZjoVcooecSuWfnITu1ctLu_1mqw3zc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "62395915069-ituiakt5sth59nd4t4htse49cbf2avpb.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "62395915069-b30mbjc0uindrlnhdlscn0v02uskvajg.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.culinaryAi"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

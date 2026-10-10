@@ -1,6 +1,6 @@
-node -v
-npm -vimport 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/firebase_service.dart';
@@ -48,7 +48,11 @@ class DashboardPlaceholderScreen extends StatelessWidget {
                 color: AppTheme.primaryEmerald.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.restaurant, color: AppTheme.primaryEmerald, size: 20),
+              child: const Icon(
+                Icons.restaurant,
+                color: AppTheme.primaryEmerald,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 10),
             const Text('CulinaryAI'),
@@ -96,7 +100,10 @@ class DashboardPlaceholderScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(20),
@@ -150,8 +157,8 @@ class DashboardPlaceholderScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: isDark
-                        ? AppTheme.borderSubtleDark
-                        : AppTheme.borderSubtleLight,
+                        ? AppTheme.borderDarkSubtle
+                        : AppTheme.borderLightSubtle,
                   ),
                 ),
                 child: Column(
@@ -159,11 +166,16 @@ class DashboardPlaceholderScreen extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.verified_rounded, color: AppTheme.primaryEmerald, size: 24),
+                        const Icon(
+                          Icons.verified_rounded,
+                          color: AppTheme.primaryEmerald,
+                          size: 24,
+                        ),
                         const SizedBox(width: 10),
                         Text(
                           'Week 1: Days 1–2 Completed',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -189,8 +201,8 @@ class DashboardPlaceholderScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: isDark
-                        ? AppTheme.borderSubtleDark
-                        : AppTheme.borderSubtleLight,
+                        ? AppTheme.borderDarkSubtle
+                        : AppTheme.borderLightSubtle,
                   ),
                 ),
                 child: Column(
@@ -198,11 +210,16 @@ class DashboardPlaceholderScreen extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.home_work_outlined, color: AppTheme.terracottaAccent, size: 24),
+                        const Icon(
+                          Icons.home_work_outlined,
+                          color: AppTheme.terracottaAccent,
+                          size: 24,
+                        ),
                         const SizedBox(width: 10),
                         Text(
                           'Next Milestone: Household (Day 3)',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -226,11 +243,16 @@ class DashboardPlaceholderScreen extends StatelessWidget {
                   foregroundColor: Colors.redAccent,
                   side: const BorderSide(color: Color(0xFFEF4444)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 onPressed: () => _showLogoutDialog(context),
                 icon: const Icon(Icons.logout_rounded, size: 20),
-                label: const Text('Log Out of Account', style: TextStyle(fontWeight: FontWeight.w600)),
+                label: const Text(
+                  'Log Out of Account',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
             ],
           ),

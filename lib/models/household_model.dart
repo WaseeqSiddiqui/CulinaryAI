@@ -27,15 +27,25 @@ class HouseholdModel {
   }
 
   factory HouseholdModel.fromMap(Map<String, dynamic> map, String id) {
+    final rawCreatedAt = map['created_at'];
+    DateTime createdAt = DateTime.now();
+    if (rawCreatedAt is String) {
+      createdAt = DateTime.tryParse(rawCreatedAt) ?? createdAt;
+    } else if (rawCreatedAt is DateTime) {
+      createdAt = rawCreatedAt;
+    } else if (rawCreatedAt != null) {
+      try {
+        createdAt = (rawCreatedAt as dynamic).toDate() as DateTime;
+      } catch (_) {}
+    }
+
     return HouseholdModel(
       id: id,
       name: map['name'] ?? 'My Kitchen',
       ownerId: map['owner_id'] ?? '',
       memberIds: List<String>.from(map['member_ids'] ?? []),
       inviteCode: map['invite_code'] ?? '',
-      createdAt: map['created_at'] != null
-          ? DateTime.tryParse(map['created_at']) ?? DateTime.now()
-          : DateTime.now(),
+      createdAt: createdAt,
     );
   }
 }

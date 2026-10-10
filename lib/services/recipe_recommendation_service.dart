@@ -1,4 +1,5 @@
 import '../models/pantry_item_model.dart';
+import '../models/recipe_ingredient.dart';
 import '../models/recipe_recommendation_model.dart';
 
 /// Intelligent Culinary Recommendation Service.
@@ -20,7 +21,13 @@ class RecipeRecommendationService {
       calories: 480,
       difficulty: 'Easy',
       mealType: 'Dinner',
-      requiredIngredients: ['Chicken', 'Garlic', 'Rice', 'Olive Oil'],
+      servings: 4,
+      ingredientDetails: [
+        RecipeIngredient(name: 'Chicken', quantity: 500, unit: 'g'),
+        RecipeIngredient(name: 'Garlic', quantity: 4, unit: 'cloves'),
+        RecipeIngredient(name: 'Rice', quantity: 300, unit: 'g'),
+        RecipeIngredient(name: 'Olive Oil', quantity: 30, unit: 'ml'),
+      ],
       instructions: [
         'Season chicken breast with salt, pepper, and crushed garlic.',
         'Heat olive oil in a wide skillet over medium-high heat until shimmering.',
@@ -37,7 +44,14 @@ class RecipeRecommendationService {
       calories: 420,
       difficulty: 'Easy',
       mealType: 'Dinner',
-      requiredIngredients: ['Pasta', 'Tomato', 'Garlic', 'Olive Oil', 'Cheese'],
+      servings: 4,
+      ingredientDetails: [
+        RecipeIngredient(name: 'Pasta', quantity: 400, unit: 'g'),
+        RecipeIngredient(name: 'Tomato', quantity: 4, unit: 'pcs'),
+        RecipeIngredient(name: 'Garlic', quantity: 4, unit: 'cloves'),
+        RecipeIngredient(name: 'Olive Oil', quantity: 30, unit: 'ml'),
+        RecipeIngredient(name: 'Cheese', quantity: 80, unit: 'g'),
+      ],
       instructions: [
         'Boil pasta in salted water until perfectly al dente.',
         'In a heavy skillet, gently saute minced garlic in extra virgin olive oil.',
@@ -54,7 +68,13 @@ class RecipeRecommendationService {
       calories: 360,
       difficulty: 'Quick',
       mealType: 'Breakfast / Brunch',
-      requiredIngredients: ['Egg', 'Milk', 'Cheese', 'Onion'],
+      servings: 4,
+      ingredientDetails: [
+        RecipeIngredient(name: 'Egg', quantity: 6, unit: 'pcs'),
+        RecipeIngredient(name: 'Milk', quantity: 120, unit: 'ml'),
+        RecipeIngredient(name: 'Cheese', quantity: 100, unit: 'g'),
+        RecipeIngredient(name: 'Onion', quantity: 1, unit: 'pcs'),
+      ],
       instructions: [
         'Whisk farm eggs with milk, salt, pepper, and chopped fresh herbs.',
         'Saute sliced onions in butter until tender and sweet.',
@@ -71,7 +91,15 @@ class RecipeRecommendationService {
       calories: 390,
       difficulty: 'Easy',
       mealType: 'Dinner',
-      requiredIngredients: ['Rice', 'Cumin', 'Garlic', 'Onion', 'Olive Oil'],
+      servings: 4,
+      ingredientDetails: [
+        RecipeIngredient(name: 'Lentils', quantity: 300, unit: 'g'),
+        RecipeIngredient(name: 'Rice', quantity: 300, unit: 'g'),
+        RecipeIngredient(name: 'Cumin', quantity: 2, unit: 'tsp'),
+        RecipeIngredient(name: 'Garlic', quantity: 4, unit: 'cloves'),
+        RecipeIngredient(name: 'Onion', quantity: 1, unit: 'pcs'),
+        RecipeIngredient(name: 'Olive Oil', quantity: 30, unit: 'ml'),
+      ],
       instructions: [
         'Rinse and simmer yellow lentils until completely tender.',
         'In a separate tadka pan, bloom cumin seeds and garlic in hot oil.',
@@ -88,7 +116,13 @@ class RecipeRecommendationService {
       calories: 520,
       difficulty: 'Medium',
       mealType: 'Dinner',
-      requiredIngredients: ['Fish', 'Garlic', 'Olive Oil', 'Peas'],
+      servings: 4,
+      ingredientDetails: [
+        RecipeIngredient(name: 'Fish', quantity: 600, unit: 'g'),
+        RecipeIngredient(name: 'Garlic', quantity: 3, unit: 'cloves'),
+        RecipeIngredient(name: 'Olive Oil', quantity: 25, unit: 'ml'),
+        RecipeIngredient(name: 'Peas', quantity: 300, unit: 'g'),
+      ],
       instructions: [
         'Pat salmon skin dry and season generously with sea salt.',
         'Place skin-down in a hot oiled skillet and press gently for 5 minutes.',
@@ -105,7 +139,12 @@ class RecipeRecommendationService {
       calories: 340,
       difficulty: 'Quick',
       mealType: 'Breakfast',
-      requiredIngredients: ['Bread', 'Egg', 'Olive Oil'],
+      servings: 4,
+      ingredientDetails: [
+        RecipeIngredient(name: 'Bread', quantity: 4, unit: 'pcs'),
+        RecipeIngredient(name: 'Egg', quantity: 4, unit: 'pcs'),
+        RecipeIngredient(name: 'Olive Oil', quantity: 15, unit: 'ml'),
+      ],
       instructions: [
         'Toast thick slices of artisan sourdough until deeply crunchy.',
         'Fry or soft-poach eggs in simmering water with a drop of vinegar.',
@@ -121,7 +160,13 @@ class RecipeRecommendationService {
       calories: 460,
       difficulty: 'Medium',
       mealType: 'Dinner',
-      requiredIngredients: ['Rice', 'Cheese', 'Butter', 'Garlic'],
+      servings: 4,
+      ingredientDetails: [
+        RecipeIngredient(name: 'Rice', quantity: 320, unit: 'g'),
+        RecipeIngredient(name: 'Cheese', quantity: 100, unit: 'g'),
+        RecipeIngredient(name: 'Butter', quantity: 40, unit: 'g'),
+        RecipeIngredient(name: 'Garlic', quantity: 4, unit: 'cloves'),
+      ],
       instructions: [
         'Saute garlic and rice in melted butter until grains become translucent.',
         'Add hot broth gradually, stirring until liquid is absorbed before adding more.',
@@ -153,7 +198,11 @@ class RecipeRecommendationService {
     // Identify top contenders (recipes with equal top score or >= 70%)
     final topScore = scoredList.first.matchPercentage(pantryItems);
     final topContenders = scoredList
-        .where((r) => r.matchPercentage(pantryItems) >= (topScore > 50 ? topScore - 25 : 0))
+        .where(
+          (r) =>
+              r.matchPercentage(pantryItems) >=
+              (topScore > 50 ? topScore - 25 : 0),
+        )
         .toList();
 
     // Use calendar day + cycleOffset to deterministically rotate recipes day-to-day

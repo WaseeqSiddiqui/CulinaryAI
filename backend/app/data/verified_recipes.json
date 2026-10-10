@@ -1,0 +1,139 @@
+{
+  "version": 1,
+  "recipes": [
+    {
+      "recipe_id": "rec_chicken_rice",
+      "name": "Lemon Garlic Chicken with Basmati Rice",
+      "cuisine": "Pakistani Fusion",
+      "cook_time_minutes": 30,
+      "servings": 4,
+      "tags": ["high protein", "dinner", "one pan"],
+      "dietary_tags": ["halal", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Chicken Breast", "quantity": 500, "unit": "g"},
+        {"name": "Basmati Rice", "quantity": 300, "unit": "g"},
+        {"name": "Garlic Cloves", "quantity": 4, "unit": "cloves"},
+        {"name": "Olive Oil", "quantity": 30, "unit": "ml"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Season the chicken with salt, pepper, and minced garlic.", "timer_seconds": 0},
+        {"step_number": 2, "instruction": "Rinse the rice and simmer it until tender.", "timer_seconds": 900},
+        {"step_number": 3, "instruction": "Sear the chicken in olive oil until golden and cooked through.", "timer_seconds": 840},
+        {"step_number": 4, "instruction": "Rest the chicken, finish with lemon, and serve over rice.", "timer_seconds": 180}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_spiced_dal",
+      "name": "Golden Cumin Dal with Rice",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 35,
+      "servings": 4,
+      "tags": ["comfort food", "budget", "dinner"],
+      "dietary_tags": ["halal", "vegetarian", "vegan", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Lentils", "quantity": 300, "unit": "g"},
+        {"name": "Basmati Rice", "quantity": 300, "unit": "g"},
+        {"name": "Cumin Seeds", "quantity": 2, "unit": "tsp"},
+        {"name": "Garlic Cloves", "quantity": 4, "unit": "cloves"},
+        {"name": "Turmeric Powder", "quantity": 1, "unit": "tsp"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Rinse the lentils until the water runs clear.", "timer_seconds": 0},
+        {"step_number": 2, "instruction": "Simmer lentils with turmeric until completely tender.", "timer_seconds": 1500},
+        {"step_number": 3, "instruction": "Bloom cumin and garlic in hot oil to make the tadka.", "timer_seconds": 120},
+        {"step_number": 4, "instruction": "Pour the tadka over the dal and serve with steamed rice.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_frittata",
+      "name": "Cheddar Herb Frittata",
+      "cuisine": "European",
+      "cook_time_minutes": 20,
+      "servings": 4,
+      "tags": ["breakfast", "quick", "high protein"],
+      "dietary_tags": ["halal", "vegetarian", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Eggs", "quantity": 6, "unit": "pcs"},
+        {"name": "Milk", "quantity": 120, "unit": "ml"},
+        {"name": "Cheddar Cheese", "quantity": 100, "unit": "g"},
+        {"name": "Onion", "quantity": 1, "unit": "pcs"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Whisk eggs with milk, salt, and pepper.", "timer_seconds": 0},
+        {"step_number": 2, "instruction": "Soften sliced onion in an oven-safe pan.", "timer_seconds": 300},
+        {"step_number": 3, "instruction": "Add the egg mixture and scatter cheddar over the top.", "timer_seconds": 0},
+        {"step_number": 4, "instruction": "Cook gently, then grill until puffed and golden.", "timer_seconds": 480}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_tomato_pasta",
+      "name": "Tomato Garlic Pasta",
+      "cuisine": "Italian",
+      "cook_time_minutes": 25,
+      "servings": 4,
+      "tags": ["quick", "dinner", "family"],
+      "dietary_tags": ["halal", "vegetarian"],
+      "ingredients_required": [
+        {"name": "Pasta", "quantity": 400, "unit": "g"},
+        {"name": "Tomatoes", "quantity": 4, "unit": "pcs"},
+        {"name": "Garlic Cloves", "quantity": 4, "unit": "cloves"},
+        {"name": "Olive Oil", "quantity": 30, "unit": "ml"},
+        {"name": "Cheese", "quantity": 80, "unit": "g"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Boil the pasta in salted water until al dente.", "timer_seconds": 600},
+        {"step_number": 2, "instruction": "Gently fry garlic in olive oil.", "timer_seconds": 60},
+        {"step_number": 3, "instruction": "Add chopped tomatoes and simmer into a sauce.", "timer_seconds": 600},
+        {"step_number": 4, "instruction": "Toss with pasta and finish with grated cheese.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_salmon_peas",
+      "name": "Crispy Salmon with Garlic Peas",
+      "cuisine": "Modern European",
+      "cook_time_minutes": 22,
+      "servings": 4,
+      "tags": ["high protein", "dinner", "quick"],
+      "dietary_tags": ["halal", "gluten-free", "pescatarian"],
+      "ingredients_required": [
+        {"name": "Salmon", "quantity": 600, "unit": "g"},
+        {"name": "Frozen Peas", "quantity": 300, "unit": "g"},
+        {"name": "Garlic Cloves", "quantity": 3, "unit": "cloves"},
+        {"name": "Olive Oil", "quantity": 25, "unit": "ml"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Pat the salmon dry and season both sides.", "timer_seconds": 0},
+        {"step_number": 2, "instruction": "Cook skin-side down in a hot pan until crisp.", "timer_seconds": 360},
+        {"step_number": 3, "instruction": "Turn once and finish cooking gently.", "timer_seconds": 180},
+        {"step_number": 4, "instruction": "Saute peas and garlic in the pan juices and serve.", "timer_seconds": 240}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_risotto",
+      "name": "Creamy Garlic Parmesan Rice",
+      "cuisine": "Italian",
+      "cook_time_minutes": 30,
+      "servings": 4,
+      "tags": ["comfort food", "dinner", "creamy"],
+      "dietary_tags": ["halal", "vegetarian", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Rice", "quantity": 320, "unit": "g"},
+        {"name": "Parmesan Cheese", "quantity": 100, "unit": "g"},
+        {"name": "Butter", "quantity": 40, "unit": "g"},
+        {"name": "Garlic Cloves", "quantity": 4, "unit": "cloves"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Saute garlic and rice in melted butter.", "timer_seconds": 180},
+        {"step_number": 2, "instruction": "Add hot stock gradually while stirring.", "timer_seconds": 1200},
+        {"step_number": 3, "instruction": "Continue until the rice is tender and creamy.", "timer_seconds": 300},
+        {"step_number": 4, "instruction": "Fold in parmesan and rest briefly before serving.", "timer_seconds": 120}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    }
+  ]
+}

@@ -6,69 +6,79 @@ import 'package:google_fonts/google_fonts.dart';
 /// and food psychology principles (warmth, appetite stimulation, zero cold-blue dark modes).
 class AppTheme {
   // ── Brand Primary Palette (Appetite-Stimulating Warm Flame / Saffron) ──────
-  static const Color primaryFlame       = Color(0xFFFF5A36); // Gourmet Saffron Vermillion
-  static const Color primaryFlameLight  = Color(0xFFFF7E61);
-  static const Color primaryFlameDark   = Color(0xFFD9401F);
-  
+  static const Color primaryFlame = Color(
+    0xFFFF5A36,
+  ); // Gourmet Saffron Vermillion
+  static const Color primaryFlameLight = Color(0xFFFF7E61);
+  static const Color primaryFlameDark = Color(0xFFD9401F);
+
   // ── Secondary Fresh Palette (Farm-Fresh Organic & Pantry Freshness) ────────
-  static const Color freshHerb          = Color(0xFF10B981); // Crisp Garden Basil / Sage
-  static const Color freshHerbLight     = Color(0xFF34D399);
-  static const Color freshHerbDark      = Color(0xFF059669);
+  static const Color freshHerb = Color(0xFF10B981); // Crisp Garden Basil / Sage
+  static const Color freshHerbLight = Color(0xFF34D399);
+  static const Color freshHerbDark = Color(0xFF059669);
 
   // ── Warm Saffron & Amber (Spices, Alerts & Highlights) ─────────────────────
-  static const Color warmSaffron        = Color(0xFFF59E0B);
-  static const Color warmSaffronLight   = Color(0xFFFCD34D);
+  static const Color warmSaffron = Color(0xFFF59E0B);
+  static const Color warmSaffronLight = Color(0xFFFCD34D);
 
   // ── Semantic Status ────────────────────────────────────────────────────────
-  static const Color errorRed           = Color(0xFFEF4444);
-  static const Color successGreen       = Color(0xFF10B981);
+  static const Color errorRed = Color(0xFFEF4444);
+  static const Color successGreen = Color(0xFF10B981);
 
   // ── Aliases for backward compatibility ─────────────────────────────────────
-  static const Color primaryEmerald     = primaryFlame;
-  static const Color primaryLight       = primaryFlameLight;
-  static const Color primaryDark        = primaryFlameDark;
-  static const Color terracottaAccent   = primaryFlame;
-  static const Color warmAmber          = warmSaffron;
+  static const Color primaryEmerald = primaryFlame;
+  static const Color primaryLight = primaryFlameLight;
+  static const Color primaryDark = primaryFlameDark;
+  static const Color terracottaAccent = primaryFlame;
+  static const Color warmAmber = warmSaffron;
 
   // ── Zone Palette (Curated Gourmet Color Coding) ───────────────────────────
-  static const Color zoneFridge         = Color(0xFF0284C7); // Chilled Ice Blue
-  static const Color zoneFreezer        = Color(0xFF818CF8); // Frost Indigo Violet
-  static const Color zonePantry         = Color(0xFFF59E0B); // Harvest Wheat Amber
-  static const Color zoneSpice          = Color(0xFFF43F5E); // Cayenne / Paprika Rose
+  static const Color zoneFridge = Color(0xFF0284C7); // Chilled Ice Blue
+  static const Color zoneFreezer = Color(0xFF818CF8); // Frost Indigo Violet
+  static const Color zonePantry = Color(0xFFF59E0B); // Harvest Wheat Amber
+  static const Color zoneSpice = Color(0xFFF43F5E); // Cayenne / Paprika Rose
 
   // ── Warm Beige & Culinary Cream Palette ────────────────────────────────────
-  static const Color creamWarm         = Color(0xFFFBF8F3); // Warm culinary rich cream
-  static const Color creamBeige        = Color(0xFFF3ECE0); // Soft artisan linen / biscuit beige
-  static const Color creamSurface      = Color(0xFFFAF5ED); // Cream card container
-  static const Color creamBorder       = Color(0xFFEADBCE); // Subtle warm beige border
-  static const Color creamAccent       = Color(0xFFF7EFE3); // Cream chip / pill background
+  static const Color creamWarm = Color(0xFFFBF8F3); // Warm culinary rich cream
+  static const Color creamBeige = Color(
+    0xFFF3ECE0,
+  ); // Soft artisan linen / biscuit beige
+  static const Color creamSurface = Color(0xFFFAF5ED); // Cream card container
+  static const Color creamBorder = Color(
+    0xFFEADBCE,
+  ); // Subtle warm beige border
+  static const Color creamAccent = Color(
+    0xFFF7EFE3,
+  ); // Cream chip / pill background
 
   // ── Light Surfaces (Warm Porcelain, Cream & Linen Beige) ───────────────────
-  static const Color bgLight            = Color(0xFFFAF6F0); // Warm culinary cream linen
-  static const Color surfaceLight       = Color(0xFFFFFFFF); // Pure crisp white
-  static const Color surfaceLight2      = Color(0xFFFAF5ED); // Elevated warm cream
-  static const Color cardLight          = creamSurface;      // Warm artisan cream card
-  static const Color borderLight        = Color(0xFFEADBCE); // Warm beige border
-  static const Color borderLightSubtle  = Color(0xFFF4ECE1);
-  static const Color textLightPrimary   = Color(0xFF111827); // Deep charcoal
+  static const Color bgLight = Color(0xFFFAF6F0); // Warm culinary cream linen
+  static const Color surfaceLight = Color(0xFFFFFFFF); // Pure crisp white
+  static const Color surfaceLight2 = Color(0xFFFAF5ED); // Elevated warm cream
+  static const Color cardLight = creamSurface; // Warm artisan cream card
+  static const Color borderLight = Color(0xFFEADBCE); // Warm beige border
+  static const Color borderLightSubtle = Color(0xFFF4ECE1);
+  static const Color textLightPrimary = Color(0xFF111827); // Deep charcoal
   static const Color textLightSecondary = Color(0xFF4B5563); // Warm slate
-  static const Color textLightMuted     = Color(0xFF9CA3AF);
+  static const Color textLightMuted = Color(0xFF9CA3AF);
 
   // ── Dark Surfaces (Warm Obsidian & Truffle Slate — NO COLD BLUE!) ──────────
-  static const Color bgDark             = Color(0xFF0F1012); // Deep obsidian slate
-  static const Color surfaceDark        = Color(0xFF17181D); // Rich charcoal card
-  static const Color cardDark           = surfaceDark;       // Rich charcoal card
-  static const Color surfaceDark2       = Color(0xFF202229); // Elevated card & inputs
-  static const Color surfaceDark3       = Color(0xFF282B34); // Active highlight
-  static const Color borderDark         = Color(0xFF292C35); // Delicate dark micro-border
-  static const Color borderDarkSubtle   = Color(0xFF1E2027);
-  static const Color textDarkPrimary    = Color(0xFFF9FAFB); // Soft bright white
-  static const Color textDarkSecondary  = Color(0xFF9CA3AF); // Warm muted slate
-  static const Color textDarkMuted      = Color(0xFF6B7280);
+  static const Color bgDark = Color(0xFF0F1012); // Deep obsidian slate
+  static const Color surfaceDark = Color(0xFF17181D); // Rich charcoal card
+  static const Color cardDark = surfaceDark; // Rich charcoal card
+  static const Color surfaceDark2 = Color(0xFF202229); // Elevated card & inputs
+  static const Color surfaceDark3 = Color(0xFF282B34); // Active highlight
+  static const Color borderDark = Color(
+    0xFF292C35,
+  ); // Delicate dark micro-border
+  static const Color borderDarkSubtle = Color(0xFF1E2027);
+  static const Color textDarkPrimary = Color(0xFFF9FAFB); // Soft bright white
+  static const Color textDarkSecondary = Color(0xFF9CA3AF); // Warm muted slate
+  static const Color textDarkMuted = Color(0xFF6B7280);
 
   // Common Aliases
-  static const Color textPrimary        = textLightPrimary;
-  static const Color textSecondary      = textLightSecondary;
+  static const Color textPrimary = textLightPrimary;
+  static const Color textSecondary = textLightSecondary;
 
   // ── Gradients ──────────────────────────────────────────────────────────────
   static const LinearGradient primaryGradient = LinearGradient(
@@ -152,7 +162,9 @@ class AppTheme {
           foregroundColor: Colors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 15),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           textStyle: TextStyle(
             fontFamily: _font,
             fontSize: 15,
@@ -166,7 +178,9 @@ class AppTheme {
           foregroundColor: primaryFlame,
           side: const BorderSide(color: primaryFlame, width: 1.5),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 15),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           textStyle: TextStyle(
             fontFamily: _font,
             fontSize: 15,
@@ -177,16 +191,16 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: primaryFlame,
-          textStyle: TextStyle(
-            fontFamily: _font,
-            fontWeight: FontWeight.w600,
-          ),
+          textStyle: TextStyle(fontFamily: _font, fontWeight: FontWeight.w600),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surfaceLight2,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: borderLight),
@@ -227,15 +241,17 @@ class AppTheme {
           final selected = states.contains(WidgetState.selected);
           return TextStyle(
             fontFamily: _font,
-            fontSize: 11,
+            fontSize: 10,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             color: selected ? primaryFlame : textLightSecondary,
           );
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           return IconThemeData(
-            color: states.contains(WidgetState.selected) ? primaryFlame : textLightSecondary,
-            size: 22,
+            color: states.contains(WidgetState.selected)
+                ? primaryFlame
+                : textLightSecondary,
+            size: 20,
           );
         }),
         elevation: 0,
@@ -334,7 +350,9 @@ class AppTheme {
           foregroundColor: Colors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 15),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           textStyle: TextStyle(
             fontFamily: _font,
             fontSize: 15,
@@ -347,8 +365,14 @@ class AppTheme {
           foregroundColor: primaryFlameLight,
           side: const BorderSide(color: primaryFlame, width: 1.5),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 15),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          textStyle: TextStyle(fontFamily: _font, fontSize: 15, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          textStyle: TextStyle(
+            fontFamily: _font,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -360,7 +384,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surfaceDark2,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: borderDark),
@@ -401,15 +428,17 @@ class AppTheme {
           final selected = states.contains(WidgetState.selected);
           return TextStyle(
             fontFamily: _font,
-            fontSize: 11,
+            fontSize: 10,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             color: selected ? primaryFlameLight : textDarkSecondary,
           );
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           return IconThemeData(
-            color: states.contains(WidgetState.selected) ? primaryFlameLight : textDarkSecondary,
-            size: 22,
+            color: states.contains(WidgetState.selected)
+                ? primaryFlameLight
+                : textDarkSecondary,
+            size: 20,
           );
         }),
         elevation: 0,
@@ -427,7 +456,11 @@ class AppTheme {
         contentTextStyle: TextStyle(fontFamily: _font, color: textDarkPrimary),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
-      dividerTheme: const DividerThemeData(color: borderDark, thickness: 1, space: 1),
+      dividerTheme: const DividerThemeData(
+        color: borderDark,
+        thickness: 1,
+        space: 1,
+      ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: surfaceDark,
         shape: RoundedRectangleBorder(
