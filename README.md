@@ -9,6 +9,10 @@ meal-planning service.
 - Person C backend: see [backend/README.md](backend/README.md) for setup, API
   examples, and tests.
 
+## Project documentation
+
+- [Detailed progress and future roadmap](docs/CulinaryAI_Project_Progress_and_Roadmap.docx)
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.
