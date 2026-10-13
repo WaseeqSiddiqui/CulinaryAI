@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -9,80 +8,8 @@ import '../../core/theme/app_theme.dart';
 import '../../models/receipt_scanned_item.dart';
 import '../../providers/pantry_provider.dart';
 import '../../services/food_image_service.dart';
-
-// Mock OCR response — simulates what the vision API returns
-const _kMockReceiptItems = [
-  {
-    'name': 'Whole Milk',
-    'quantity': 2.0,
-    'unit': 'litres',
-    'location': 'fridge',
-    'price': 320.0,
-  },
-  {
-    'name': 'Free Range Eggs',
-    'quantity': 12.0,
-    'unit': 'pcs',
-    'location': 'fridge',
-    'price': 280.0,
-  },
-  {
-    'name': 'Basmati Rice',
-    'quantity': 5.0,
-    'unit': 'kg',
-    'location': 'pantry_shelf',
-    'price': 950.0,
-  },
-  {
-    'name': 'Chicken Breast',
-    'quantity': 1.0,
-    'unit': 'kg',
-    'location': 'fridge',
-    'price': 680.0,
-  },
-  {
-    'name': 'Olive Oil',
-    'quantity': 500.0,
-    'unit': 'ml',
-    'location': 'pantry_shelf',
-    'price': 450.0,
-  },
-  {
-    'name': 'Cumin Seeds',
-    'quantity': 100.0,
-    'unit': 'g',
-    'location': 'spice_rack',
-    'price': 80.0,
-  },
-  {
-    'name': 'Coriander Powder',
-    'quantity': 100.0,
-    'unit': 'g',
-    'location': 'spice_rack',
-    'price': 65.0,
-  },
-  {
-    'name': 'Frozen Peas',
-    'quantity': 500.0,
-    'unit': 'g',
-    'location': 'freezer',
-    'price': 120.0,
-  },
-  {
-    'name': 'Greek Yogurt',
-    'quantity': 400.0,
-    'unit': 'g',
-    'location': 'fridge',
-    'price': 195.0,
-  },
-  {
-    'name': 'Garlic Paste',
-    'quantity': 200.0,
-    'unit': 'g',
-    'location': 'fridge',
-    'price': 75.0,
-  },
-];
+import '../../services/receipt_ocr_service.dart';
+import '../../services/receipt_parser_service.dart';
 
 class ReceiptScannerScreen extends StatefulWidget {
   const ReceiptScannerScreen({super.key});
@@ -96,7 +23,9 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
   _ScanState _scanState = _ScanState.idle;
   List<ReceiptScannedItem> _scannedItems = [];
   final ImagePicker _imagePicker = ImagePicker();
+  final ReceiptOcrService _ocrService = ReceiptOcrService();
   Uint8List? _receiptImage;
+  String? _scanError;
 
   late AnimationController _scanLineController;
   late AnimationController _pulseController;
@@ -127,6 +56,7 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
   void dispose() {
     _scanLineController.dispose();
     _pulseController.dispose();
+    _ocrService.close();
     super.dispose();
   }
 
@@ -152,36 +82,51 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
     setState(() {
       _scanState = _ScanState.scanning;
       _receiptImage = bytes;
+      _scanError = null;
     });
 
-    // The captured image is ready for an OCR backend. Week 1 uses the
-    // reviewable extraction fixture until that backend endpoint is connected.
-    await Future.delayed(const Duration(milliseconds: 2800));
+    await Future.delayed(const Duration(milliseconds: 450));
     if (!mounted) return;
     setState(() => _scanState = _ScanState.processing);
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (!mounted) return;
 
-    // Build mock scanned items (simulate slight OCR variation)
-    final rng = Random();
-    final items = _kMockReceiptItems.map((data) {
-      return ReceiptScannedItem(
-        name: data['name'] as String,
-        quantity:
-            (data['quantity'] as double) + (rng.nextDouble() * 0.1 - 0.05),
-        unit: data['unit'] as String,
-        location: data['location'] as String,
-        price: data['price'] as double?,
-        isSelected: true,
-      );
-    }).toList();
+    try {
+      final recognized = await _ocrService.recognize(image.path);
+      final items = ReceiptParserService.parseLines(recognized.lines);
+      if (!mounted) return;
 
+      if (items.isEmpty) {
+        setState(() {
+          _scanError = recognized.rawText.trim().isEmpty
+              ? 'No text was found. Use a clear, well-lit photo of the full receipt.'
+              : 'Text was found, but no grocery items could be identified. Try a straighter photo.';
+          _scanState = _ScanState.error;
+        });
+        return;
+      }
+
+      setState(() {
+        _scannedItems = items;
+        _scanState = _ScanState.review;
+      });
+      _showReviewSheet();
+    } catch (error) {
+      debugPrint('Receipt OCR failed: $error');
+      if (!mounted) return;
+      setState(() {
+        _scanError =
+            'The receipt could not be read. Check the image and try again.';
+        _scanState = _ScanState.error;
+      });
+    }
+  }
+
+  void _resetScan() {
     setState(() {
-      _scannedItems = items;
-      _scanState = _ScanState.review;
+      _scanState = _ScanState.idle;
+      _scannedItems = [];
+      _receiptImage = null;
+      _scanError = null;
     });
-
-    _showReviewSheet();
   }
 
   void _showReviewSheet() {
@@ -195,11 +140,7 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
         onConfirm: _confirmItems,
         onRescan: () {
           Navigator.pop(context);
-          setState(() {
-            _scanState = _ScanState.idle;
-            _scannedItems = [];
-            _receiptImage = null;
-          });
+          _resetScan();
         },
       ),
     );
@@ -260,7 +201,7 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
   }
 
   double _defaultThreshold(String unit) {
-    if (unit == 'kg' || unit == 'litres') return 0.5;
+    if (unit == 'kg' || unit == 'L') return 0.5;
     if (unit == 'pcs') return 2;
     if (unit == 'g' || unit == 'ml') return 50;
     return 1;
@@ -289,11 +230,7 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
         actions: [
           if (_scanState == _ScanState.done)
             TextButton.icon(
-              onPressed: () => setState(() {
-                _scanState = _ScanState.idle;
-                _scannedItems = [];
-                _receiptImage = null;
-              }),
+              onPressed: _resetScan,
               icon: const Icon(
                 Icons.refresh_rounded,
                 color: AppTheme.primaryEmerald,
@@ -326,19 +263,19 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
       ),
       _ScanState.processing => const _ProcessingView(),
       _ScanState.review => const _ProcessingView(), // brief flash
+      _ScanState.error => _ScanErrorView(
+        message: _scanError ?? 'The receipt could not be read.',
+        onRetry: _resetScan,
+      ),
       _ScanState.done => _DoneView(
         itemCount: _scannedItems.where((i) => i.isSelected).length,
-        onNewScan: () => setState(() {
-          _scanState = _ScanState.idle;
-          _scannedItems = [];
-          _receiptImage = null;
-        }),
+        onNewScan: _resetScan,
       ),
     };
   }
 }
 
-enum _ScanState { idle, scanning, processing, review, done }
+enum _ScanState { idle, scanning, processing, review, error, done }
 
 // ── Idle View ────────────────────────────────────────────────────────────────
 
@@ -784,7 +721,7 @@ class _ProcessingView extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'OCR Vision AI is reading your receipt',
+            'On-device OCR is reading your receipt',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.4),
               fontSize: 13,
@@ -797,6 +734,73 @@ class _ProcessingView extends StatelessWidget {
 }
 
 // ── Done View ────────────────────────────────────────────────────────────────
+
+class _ScanErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ScanErrorView({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: const Icon(
+                Icons.document_scanner_outlined,
+                color: Colors.orange,
+                size: 40,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Could not read this receipt',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.55),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 22),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try another receipt'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryEmerald,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 22,
+                  vertical: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _DoneView extends StatelessWidget {
   final int itemCount;
