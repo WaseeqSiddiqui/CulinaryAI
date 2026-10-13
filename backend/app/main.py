@@ -16,8 +16,8 @@ planner = MealPlannerService(repository)
 
 app = FastAPI(
     title="CulinaryAI Meal Planning API",
-    version="0.1.0",
-    description="Week 1 pantry-aware planning and verified-recipe retrieval API.",
+    version="0.2.0",
+    description="Pantry-aware planning API integrated with the CulinaryAI mobile client.",
 )
 app.add_middleware(
     CORSMiddleware,

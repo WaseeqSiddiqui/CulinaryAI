@@ -1,8 +1,9 @@
 # CulinaryAI FastAPI Backend
 
-This is the Person C Week 1 service. It provides pantry-aware meal planning,
-verified-recipe retrieval, and structured cooking instructions without requiring
-an external AI API key.
+This service provides pantry-aware meal planning, verified-recipe retrieval,
+and structured cooking instructions without requiring an external AI API key.
+Chef Chat calls it for live recommendations and falls back to its local catalog
+when the service cannot be reached.
 
 ## Run locally
 
@@ -12,7 +13,7 @@ From the repository root:
 python -m venv backend\.venv
 backend\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
 cd backend
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Open `http://127.0.0.1:8000/docs` for the interactive API documentation.
@@ -23,6 +24,7 @@ Open `http://127.0.0.1:8000/docs` for the interactive API documentation.
 
 ```json
 {
+  "question": "Suggest a quick high-protein dinner",
   "pantry_items": [
     {"name": "chicken breast", "quantity": 500, "unit": "g"},
     {"name": "basmati rice", "quantity": 250, "unit": "g"}

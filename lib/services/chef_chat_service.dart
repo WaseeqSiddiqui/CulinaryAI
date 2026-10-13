@@ -5,6 +5,21 @@ import 'recipe_recommendation_service.dart';
 class ChefChatService {
   ChefChatService._();
 
+  static bool isMealPlanningQuestion(String question) {
+    final query = question.trim().toLowerCase();
+    return _containsAny(query, [
+      'what can i cook',
+      'recommend',
+      'suggest',
+      'meal idea',
+      'dinner idea',
+      'lunch idea',
+      'breakfast idea',
+      'i am hungry',
+      "i'm hungry",
+    ]);
+  }
+
   static String answer(String question, List<PantryItemModel> pantryItems) {
     final cleanQuestion = question.trim();
     final query = cleanQuestion.toLowerCase();

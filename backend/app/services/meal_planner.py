@@ -21,7 +21,9 @@ class MealPlannerService:
 
     def generate_plan(self, request: GeneratePlanRequest) -> GeneratePlanResponse:
         pantry_names = [item.name for item in request.pantry_items]
-        query_parts = pantry_names + request.dietary_preferences
+        query_parts = (
+            [request.question] + pantry_names + request.dietary_preferences
+        )
         query = " ".join(query_parts) or "balanced easy meal"
         candidates = self.repository.search(query, limit=len(self.repository.recipes))
         candidates = [

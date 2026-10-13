@@ -41,6 +41,18 @@ def test_dietary_and_cook_time_filters_are_applied() -> None:
     assert response.meals[0].recipe_id == "rec_spiced_dal"
 
 
+def test_user_question_contributes_to_recipe_retrieval() -> None:
+    request = GeneratePlanRequest(
+        question="quick breakfast with eggs",
+        pantry_items=[],
+        meal_count=1,
+    )
+
+    response = build_planner().generate_plan(request)
+
+    assert response.meals[0].recipe_id == "rec_frittata"
+
+
 def test_instruction_generator_scales_ingredients() -> None:
     response = build_planner().instructions("rec_chicken_rice", servings=8)
     chicken = next(

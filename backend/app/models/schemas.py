@@ -27,11 +27,17 @@ class CookingStep(BaseModel):
 
 
 class GeneratePlanRequest(BaseModel):
+    question: str = Field(default="", max_length=300)
     pantry_items: list[PantryItemInput] = Field(default_factory=list)
     servings: int = Field(default=4, ge=1, le=12)
     meal_count: int = Field(default=3, ge=1, le=7)
     dietary_preferences: list[str] = Field(default_factory=list)
     max_cook_time_minutes: int | None = Field(default=None, ge=5, le=240)
+
+    @field_validator("question")
+    @classmethod
+    def clean_question(cls, value: str) -> str:
+        return value.strip()
 
     @field_validator("dietary_preferences")
     @classmethod

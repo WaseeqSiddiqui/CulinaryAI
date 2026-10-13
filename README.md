@@ -3,7 +3,26 @@
 A Flutter cooking assistant with pantry tracking, receipt OCR, AI-assisted
 recipe discovery, guided cooking, household sharing, and smart restocking.
 
-## MVP demo
+## Run the integrated app
+
+Week 2 connects Chef Chat to the FastAPI verified-recipe planner. Start both
+services from separate terminals:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+```powershell
+flutter run --dart-define=CULINARY_API_BASE_URL=http://10.0.2.2:8000
+```
+
+`10.0.2.2` reaches the host machine from the Android emulator. For a physical
+device, replace it with the development machine's LAN address. Deployed builds
+should use an HTTPS endpoint. If the backend is unavailable, Chef Chat clearly
+labels the issue and continues with its offline recommendation engine.
+
+## Demo kitchen
 
 Run `flutter pub get` followed by `flutter run`, then choose **Explore the Demo
 Kitchen**. This path is offline-safe and opens a pre-populated pantry so the
@@ -28,16 +47,11 @@ Suggested demo flow:
 
 - [Detailed progress and future roadmap](docs/CulinaryAI_Project_Progress_and_Roadmap.docx)
 
-## Getting Started
+## Verification
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```powershell
+flutter analyze
+flutter test
+cd backend
+.\.venv\Scripts\python.exe -m pytest -q
+```
