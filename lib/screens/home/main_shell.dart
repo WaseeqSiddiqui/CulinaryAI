@@ -23,7 +23,7 @@ import '../scanner/receipt_scanner_screen.dart';
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
-  static _MainShellState? of(BuildContext context) =>
+  static _MainShellState? _of(BuildContext context) =>
       context.findAncestorStateOfType<_MainShellState>();
 
   @override
@@ -226,8 +226,10 @@ class _DashboardTabState extends State<_DashboardTab> {
                   backgroundColor: AppTheme.primaryFlame.withValues(
                     alpha: 0.15,
                   ),
-                  backgroundImage: const NetworkImage(
-                    'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=160&q=80',
+                  child: const Icon(
+                    Icons.person_rounded,
+                    color: AppTheme.primaryFlame,
+                    size: 22,
                   ),
                 ),
                 Positioned(
@@ -615,10 +617,10 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
               Image.network(
                 recipe.imageUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Image.asset(
+                errorBuilder: (_, _, _) => Image.asset(
                   'assets/images/hero_dish.jpg',
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  errorBuilder: (_, _, _) => Container(
                     color: widget.isDark
                         ? const Color(0xFF1C1917)
                         : AppTheme.creamBeige,
@@ -978,7 +980,7 @@ class _RecipeDetailModal extends StatelessWidget {
                           height: 200,
                           width: double.infinity,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (_, _, _) => Container(
                             height: 200,
                             color: isDark
                                 ? AppTheme.cardDark
@@ -1494,7 +1496,6 @@ class _PantryZonesGrid extends StatelessWidget {
         title: 'Fridge',
         count: pantry.itemsByZone['Fridge']?.length ?? 0,
         subtitle: 'Chilled • 3.2°C',
-        imageUrl: 'https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?w=400&q=80',
         color: AppTheme.zoneFridge,
         icon: Icons.kitchen_rounded,
       ),
@@ -1502,7 +1503,6 @@ class _PantryZonesGrid extends StatelessWidget {
         title: 'Freezer',
         count: pantry.itemsByZone['Freezer']?.length ?? 0,
         subtitle: 'Deep Freeze • -18°C',
-        imageUrl: 'https://images.unsplash.com/photo-1497034825429-c343d7c6a68f?w=400&q=80',
         color: AppTheme.zoneFreezer,
         icon: Icons.ac_unit_rounded,
       ),
@@ -1510,7 +1510,6 @@ class _PantryZonesGrid extends StatelessWidget {
         title: 'Pantry Shelf',
         count: pantry.itemsByZone['Pantry Shelf']?.length ?? 0,
         subtitle: 'Grains & Staples',
-        imageUrl: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=80',
         color: AppTheme.zonePantry,
         icon: Icons.shelves,
       ),
@@ -1518,7 +1517,6 @@ class _PantryZonesGrid extends StatelessWidget {
         title: 'Spice Rack',
         count: pantry.itemsByZone['Spice Rack']?.length ?? 0,
         subtitle: 'Seasonings & Herbs',
-        imageUrl: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&q=80',
         color: AppTheme.zoneSpice,
         icon: Icons.grass_rounded,
       ),
@@ -1559,7 +1557,10 @@ class _PantryZonesGrid extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(zone.imageUrl, fit: BoxFit.cover),
+                  Image.asset(
+                    'assets/images/pantry_basket.jpg',
+                    fit: BoxFit.cover,
+                  ),
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -1659,7 +1660,6 @@ class _ZoneCardData {
   final String title;
   final int count;
   final String subtitle;
-  final String imageUrl;
   final Color color;
   final IconData icon;
 
@@ -1667,7 +1667,6 @@ class _ZoneCardData {
     required this.title,
     required this.count,
     required this.subtitle,
-    required this.imageUrl,
     required this.color,
     required this.icon,
   });
@@ -1709,9 +1708,7 @@ class _ReceiptScanBanner extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
                 image: const DecorationImage(
-                  image: NetworkImage(
-                    'https://images.unsplash.com/photo-1554415707-9e4466bfe0d0?w=200&q=80',
-                  ),
+                  image: AssetImage('assets/images/pantry_basket.jpg'),
                   fit: BoxFit.cover,
                 ),
               ),
@@ -1817,7 +1814,7 @@ class _AttentionItemsCarousel extends StatelessWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: displayItems.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (ctx, i) {
           final item = displayItems[i];
           return Container(
@@ -1849,7 +1846,7 @@ class _AttentionItemsCarousel extends StatelessWidget {
                     width: 48,
                     height: 48,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       width: 48,
                       height: 48,
                       color: AppTheme.primaryFlame.withValues(alpha: 0.1),
@@ -1942,7 +1939,7 @@ class _RecommendedMealsCarousel extends StatelessWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: recipes.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 14),
+        separatorBuilder: (_, _) => const SizedBox(width: 14),
         itemBuilder: (ctx, i) {
           final recipe = recipes[i];
           final matchPct = recipe.matchPercentage(pantry.allItems);
@@ -1997,7 +1994,7 @@ class _RecommendedMealsCarousel extends StatelessWidget {
                           height: 110,
                           width: double.infinity,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (_, _, _) => Container(
                             height: 110,
                             color: isDark
                                 ? AppTheme.cardDark
@@ -2076,13 +2073,17 @@ class _RecommendedMealsCarousel extends StatelessWidget {
                                     : AppTheme.textLightMuted,
                               ),
                               const SizedBox(width: 4),
-                              Text(
-                                '${recipe.calories} kcal',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: isDark
-                                      ? AppTheme.textDarkSecondary
-                                      : AppTheme.textLightSecondary,
+                              Expanded(
+                                child: Text(
+                                  '${recipe.calories} kcal',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark
+                                        ? AppTheme.textDarkSecondary
+                                        : AppTheme.textLightSecondary,
+                                  ),
                                 ),
                               ),
                             ],
@@ -2099,22 +2100,6 @@ class _RecommendedMealsCarousel extends StatelessWidget {
       ),
     );
   }
-}
-
-class _MealCardData {
-  final String title;
-  final String cookTime;
-  final String calories;
-  final String imageUrl;
-  final String matchPercent;
-
-  _MealCardData({
-    required this.title,
-    required this.cookTime,
-    required this.calories,
-    required this.imageUrl,
-    required this.matchPercent,
-  });
 }
 
 // ── Placeholder Tabs (Recipes & Restock) ──────────────────────────────────────
@@ -2249,7 +2234,7 @@ class _KitchenDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shell = MainShell.of(context);
+    final shell = MainShell._of(context);
     final drawerBg = isDark ? AppTheme.bgDark : Colors.white;
     final itemColor = isDark
         ? AppTheme.textDarkPrimary
@@ -2298,8 +2283,10 @@ class _KitchenDrawer extends StatelessWidget {
                             backgroundColor: AppTheme.primaryFlame.withValues(
                               alpha: 0.15,
                             ),
-                            backgroundImage: const NetworkImage(
-                              'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=160&q=80',
+                            child: const Icon(
+                              Icons.person_rounded,
+                              color: AppTheme.primaryFlame,
+                              size: 28,
                             ),
                           ),
                           Positioned(

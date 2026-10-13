@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/theme/app_theme.dart';
 import '../../models/pantry_item_model.dart';
 import '../../providers/pantry_provider.dart';
@@ -11,14 +12,34 @@ class _ZoneMeta {
   final Color color;
   final IconData icon;
   final String label;
-  const _ZoneMeta({required this.color, required this.icon, required this.label});
+  const _ZoneMeta({
+    required this.color,
+    required this.icon,
+    required this.label,
+  });
 }
 
 const Map<String, _ZoneMeta> _zoneMeta = {
-  'Fridge':       _ZoneMeta(color: AppTheme.zoneFridge,   icon: Icons.kitchen_rounded,    label: 'Fridge'),
-  'Freezer':      _ZoneMeta(color: AppTheme.zoneFreezer,  icon: Icons.ac_unit_rounded,    label: 'Freezer'),
-  'Pantry Shelf': _ZoneMeta(color: AppTheme.zonePantry,   icon: Icons.shelves,            label: 'Pantry Shelf'),
-  'Spice Rack':   _ZoneMeta(color: AppTheme.zoneSpice,    icon: Icons.grass_rounded,      label: 'Spice Rack'),
+  'Fridge': _ZoneMeta(
+    color: AppTheme.zoneFridge,
+    icon: Icons.kitchen_rounded,
+    label: 'Fridge',
+  ),
+  'Freezer': _ZoneMeta(
+    color: AppTheme.zoneFreezer,
+    icon: Icons.ac_unit_rounded,
+    label: 'Freezer',
+  ),
+  'Pantry Shelf': _ZoneMeta(
+    color: AppTheme.zonePantry,
+    icon: Icons.shelves,
+    label: 'Pantry Shelf',
+  ),
+  'Spice Rack': _ZoneMeta(
+    color: AppTheme.zoneSpice,
+    icon: Icons.grass_rounded,
+    label: 'Spice Rack',
+  ),
 };
 
 // ── Pantry Screen ─────────────────────────────────────────────────────────────
@@ -174,7 +195,9 @@ class _PantryScreenState extends State<PantryScreen>
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary,
+                color: isDark
+                    ? AppTheme.textDarkPrimary
+                    : AppTheme.textLightPrimary,
               ),
               onChanged: pantry.setSearch,
             )
@@ -201,7 +224,9 @@ class _PantryScreenState extends State<PantryScreen>
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 2),
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: AppTheme.freshHerb.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(10),
@@ -228,8 +253,8 @@ class _PantryScreenState extends State<PantryScreen>
                           color: pantry.lowStockCount > 0
                               ? AppTheme.warmAmber
                               : (isDark
-                                  ? AppTheme.textDarkSecondary
-                                  : AppTheme.textLightSecondary),
+                                    ? AppTheme.textDarkSecondary
+                                    : AppTheme.textLightSecondary),
                         ),
                       ),
                     ],
@@ -303,8 +328,11 @@ class _PantryScreenState extends State<PantryScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.search_off_rounded, size: 56,
-                color: isDark ? AppTheme.borderDark : AppTheme.borderLight),
+            Icon(
+              Icons.search_off_rounded,
+              size: 56,
+              color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+            ),
             const SizedBox(height: 12),
             const Text('No items found', style: TextStyle(fontSize: 16)),
           ],
@@ -346,7 +374,7 @@ class _PantryScreenState extends State<PantryScreen>
                 width: 140,
                 height: 140,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Image.asset(
+                errorBuilder: (_, _, _) => Image.asset(
                   'assets/images/pantry_basket.jpg',
                   width: 140,
                   height: 140,
@@ -357,9 +385,7 @@ class _PantryScreenState extends State<PantryScreen>
             const SizedBox(height: 20),
             Text(
               'Your Pantry is Empty',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
+              style: Theme.of(context).textTheme.titleLarge
                   ?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
@@ -367,7 +393,9 @@ class _PantryScreenState extends State<PantryScreen>
               'Tap + below or scan a grocery receipt to stock your kitchen.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: isDark ? AppTheme.textDarkSecondary : AppTheme.textLightSecondary,
+                color: isDark
+                    ? AppTheme.textDarkSecondary
+                    : AppTheme.textLightSecondary,
                 fontSize: 13,
               ),
             ),
@@ -387,14 +415,23 @@ class _PantryScreenState extends State<PantryScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Filter by Zone',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+              Text(
+                'Filter by Zone',
+                style: Theme.of(context).textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 16),
               ListTile(
-                leading: const Icon(Icons.grid_view_rounded, color: AppTheme.primaryEmerald),
+                leading: const Icon(
+                  Icons.grid_view_rounded,
+                  color: AppTheme.primaryEmerald,
+                ),
                 title: const Text('All Zones'),
                 trailing: pantry.selectedZone == null
-                    ? const Icon(Icons.check_rounded, color: AppTheme.primaryEmerald)
+                    ? const Icon(
+                        Icons.check_rounded,
+                        color: AppTheme.primaryEmerald,
+                      )
                     : null,
                 onTap: () {
                   pantry.setZoneFilter(null);
@@ -498,7 +535,9 @@ class _ZoneSectionState extends State<_ZoneSection> {
               ),
               const Spacer(),
               Icon(
-                _expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                _expanded
+                    ? Icons.expand_less_rounded
+                    : Icons.expand_more_rounded,
                 color: meta.color.withValues(alpha: 0.7),
                 size: 20,
               ),
@@ -507,18 +546,20 @@ class _ZoneSectionState extends State<_ZoneSection> {
         ),
         const SizedBox(height: 8),
         if (_expanded)
-          ...widget.items.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _PantryItemCard(
-                  item: item,
-                  zoneColor: meta.color,
-                  isDark: widget.isDark,
-                  onEdit: () => widget.onEdit(item),
-                  onDelete: () => widget.onDelete(item),
-                  onDecrement: () => widget.onAdjust(item, -1),
-                  onIncrement: () => widget.onAdjust(item, 1),
-                ),
-              )),
+          ...widget.items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _PantryItemCard(
+                item: item,
+                zoneColor: meta.color,
+                isDark: widget.isDark,
+                onEdit: () => widget.onEdit(item),
+                onDelete: () => widget.onDelete(item),
+                onDecrement: () => widget.onAdjust(item, -1),
+                onIncrement: () => widget.onAdjust(item, 1),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -579,11 +620,7 @@ class _PantryItemCard extends StatelessWidget {
             child: Row(
               children: [
                 // Zone color vertical accent pill
-                Container(
-                  width: 4,
-                  height: 64,
-                  color: zoneColor,
-                ),
+                Container(width: 4, height: 64, color: zoneColor),
                 const SizedBox(width: 10),
                 // Food Photo Thumbnail
                 ClipRRect(
@@ -593,7 +630,7 @@ class _PantryItemCard extends StatelessWidget {
                     width: 48,
                     height: 48,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
@@ -629,20 +666,33 @@ class _PantryItemCard extends StatelessWidget {
                             ),
                             if (item.isLowStock)
                               Container(
-                                margin: const EdgeInsets.only(left: 6, right: 4),
+                                margin: const EdgeInsets.only(
+                                  left: 6,
+                                  right: 4,
+                                ),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 7, vertical: 2),
+                                  horizontal: 7,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.warmAmber.withValues(alpha: 0.15),
+                                  color: AppTheme.warmAmber.withValues(
+                                    alpha: 0.15,
+                                  ),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                      color: AppTheme.warmAmber.withValues(alpha: 0.4)),
+                                    color: AppTheme.warmAmber.withValues(
+                                      alpha: 0.4,
+                                    ),
+                                  ),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: const [
-                                    Icon(Icons.warning_amber_rounded,
-                                        size: 11, color: AppTheme.warmAmber),
+                                    Icon(
+                                      Icons.warning_amber_rounded,
+                                      size: 11,
+                                      color: AppTheme.warmAmber,
+                                    ),
                                     SizedBox(width: 3),
                                     Text(
                                       'Low',
@@ -667,8 +717,8 @@ class _PantryItemCard extends StatelessWidget {
                                 color: item.isLowStock
                                     ? AppTheme.warmAmber
                                     : (isDark
-                                        ? AppTheme.textDarkSecondary
-                                        : AppTheme.textLightSecondary),
+                                          ? AppTheme.textDarkSecondary
+                                          : AppTheme.textLightSecondary),
                                 fontWeight: item.isLowStock
                                     ? FontWeight.w700
                                     : FontWeight.w500,
@@ -698,13 +748,16 @@ class _PantryItemCard extends StatelessWidget {
                 ),
                 // Actions menu
                 PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert_rounded,
-                      size: 20,
-                      color: isDark
-                          ? AppTheme.textDarkMuted
-                          : AppTheme.textLightSecondary),
+                  icon: Icon(
+                    Icons.more_vert_rounded,
+                    size: 20,
+                    color: isDark
+                        ? AppTheme.textDarkMuted
+                        : AppTheme.textLightSecondary,
+                  ),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   onSelected: (val) {
                     if (val == 'edit') onEdit();
                     if (val == 'delete') onDelete();
@@ -712,21 +765,30 @@ class _PantryItemCard extends StatelessWidget {
                   itemBuilder: (_) => [
                     const PopupMenuItem(
                       value: 'edit',
-                      child: Row(children: [
-                        Icon(Icons.edit_outlined, size: 18),
-                        SizedBox(width: 10),
-                        Text('Edit'),
-                      ]),
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_outlined, size: 18),
+                          SizedBox(width: 10),
+                          Text('Edit'),
+                        ],
+                      ),
                     ),
                     PopupMenuItem(
                       value: 'delete',
-                      child: Row(children: [
-                        Icon(Icons.delete_outline_rounded,
-                            size: 18, color: AppTheme.errorRed),
-                        const SizedBox(width: 10),
-                        Text('Remove',
-                            style: TextStyle(color: AppTheme.errorRed)),
-                      ]),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.delete_outline_rounded,
+                            size: 18,
+                            color: AppTheme.errorRed,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Remove',
+                            style: TextStyle(color: AppTheme.errorRed),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -752,9 +814,14 @@ class _PantryItemCard extends StatelessWidget {
         children: [
           Icon(Icons.delete_outline_rounded, color: Colors.white, size: 22),
           SizedBox(height: 2),
-          Text('Remove',
-              style:
-                  TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+          Text(
+            'Remove',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -819,7 +886,11 @@ class _QtyBtn extends StatelessWidget {
   final VoidCallback onTap;
   final bool isDark;
 
-  const _QtyBtn({required this.icon, required this.onTap, required this.isDark});
+  const _QtyBtn({
+    required this.icon,
+    required this.onTap,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -832,10 +903,16 @@ class _QtyBtn extends StatelessWidget {
           color: isDark ? AppTheme.surfaceDark2 : AppTheme.bgLight,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-              color: isDark ? AppTheme.borderDark : AppTheme.borderLight),
+            color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+          ),
         ),
-        child: Icon(icon, size: 16,
-            color: isDark ? AppTheme.textDarkSecondary : AppTheme.textLightSecondary),
+        child: Icon(
+          icon,
+          size: 16,
+          color: isDark
+              ? AppTheme.textDarkSecondary
+              : AppTheme.textLightSecondary,
+        ),
       ),
     );
   }
@@ -881,11 +958,15 @@ class _ZoneChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon,
-                size: 14,
-                color: isSelected
-                    ? color
-                    : (isDark ? AppTheme.textDarkSecondary : AppTheme.textLightSecondary)),
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected
+                  ? color
+                  : (isDark
+                        ? AppTheme.textDarkSecondary
+                        : AppTheme.textLightSecondary),
+            ),
             const SizedBox(width: 6),
             Text(
               label,
@@ -894,7 +975,9 @@ class _ZoneChip extends StatelessWidget {
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 color: isSelected
                     ? color
-                    : (isDark ? AppTheme.textDarkSecondary : AppTheme.textLightSecondary),
+                    : (isDark
+                          ? AppTheme.textDarkSecondary
+                          : AppTheme.textLightSecondary),
               ),
             ),
           ],
@@ -905,47 +988,6 @@ class _ZoneChip extends StatelessWidget {
 }
 
 // ── Stat Chip ─────────────────────────────────────────────────────────────────
-
-class _StatChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final bool isDark;
-
-  const _StatChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.isDark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 // ── Add / Edit Sheet ──────────────────────────────────────────────────────────
 
@@ -976,11 +1018,12 @@ class _AddEditSheetState extends State<_AddEditSheet> {
     final item = widget.item;
     _nameCtrl = TextEditingController(text: item?.name ?? '');
     _qtyCtrl = TextEditingController(
-        text: item != null ? _fmt(item.quantity) : '');
+      text: item != null ? _fmt(item.quantity) : '',
+    );
     _thresholdCtrl = TextEditingController(
-        text: item != null ? _fmt(item.lowStockThreshold) : '1');
-    _customImageCtrl =
-        TextEditingController(text: item?.customImageUrl ?? '');
+      text: item != null ? _fmt(item.lowStockThreshold) : '1',
+    );
+    _customImageCtrl = TextEditingController(text: item?.customImageUrl ?? '');
     _showCustomImageField =
         item?.customImageUrl != null && item!.customImageUrl!.isNotEmpty;
 
@@ -1031,14 +1074,16 @@ class _AddEditSheetState extends State<_AddEditSheet> {
         : null;
 
     if (_isEditing) {
-      pantry.updateItem(widget.item!.copyWith(
-        name: _nameCtrl.text.trim(),
-        quantity: qty,
-        unit: _selectedUnit,
-        location: _selectedLocation,
-        lowStockThreshold: threshold,
-        customImageUrl: customUrl,
-      ));
+      pantry.updateItem(
+        widget.item!.copyWith(
+          name: _nameCtrl.text.trim(),
+          quantity: qty,
+          unit: _selectedUnit,
+          location: _selectedLocation,
+          lowStockThreshold: threshold,
+          customImageUrl: customUrl,
+        ),
+      );
     } else {
       pantry.addItem(
         householdId: 'hh_demo',
@@ -1073,7 +1118,10 @@ class _AddEditSheetState extends State<_AddEditSheet> {
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        20, 4, 20, MediaQuery.of(context).viewInsets.bottom + 28,
+        20,
+        4,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 28,
       ),
       child: Form(
         key: _formKey,
@@ -1097,9 +1145,7 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                   const SizedBox(width: 12),
                   Text(
                     _isEditing ? 'Edit Item' : 'Add to Pantry',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
+                    style: Theme.of(context).textTheme.titleLarge
                         ?.copyWith(fontWeight: FontWeight.w800),
                   ),
                 ],
@@ -1125,7 +1171,7 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                         width: 58,
                         height: 58,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        errorBuilder: (_, _, _) => Container(
                           width: 58,
                           height: 58,
                           color: meta.color.withValues(alpha: 0.2),
@@ -1142,9 +1188,13 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.freshHerb.withValues(alpha: 0.15),
+                                  color: AppTheme.freshHerb.withValues(
+                                    alpha: 0.15,
+                                  ),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: const Text(
@@ -1223,7 +1273,10 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                     const Spacer(),
                     const Text(
                       'Tap to auto-fill',
-                      style: TextStyle(fontSize: 10, color: AppTheme.warmSaffron),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppTheme.warmSaffron,
+                      ),
                     ),
                   ],
                 ),
@@ -1233,7 +1286,7 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: FoodImageService.popularPresets.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
                     itemBuilder: (context, index) {
                       final p = FoodImageService.popularPresets[index];
                       final isCurrent = _nameCtrl.text == p['name'];
@@ -1246,28 +1299,29 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                             color: isCurrent
                                 ? AppTheme.primaryFlame.withValues(alpha: 0.15)
                                 : (isDark
-                                    ? AppTheme.surfaceDark2
-                                    : AppTheme.bgLight),
+                                      ? AppTheme.surfaceDark2
+                                      : AppTheme.bgLight),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: isCurrent
                                   ? AppTheme.primaryFlame
                                   : (isDark
-                                      ? AppTheme.borderDark
-                                      : AppTheme.borderLight),
+                                        ? AppTheme.borderDark
+                                        : AppTheme.borderLight),
                             ),
                           ),
                           child: Text(
                             p['name']!,
                             style: TextStyle(
                               fontSize: 11,
-                              fontWeight:
-                                  isCurrent ? FontWeight.w700 : FontWeight.w500,
+                              fontWeight: isCurrent
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
                               color: isCurrent
                                   ? AppTheme.primaryFlame
                                   : (isDark
-                                      ? AppTheme.textDarkPrimary
-                                      : AppTheme.textLightPrimary),
+                                        ? AppTheme.textDarkPrimary
+                                        : AppTheme.textLightPrimary),
                             ),
                           ),
                         ),
@@ -1312,8 +1366,9 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                         labelText: 'Quantity',
                         prefixIcon: Icon(Icons.numbers_rounded),
                       ),
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       validator: (v) {
                         if (v == null || v.isEmpty) return 'Required';
                         if (double.tryParse(v) == null) return 'Invalid';
@@ -1325,10 +1380,12 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                   Expanded(
                     flex: 2,
                     child: DropdownButtonFormField<String>(
-                      value: _selectedUnit,
+                      initialValue: _selectedUnit,
                       decoration: const InputDecoration(labelText: 'Unit'),
                       items: PantryProvider.units
-                          .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                          .map(
+                            (u) => DropdownMenuItem(value: u, child: Text(u)),
+                          )
                           .toList(),
                       onChanged: (v) => setState(() => _selectedUnit = v!),
                     ),
@@ -1339,7 +1396,7 @@ class _AddEditSheetState extends State<_AddEditSheet> {
 
               // Storage zone
               DropdownButtonFormField<String>(
-                value: _selectedLocation,
+                initialValue: _selectedLocation,
                 decoration: InputDecoration(
                   labelText: 'Storage Zone',
                   prefixIcon: Icon(meta.icon, color: meta.color),
@@ -1366,12 +1423,15 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                 controller: _thresholdCtrl,
                 decoration: const InputDecoration(
                   labelText: 'Low Stock Alert (threshold)',
-                  prefixIcon: Icon(Icons.warning_amber_rounded,
-                      color: AppTheme.warmAmber),
+                  prefixIcon: Icon(
+                    Icons.warning_amber_rounded,
+                    color: AppTheme.warmAmber,
+                  ),
                   hintText: 'e.g. 0.5',
                 ),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Required';
                   if (double.tryParse(v) == null) return 'Invalid number';
@@ -1383,7 +1443,8 @@ class _AddEditSheetState extends State<_AddEditSheet> {
               // Toggle custom image url field
               InkWell(
                 onTap: () => setState(
-                    () => _showCustomImageField = !_showCustomImageField),
+                  () => _showCustomImageField = !_showCustomImageField,
+                ),
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6),
@@ -1441,11 +1502,12 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                     flex: 2,
                     child: ElevatedButton.icon(
                       onPressed: _save,
-                      icon: Icon(_isEditing
-                          ? Icons.save_rounded
-                          : Icons.add_rounded),
-                      label:
-                          Text(_isEditing ? 'Save Changes' : 'Add to Pantry'),
+                      icon: Icon(
+                        _isEditing ? Icons.save_rounded : Icons.add_rounded,
+                      ),
+                      label: Text(
+                        _isEditing ? 'Save Changes' : 'Add to Pantry',
+                      ),
                     ),
                   ),
                 ],
@@ -1494,14 +1556,15 @@ class _ItemDetailModal extends StatelessWidget {
           Stack(
             children: [
               ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(28)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(28),
+                ),
                 child: Image.network(
                   item.displayImageUrl,
                   height: 190,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  errorBuilder: (_, _, _) => Container(
                     height: 190,
                     color: zoneColor.withValues(alpha: 0.2),
                     child: Icon(Icons.restaurant, size: 50, color: zoneColor),
@@ -1533,8 +1596,11 @@ class _ItemDetailModal extends StatelessWidget {
                       color: Colors.black.withValues(alpha: 0.5),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.close_rounded,
-                        color: Colors.white, size: 20),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                 ),
               ),
@@ -1549,7 +1615,9 @@ class _ItemDetailModal extends StatelessWidget {
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: zoneColor,
                             borderRadius: BorderRadius.circular(20),
@@ -1567,15 +1635,20 @@ class _ItemDetailModal extends StatelessWidget {
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: AppTheme.warmAmber,
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: const Row(
                               children: [
-                                Icon(Icons.warning_amber_rounded,
-                                    size: 13, color: Colors.white),
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  size: 13,
+                                  color: Colors.white,
+                                ),
                                 SizedBox(width: 4),
                                 Text(
                                   'Restock Needed',
@@ -1619,7 +1692,9 @@ class _ItemDetailModal extends StatelessWidget {
                     color: isDark ? AppTheme.surfaceDark2 : AppTheme.bgLight,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                      color: isDark
+                          ? AppTheme.borderDark
+                          : AppTheme.borderLight,
                     ),
                   ),
                   child: Row(
@@ -1646,8 +1721,8 @@ class _ItemDetailModal extends StatelessWidget {
                               color: item.isLowStock
                                   ? AppTheme.warmAmber
                                   : (isDark
-                                      ? AppTheme.textDarkPrimary
-                                      : AppTheme.textLightPrimary),
+                                        ? AppTheme.textDarkPrimary
+                                        : AppTheme.textLightPrimary),
                             ),
                           ),
                         ],
@@ -1714,8 +1789,7 @@ class _ItemDetailModal extends StatelessWidget {
                       child: _RecipeMiniChip(
                         title: 'Skillet Dinner',
                         time: '20m',
-                        imageUrl:
-                            'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=200&q=80',
+                        imageUrl: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=200&q=80',
                         isDark: isDark,
                       ),
                     ),
@@ -1724,8 +1798,7 @@ class _ItemDetailModal extends StatelessWidget {
                       child: _RecipeMiniChip(
                         title: 'Quick Sauté',
                         time: '12m',
-                        imageUrl:
-                            'https://images.unsplash.com/photo-1510693206972-df098062cb71?w=200&q=80',
+                        imageUrl: 'https://images.unsplash.com/photo-1510693206972-df098062cb71?w=200&q=80',
                         isDark: isDark,
                       ),
                     ),
@@ -1758,8 +1831,11 @@ class _ItemDetailModal extends StatelessWidget {
                           Navigator.pop(context);
                           onDelete();
                         },
-                        icon: const Icon(Icons.delete_outline_rounded,
-                            size: 18, color: Colors.white),
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: Colors.white,
+                        ),
                         label: const Text('Remove'),
                       ),
                     ),
@@ -1795,14 +1871,19 @@ class _RecipeMiniChip extends StatelessWidget {
         color: isDark ? AppTheme.surfaceDark2 : Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-            color: isDark ? AppTheme.borderDark : AppTheme.borderLight),
+          color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+        ),
       ),
       child: Row(
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: Image.network(imageUrl,
-                width: 36, height: 36, fit: BoxFit.cover),
+            child: Image.network(
+              imageUrl,
+              width: 36,
+              height: 36,
+              fit: BoxFit.cover,
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(

@@ -113,6 +113,25 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> continueAsDemo() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    const demoUserId = 'demo_chef';
+    _currentUser = UserModel(
+      id: demoUserId,
+      name: 'Alex',
+      email: 'chef@culinary.ai',
+      dietaryPreference: 'Balanced',
+      location: 'Lahore, Pakistan',
+      bio: 'Exploring smarter home cooking with CulinaryAI.',
+    );
+    await _sessionService.saveUser(_currentUser!);
+    _isLoading = false;
+    notifyListeners();
+  }
+
   Future<void> logout() async {
     _isLoading = true;
     notifyListeners();

@@ -72,11 +72,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _fillDemoCredentials() {
-    setState(() {
-      _emailController.text = 'chef@culinary.ai';
-      _passwordController.text = 'password123';
-    });
+  Future<void> _continueAsDemo() async {
+    await Provider.of<AuthProvider>(context, listen: false).continueAsDemo();
   }
 
   @override
@@ -412,14 +409,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   // Demo Credentials Shortcut
                   TextButton.icon(
-                    onPressed: _fillDemoCredentials,
+                    key: const Key('continueAsDemoButton'),
+                    onPressed: authProvider.isLoading ? null : _continueAsDemo,
                     icon: const Icon(
                       Icons.flash_on_rounded,
                       size: 18,
                       color: AppTheme.warmSaffron,
                     ),
                     label: const Text(
-                      'Use Demo Credentials (Quick Test)',
+                      'Explore the Demo Kitchen',
                       style: TextStyle(
                         color: AppTheme.warmSaffron,
                         fontWeight: FontWeight.w600,

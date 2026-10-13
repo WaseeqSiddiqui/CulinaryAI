@@ -94,6 +94,10 @@ class PantryProvider extends ChangeNotifier {
     _items
       ..clear()
       ..addAll(localItems);
+    if (_items.isEmpty && householdId == 'personal_demo_chef') {
+      _items.addAll(_demoPantry(householdId));
+      await _service.saveLocal(householdId, _items);
+    }
     _isLoading = false;
     notifyListeners();
 
@@ -123,6 +127,40 @@ class PantryProvider extends ChangeNotifier {
             notifyListeners();
           },
         );
+  }
+
+  List<PantryItemModel> _demoPantry(String householdId) {
+    final now = DateTime.now();
+    PantryItemModel item(
+      String id,
+      String name,
+      double quantity,
+      String unit,
+      String location,
+      double lowStockThreshold,
+    ) => PantryItemModel(
+      id: id,
+      householdId: householdId,
+      name: name,
+      quantity: quantity,
+      unit: unit,
+      location: location,
+      lowStockThreshold: lowStockThreshold,
+      addedVia: 'demo',
+      updatedAt: now,
+    );
+
+    return [
+      item('demo_chicken', 'Chicken Breast', 0.8, 'kg', 'Fridge', 0.5),
+      item('demo_eggs', 'Eggs', 4, 'pcs', 'Fridge', 6),
+      item('demo_spinach', 'Spinach', 1, 'pcs', 'Fridge', 1),
+      item('demo_peas', 'Frozen Peas', 0.6, 'kg', 'Freezer', 0.25),
+      item('demo_rice', 'Basmati Rice', 2, 'kg', 'Pantry Shelf', 0.5),
+      item('demo_pasta', 'Pasta', 0.4, 'kg', 'Pantry Shelf', 0.5),
+      item('demo_tomatoes', 'Canned Tomatoes', 3, 'pcs', 'Pantry Shelf', 2),
+      item('demo_cumin', 'Cumin', 80, 'g', 'Spice Rack', 30),
+      item('demo_turmeric', 'Turmeric', 45, 'g', 'Spice Rack', 30),
+    ];
   }
 
   void setSearch(String query) {
