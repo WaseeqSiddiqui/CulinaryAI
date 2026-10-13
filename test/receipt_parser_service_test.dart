@@ -43,6 +43,14 @@ void main() {
       expect(items.single.price, 450);
     });
 
+    test('supports a name followed by a numeric-only price line', () {
+      final items = ReceiptParserService.parseLines(['Brown Bread', '220.00']);
+
+      expect(items, hasLength(1));
+      expect(items.single.name, 'Brown Bread');
+      expect(items.single.price, 220);
+    });
+
     test('supports leading item counts and merges duplicate lines', () {
       final items = ReceiptParserService.parseLines([
         '2 x Tomato Sauce 250.00',
@@ -53,6 +61,49 @@ void main() {
       expect(items.single.name, 'Tomato Sauce');
       expect(items.single.quantity, 3);
       expect(items.single.price, 375);
+    });
+
+    test('parses barcode, quantity, unit price and total columns', () {
+      final items = ReceiptParserService.parseLines([
+        'ITEM DESCRIPTION QTY RATE AMOUNT',
+        '2 8961008210074 NESTLE MILK 1L 310.00 620.00',
+        '1 8901030895489 BASMATI RICE 5 KG 1850.00 1850.00',
+        'GRAND TOTAL 2470.00',
+      ]);
+
+      expect(items, hasLength(2));
+      final milk = items.firstWhere((item) => item.name == 'Nestle Milk');
+      expect(milk.quantity, 2);
+      expect(milk.unit, 'L');
+      expect(milk.price, 620);
+
+      final rice = items.firstWhere((item) => item.name == 'Basmati Rice');
+      expect(rice.quantity, 5);
+      expect(rice.unit, 'kg');
+      expect(rice.price, 1850);
+    });
+
+    test('joins product names with split quantity and price lines', () {
+      final items = ReceiptParserService.parseLines([
+        'Olper Milk',
+        '2 x 1 L',
+        'Rs 640.00',
+        'Shan Tikka Masala',
+        '1 x 180.00 180.00',
+      ]);
+
+      expect(items, hasLength(2));
+      final milk = items.firstWhere((item) => item.name == 'Olper Milk');
+      expect(milk.quantity, 2);
+      expect(milk.unit, 'L');
+      expect(milk.price, 640);
+
+      final masala = items.firstWhere(
+        (item) => item.name == 'Shan Tikka Masala',
+      );
+      expect(masala.quantity, 1);
+      expect(masala.price, 180);
+      expect(masala.location, 'spice_rack');
     });
 
     test('returns no items for headings and receipt totals', () {

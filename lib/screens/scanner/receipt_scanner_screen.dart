@@ -931,6 +931,110 @@ class _ReviewSheetState extends State<_ReviewSheet> {
       .where((i) => i.isSelected && i.price != null)
       .fold(0.0, (sum, i) => sum + i.price!);
 
+  Future<void> _editItem(int index) async {
+    final item = _items[index];
+    final formKey = GlobalKey<FormState>();
+    final nameController = TextEditingController(text: item.name);
+    final quantityController = TextEditingController(
+      text: item.quantity.toStringAsFixed(
+        item.quantity.truncateToDouble() == item.quantity ? 0 : 2,
+      ),
+    );
+    var selectedUnit = item.unit;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Correct scanned item'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameController,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Item name',
+                    prefixIcon: Icon(Icons.edit_outlined),
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Enter the item name'
+                      : null,
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: quantityController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Quantity',
+                        ),
+                        validator: (value) {
+                          final quantity = double.tryParse(value ?? '');
+                          return quantity == null || quantity <= 0
+                              ? 'Invalid quantity'
+                              : null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: selectedUnit,
+                        decoration: const InputDecoration(labelText: 'Unit'),
+                        items: PantryProvider.units
+                            .map(
+                              (unit) => DropdownMenuItem(
+                                value: unit,
+                                child: Text(unit),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) => setDialogState(
+                          () => selectedUnit = value ?? selectedUnit,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (formKey.currentState?.validate() != true) return;
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('Save correction'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (saved == true && mounted) {
+      setState(() {
+        item.name = nameController.text.trim();
+        item.quantity = double.parse(quantityController.text);
+        item.unit = selectedUnit;
+      });
+    }
+    nameController.dispose();
+    quantityController.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -992,6 +1096,13 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                           style: const TextStyle(
                             color: AppTheme.textSecondary,
                             fontSize: 12,
+                          ),
+                        ),
+                        const Text(
+                          'Use the pencil to correct OCR mistakes.',
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 10,
                           ),
                         ),
                       ],
@@ -1081,8 +1192,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                   onToggle: (val) => setState(() => _items[i].isSelected = val),
                   onZoneChange: (zone) =>
                       setState(() => _items[i].location = zone),
-                  onQtyChange: (qty) =>
-                      setState(() => _items[i].quantity = qty),
+                  onEdit: () => _editItem(i),
                 ),
               ),
             ),
@@ -1159,7 +1269,7 @@ class _ReviewItemTile extends StatelessWidget {
   final bool isDark;
   final ValueChanged<bool> onToggle;
   final ValueChanged<String> onZoneChange;
-  final ValueChanged<double> onQtyChange;
+  final VoidCallback onEdit;
 
   const _ReviewItemTile({
     required this.item,
@@ -1169,7 +1279,7 @@ class _ReviewItemTile extends StatelessWidget {
     required this.isDark,
     required this.onToggle,
     required this.onZoneChange,
-    required this.onQtyChange,
+    required this.onEdit,
   });
 
   Color get _zoneColor {
@@ -1254,17 +1364,34 @@ class _ReviewItemTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.name,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: isDark
-                          ? AppTheme.textDarkPrimary
-                          : AppTheme.textLightPrimary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.name,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: isDark
+                                ? AppTheme.textDarkPrimary
+                                : AppTheme.textLightPrimary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Correct item',
+                        onPressed: onEdit,
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 30,
+                          height: 28,
+                        ),
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.edit_outlined, size: 15),
+                      ),
+                    ],
                   ),
                   Row(
                     children: [
