@@ -1,6 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -25,6 +24,7 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
   final ImagePicker _imagePicker = ImagePicker();
   final ReceiptOcrService _ocrService = ReceiptOcrService();
   Uint8List? _receiptImage;
+  ReceiptOcrResult? _ocrResult;
   String? _scanError;
 
   late AnimationController _scanLineController;
@@ -63,11 +63,7 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
   Future<void> _startScan(ImageSource source) async {
     XFile? image;
     try {
-      image = await _imagePicker.pickImage(
-        source: source,
-        imageQuality: 88,
-        maxWidth: 1800,
-      );
+      image = await _imagePicker.pickImage(source: source);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -95,16 +91,25 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
       if (!mounted) return;
 
       if (items.isEmpty) {
+        if (recognized.rawText.trim().isNotEmpty) {
+          setState(() {
+            _ocrResult = recognized;
+            _scannedItems = [];
+            _scanState = _ScanState.review;
+          });
+          _showReviewSheet();
+          return;
+        }
         setState(() {
-          _scanError = recognized.rawText.trim().isEmpty
-              ? 'No text was found. Use a clear, well-lit photo of the full receipt.'
-              : 'Text was found, but no grocery items could be identified. Try a straighter photo.';
+          _ocrResult = recognized;
+          _scanError = 'No text was found. Use a clear, well-lit photo of the full receipt.';
           _scanState = _ScanState.error;
         });
         return;
       }
 
       setState(() {
+        _ocrResult = recognized;
         _scannedItems = items;
         _scanState = _ScanState.review;
       });
@@ -125,6 +130,7 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
       _scanState = _ScanState.idle;
       _scannedItems = [];
       _receiptImage = null;
+      _ocrResult = null;
       _scanError = null;
     });
   }
@@ -137,6 +143,8 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
       isDismissible: false,
       builder: (_) => _ReviewSheet(
         items: _scannedItems,
+        diagnosticText: _ocrResult?.diagnosticText ?? '',
+        receiptImage: _receiptImage,
         onConfirm: _confirmItems,
         onRescan: () {
           Navigator.pop(context);
@@ -891,11 +899,15 @@ class _DoneView extends StatelessWidget {
 
 class _ReviewSheet extends StatefulWidget {
   final List<ReceiptScannedItem> items;
+  final String diagnosticText;
+  final Uint8List? receiptImage;
   final void Function(List<ReceiptScannedItem>) onConfirm;
   final VoidCallback onRescan;
 
   const _ReviewSheet({
     required this.items,
+    required this.diagnosticText,
+    required this.receiptImage,
     required this.onConfirm,
     required this.onRescan,
   });
@@ -931,7 +943,16 @@ class _ReviewSheetState extends State<_ReviewSheet> {
       .where((i) => i.isSelected && i.price != null)
       .fold(0.0, (sum, i) => sum + i.price!);
 
-  Future<void> _editItem(int index) async {
+  String get _detectedCurrency {
+    final text = widget.diagnosticText.toLowerCase();
+    if (text.contains('£')) return '£';
+    if (text.contains('€')) return '€';
+    if (text.contains(r'$') || text.contains('usd')) return r'$';
+    if (text.contains('pkr') || text.contains('rs')) return 'PKR ';
+    return '';
+  }
+
+  Future<bool> _editItem(int index) async {
     final item = _items[index];
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController(text: item.name);
@@ -1033,6 +1054,92 @@ class _ReviewSheetState extends State<_ReviewSheet> {
     }
     nameController.dispose();
     quantityController.dispose();
+    return saved == true;
+  }
+
+  Future<void> _addMissingItem() async {
+    final item = ReceiptScannedItem(
+      name: 'New item',
+      quantity: 1,
+      unit: 'pcs',
+      location: 'pantry_shelf',
+      isSelected: true,
+    );
+    setState(() => _items.add(item));
+    final index = _items.length - 1;
+    final saved = await _editItem(index);
+    if (!saved && mounted) {
+      setState(() => _items.remove(item));
+    }
+  }
+
+  void _removeItem(int index) {
+    setState(() => _items.removeAt(index));
+  }
+
+  Future<void> _showDetectedText() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Receipt OCR details'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: MediaQuery.sizeOf(dialogContext).height * 0.62,
+          child: ListView(
+            children: [
+              if (widget.receiptImage != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.memory(
+                    widget.receiptImage!,
+                    height: 220,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              const Text(
+                'Copy this text when reporting a bad scan.',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              SelectableText(
+                widget.diagnosticText.isEmpty
+                    ? 'No OCR text was detected.'
+                    : widget.diagnosticText,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: widget.diagnosticText.isEmpty
+                ? null
+                : () async {
+                    await Clipboard.setData(
+                      ClipboardData(text: widget.diagnosticText),
+                    );
+                    if (!mounted || !dialogContext.mounted) return;
+                    Navigator.pop(dialogContext);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('OCR text copied')),
+                    );
+                  },
+            icon: const Icon(Icons.copy_rounded, size: 17),
+            label: const Text('Copy text'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -1099,7 +1206,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                           ),
                         ),
                         const Text(
-                          'Use the pencil to correct OCR mistakes.',
+                          'Check every name and quantity before adding.',
                           style: TextStyle(
                             color: AppTheme.textSecondary,
                             fontSize: 10,
@@ -1153,7 +1260,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                     ),
                     const SizedBox(width: 8),
                     const Text(
-                      'Receipt Total:',
+                      'Detected item sum:',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -1162,7 +1269,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                     ),
                     const Spacer(),
                     Text(
-                      'PKR ${_totalPrice.toStringAsFixed(0)}',
+                      '$_detectedCurrency${_totalPrice.toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
@@ -1173,28 +1280,63 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                 ),
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _showDetectedText,
+                      icon: const Icon(Icons.text_snippet_outlined, size: 17),
+                      label: const Text('Receipt & OCR'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: _addMissingItem,
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Add missed item'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             // Items list
             Expanded(
-              child: ListView.separated(
-                controller: controller,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 4,
-                ),
-                itemCount: _items.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 4),
-                itemBuilder: (_, i) => _ReviewItemTile(
-                  item: _items[i],
-                  zones: _zones,
-                  zoneLabels: _zoneLabels,
-                  zoneIcons: _zoneIcons,
-                  isDark: isDark,
-                  onToggle: (val) => setState(() => _items[i].isSelected = val),
-                  onZoneChange: (zone) =>
-                      setState(() => _items[i].location = zone),
-                  onEdit: () => _editItem(i),
-                ),
-              ),
+              child: _items.isEmpty
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          'No reliable rows were found. View the OCR text or add the missed items manually.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppTheme.textSecondary),
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      controller: controller,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
+                      itemCount: _items.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 4),
+                      itemBuilder: (_, i) => _ReviewItemTile(
+                        item: _items[i],
+                        zones: _zones,
+                        zoneLabels: _zoneLabels,
+                        zoneIcons: _zoneIcons,
+                        isDark: isDark,
+                        onToggle: (val) =>
+                            setState(() => _items[i].isSelected = val),
+                        onZoneChange: (zone) =>
+                            setState(() => _items[i].location = zone),
+                        onEdit: () => _editItem(i),
+                        onDelete: () => _removeItem(i),
+                      ),
+                    ),
             ),
             // Bottom confirm bar
             Container(
@@ -1270,6 +1412,7 @@ class _ReviewItemTile extends StatelessWidget {
   final ValueChanged<bool> onToggle;
   final ValueChanged<String> onZoneChange;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   const _ReviewItemTile({
     required this.item,
@@ -1280,6 +1423,7 @@ class _ReviewItemTile extends StatelessWidget {
     required this.onToggle,
     required this.onZoneChange,
     required this.onEdit,
+    required this.onDelete,
   });
 
   Color get _zoneColor {
@@ -1376,7 +1520,7 @@ class _ReviewItemTile extends StatelessWidget {
                                 ? AppTheme.textDarkPrimary
                                 : AppTheme.textLightPrimary,
                           ),
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -1390,6 +1534,17 @@ class _ReviewItemTile extends StatelessWidget {
                         ),
                         padding: EdgeInsets.zero,
                         icon: const Icon(Icons.edit_outlined, size: 15),
+                      ),
+                      IconButton(
+                        tooltip: 'Remove item',
+                        onPressed: onDelete,
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 30,
+                          height: 28,
+                        ),
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.close_rounded, size: 17),
                       ),
                     ],
                   ),
