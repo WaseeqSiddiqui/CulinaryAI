@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/chef_name_formatter.dart';
 import '../../models/pantry_item_model.dart';
@@ -2110,110 +2108,6 @@ class _RecipesPlaceholderTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const ChatbotScreen();
-}
-
-class _RestockPlaceholderTab extends StatelessWidget {
-  const _RestockPlaceholderTab();
-
-  Future<void> _openStore(
-    BuildContext context,
-    String itemName, {
-    required bool daraz,
-  }) async {
-    final baseUrl = daraz
-        ? AppConstants.darazMartBaseUrl
-        : AppConstants.foodpandaMartBaseUrl;
-    final uri = Uri.parse(baseUrl).replace(queryParameters: {'q': itemName});
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!launched && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open the store app.')),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pantry = context.watch<PantryProvider>();
-    final lowStock = pantry.allItems.where((item) => item.isLowStock).toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Shopping list')),
-      body: lowStock.isEmpty
-          ? const Center(child: Text('Everything is stocked'))
-          : ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              itemCount: lowStock.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final item = lowStock[index];
-                return Card(
-                  elevation: 0,
-                  color: isDark ? AppTheme.surfaceDark : Colors.white,
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.warning_amber_rounded,
-                              color: AppTheme.warmAmber,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.name,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${item.quantity} ${item.unit} remaining',
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () =>
-                                    _openStore(context, item.name, daraz: true),
-                                child: const Text('Daraz'),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: FilledButton(
-                                onPressed: () => _openStore(
-                                  context,
-                                  item.name,
-                                  daraz: false,
-                                ),
-                                child: const Text('Pandamart'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-    );
-  }
 }
 
 // ── Kitchen Navigation Drawer (Hamburger Slider) ─────────────────────────────

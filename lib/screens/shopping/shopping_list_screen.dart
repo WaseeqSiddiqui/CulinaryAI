@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/shopping_provider.dart';
+import 'store_automation_screen.dart';
 
 class ShoppingListScreen extends StatelessWidget {
   const ShoppingListScreen({super.key});
@@ -35,23 +36,46 @@ class ShoppingListScreen extends StatelessWidget {
             ),
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.all(16),
-        child: FilledButton.icon(
-          onPressed: shopping.items.isEmpty
-              ? null
-              : () async {
-                  final order = await context
-                      .read<ShoppingProvider>()
-                      .placePendingOrder();
-                  if (context.mounted && order != null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Pending order created. Pantry stock was not changed.'),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            FilledButton.icon(
+              onPressed: shopping.items.isEmpty
+                  ? null
+                  : () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => StoreAutomationScreen(
+                          items: List.of(shopping.items),
+                        ),
                       ),
-                    );
-                  }
-                },
-          icon: const Icon(Icons.receipt_long),
-          label: const Text('Place order'),
+                    ),
+              icon: const Icon(Icons.shopping_cart_checkout),
+              label: const Text('Buy from PandaMart'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: shopping.items.isEmpty
+                  ? null
+                  : () async {
+                      final order = await context
+                          .read<ShoppingProvider>()
+                          .placePendingOrder();
+                      if (context.mounted && order != null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Pending order created. Pantry stock was not changed.',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+              icon: const Icon(Icons.receipt_long),
+              label: const Text('Place order without store'),
+            ),
+          ],
         ),
       ),
     );

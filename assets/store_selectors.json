@@ -1,0 +1,25 @@
+{
+  "pandamart": {
+    "home_url": "https://www.foodpanda.pk/",
+    "search_url_template": "",
+    "logged_in": "",
+    "search_input": "",
+    "search_submit": "",
+    "product_card": "",
+    "product_name": "",
+    "product_size": "",
+    "product_price": "",
+    "product_out_of_stock": "",
+    "product_add_button": "",
+    "cart_line": "",
+    "cart_line_name": "",
+    "cart_line_quantity": "",
+    "cart_line_price": "",
+    "cart_total": "",
+    "checkout_button": "",
+    "cash_on_delivery": "",
+    "final_purchase_button": "",
+    "captcha": "",
+    "otp_prompt": ""
+  }
+}

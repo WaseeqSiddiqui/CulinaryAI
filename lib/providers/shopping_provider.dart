@@ -57,14 +57,16 @@ class ShoppingProvider extends ChangeNotifier {
   Future<void> _seedFromPantry(List<PantryItemModel> pantryItems) async {
     if (!_maySeedFromPantry) return;
     _items.addAll(
-      pantryItems.where((item) => item.isLowStock).map(
-        (item) => ShoppingListItem(
-          id: item.id,
-          name: item.name,
-          quantity: _restockQuantity(item),
-          unit: item.unit,
-        ),
-      ),
+      pantryItems
+          .where((item) => item.isLowStock)
+          .map(
+            (item) => ShoppingListItem(
+              id: item.id,
+              name: item.name,
+              quantity: _restockQuantity(item),
+              unit: item.unit,
+            ),
+          ),
     );
     _maySeedFromPantry = false;
     await _persist();
@@ -109,6 +111,34 @@ class ShoppingProvider extends ChangeNotifier {
     );
     await _service.createOrder(order);
     _items.removeWhere((item) => !item.keepAfterOrder);
+    await _persist();
+    notifyListeners();
+    return order;
+  }
+
+  Future<ShoppingOrder?> recordStoreOrder({
+    required String storeName,
+    required double total,
+    required Set<String> purchasedItemIds,
+  }) async {
+    final householdId = _householdId;
+    final purchased = _items
+        .where((item) => purchasedItemIds.contains(item.id))
+        .toList();
+    if (householdId == null || purchased.isEmpty) return null;
+    final order = ShoppingOrder(
+      id: _uuid.v4(),
+      householdId: householdId,
+      items: purchased,
+      status: 'ordered (pending delivery)',
+      createdAt: DateTime.now(),
+      storeName: storeName,
+      total: total,
+    );
+    await _service.createOrder(order);
+    _items.removeWhere(
+      (item) => purchasedItemIds.contains(item.id) && !item.keepAfterOrder,
+    );
     await _persist();
     notifyListeners();
     return order;
