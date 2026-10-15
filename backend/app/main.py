@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException
+import json
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.models.schemas import (
@@ -8,16 +9,21 @@ from app.models.schemas import (
     InstructionRequest,
     InstructionResponse,
 )
+from app.models.vision_schemas import ValidatedReceiptResponse
+from app.services.gemini_service import GeminiVisionService
+from app.services.ingredient_catalog import IngredientCatalogService
 from app.services.meal_planner import MealPlannerService
 from app.services.recipe_repository import VerifiedRecipeRepository
 
 repository = VerifiedRecipeRepository()
 planner = MealPlannerService(repository)
+catalog_service = IngredientCatalogService()
+vision_service = GeminiVisionService(catalog_service=catalog_service)
 
 app = FastAPI(
-    title="CulinaryAI Meal Planning API",
-    version="0.2.0",
-    description="Pantry-aware planning API integrated with the CulinaryAI mobile client.",
+    title="CulinaryAI API",
+    version="0.3.0",
+    description="Pantry-aware planning and vision AI API for the CulinaryAI platform.",
 )
 app.add_middleware(
     CORSMiddleware,
@@ -44,3 +50,30 @@ def generate_instructions(request: InstructionRequest) -> InstructionResponse:
         return planner.instructions(request.recipe_id, request.servings)
     except KeyError as error:
         raise HTTPException(status_code=404, detail="Recipe not found") from error
+
+
+@app.post("/parse-receipt", response_model=ValidatedReceiptResponse)
+async def parse_receipt(
+    file: UploadFile = File(..., description="Multipart image of receipt"),
+    user_id: str | None = Header(default=None, alias="X-User-Id"),
+    user_id_form: str | None = Form(default=None, alias="user_id"),
+    aliases_json: str | None = Form(default=None, alias="household_aliases"),
+) -> ValidatedReceiptResponse:
+    effective_user = user_id or user_id_form or "default_user"
+    
+    aliases: dict[str, str] | None = None
+    if aliases_json:
+        try:
+            aliases = json.loads(aliases_json)
+        except Exception:
+            aliases = None
+
+    image_bytes = await file.read()
+    mime = file.content_type or "image/jpeg"
+    
+    return vision_service.parse_receipt(
+        image_bytes=image_bytes,
+        mime_type=mime,
+        user_id=effective_user,
+        household_aliases=aliases,
+    )
