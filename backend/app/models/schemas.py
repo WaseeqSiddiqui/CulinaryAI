@@ -83,3 +83,31 @@ class InstructionResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     indexed_recipes: int
+
+
+class ProductCandidateInput(BaseModel):
+    name: str = Field(min_length=1, max_length=240)
+    size: str | None = Field(default=None, max_length=80)
+    price: float = Field(ge=0)
+    in_stock: bool
+
+
+class MatchProductRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    quantity: float = Field(gt=0, le=10000)
+    unit: str = Field(min_length=1, max_length=24)
+    candidates: list[ProductCandidateInput] = Field(min_length=1, max_length=8)
+
+
+class MatchProductResponse(BaseModel):
+    chosen_index: int | None = None
+    units_to_buy: int | None = Field(default=None, ge=1, le=10)
+    confidence: float = Field(ge=0, le=1)
+    reason: str = Field(min_length=1, max_length=500)
+
+    @field_validator("units_to_buy")
+    @classmethod
+    def units_require_choice(cls, value: int | None, info):
+        if info.data.get("chosen_index") is not None and value is None:
+            raise ValueError("units_to_buy is required when a product is chosen")
+        return value
