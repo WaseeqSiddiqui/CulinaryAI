@@ -19,6 +19,7 @@ import '../cooking/guided_cooking_screen.dart';
 import '../pantry/pantry_screen.dart';
 import '../profile/profile_screen.dart';
 import '../scanner/receipt_scanner_screen.dart';
+import '../shopping/shopping_list_screen.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -79,7 +80,7 @@ class _MainShellState extends State<MainShell> {
           _DashboardTab(),
           PantryScreen(),
           _RecipesPlaceholderTab(),
-          _RestockPlaceholderTab(),
+          ShoppingListScreen(),
           ProfileScreen(),
         ],
       ),

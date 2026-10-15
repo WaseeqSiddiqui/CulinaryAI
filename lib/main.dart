@@ -5,6 +5,7 @@ import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/household_provider.dart';
 import 'providers/pantry_provider.dart';
+import 'providers/shopping_provider.dart';
 import 'providers/theme_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/main_shell.dart';
@@ -38,6 +39,15 @@ class CulinaryAiApp extends StatelessWidget {
           update: (_, household, pantry) {
             final value = pantry ?? PantryProvider();
             value.bindHousehold(household.pantryScopeId);
+            return value;
+          },
+        ),
+        ChangeNotifierProxyProvider2<HouseholdProvider, PantryProvider,
+            ShoppingProvider>(
+          create: (_) => ShoppingProvider(),
+          update: (_, household, pantry, shopping) {
+            final value = shopping ?? ShoppingProvider();
+            value.bindHousehold(household.pantryScopeId, pantry.allItems);
             return value;
           },
         ),
