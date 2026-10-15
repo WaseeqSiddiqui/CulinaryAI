@@ -163,6 +163,7 @@ class ReconciledFridgeItem(BaseModel):
     suggested_quantity: float | None = None
     unit: str = "pcs"
     estimated: bool = True
+    verified_at: str | None = None
 
 
 class FridgeScanResponse(BaseModel):

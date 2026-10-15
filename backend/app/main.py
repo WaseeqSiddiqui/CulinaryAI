@@ -9,7 +9,12 @@ from app.models.schemas import (
     InstructionRequest,
     InstructionResponse,
 )
-from app.models.vision_schemas import ValidatedReceiptResponse
+from app.models.vision_schemas import (
+    ExistingPantryItem,
+    FridgeScanResponse,
+    ValidatedReceiptResponse,
+)
+from app.services.fridge_reconciler import FridgeReconciler
 from app.services.gemini_service import GeminiVisionService
 from app.services.ingredient_catalog import IngredientCatalogService
 from app.services.meal_planner import MealPlannerService
@@ -19,6 +24,7 @@ repository = VerifiedRecipeRepository()
 planner = MealPlannerService(repository)
 catalog_service = IngredientCatalogService()
 vision_service = GeminiVisionService(catalog_service=catalog_service)
+fridge_reconciler = FridgeReconciler(catalog=catalog_service)
 
 app = FastAPI(
     title="CulinaryAI API",
@@ -76,4 +82,40 @@ async def parse_receipt(
         mime_type=mime,
         user_id=effective_user,
         household_aliases=aliases,
+    )
+
+
+@app.post("/scan-fridge", response_model=FridgeScanResponse)
+async def scan_fridge(
+    file: UploadFile = File(..., description="Multipart image of fridge shelf or compartment"),
+    user_id: str | None = Header(default=None, alias="X-User-Id"),
+    user_id_form: str | None = Form(default=None, alias="user_id"),
+    pantry_items_json: str | None = Form(default=None, alias="pantry_items"),
+) -> FridgeScanResponse:
+    effective_user = user_id or user_id_form or "default_user"
+
+    pantry_items: list[ExistingPantryItem] = []
+    if pantry_items_json:
+        try:
+            raw_list = json.loads(pantry_items_json)
+            if isinstance(raw_list, list):
+                for item in raw_list:
+                    pantry_items.append(ExistingPantryItem.model_validate(item))
+        except Exception:
+            pass
+
+    image_bytes = await file.read()
+    mime = file.content_type or "image/jpeg"
+
+    # Detect items using Gemini vision
+    detected_scan = vision_service.scan_fridge(
+        image_bytes=image_bytes,
+        mime_type=mime,
+        user_id=effective_user,
+    )
+
+    # Reconcile detected items vs household pantry items
+    return fridge_reconciler.reconcile(
+        detected_scan=detected_scan,
+        pantry_items=pantry_items,
     )
