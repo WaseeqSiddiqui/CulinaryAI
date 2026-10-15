@@ -729,7 +729,7 @@ class _ProcessingView extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'On-device OCR is reading your receipt',
+            'Tesseract OCR is reading your receipt on-device',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.4),
               fontSize: 13,
