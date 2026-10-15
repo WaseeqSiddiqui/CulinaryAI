@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/pantry_item_model.dart';
+import '../models/receipt_vision_models.dart';
 import '../services/pantry_service.dart';
 
 class PantryProvider extends ChangeNotifier {
@@ -199,6 +200,83 @@ class PantryProvider extends ChangeNotifier {
     _items.add(item);
     _persistAndSync(item);
     notifyListeners();
+  }
+
+  Future<void> ingestReceiptItems({
+    required String householdId,
+    required List<ValidatedReceiptItem> items,
+    String? storeName,
+    String? receiptDate,
+    double? receiptTotal,
+    String? receiptHash,
+  }) async {
+    final scopeId = _householdId ?? householdId;
+    final now = DateTime.now();
+
+    for (final scanned in items.where((i) => i.isSelected)) {
+      // 1. Record purchase event in the ledger (source="receipt")
+      final event = {
+        'id': _uuid.v4(),
+        'household_id': scopeId,
+        'item_name': scanned.name,
+        'matched_ingredient': scanned.matchedIngredient,
+        'quantity': scanned.totalQty,
+        'unit': scanned.unit,
+        'price': scanned.linePrice,
+        'type': 'purchase',
+        'source': 'receipt',
+        'timestamp': now.toIso8601String(),
+        'store_name': storeName,
+        'receipt_date': receiptDate,
+        'receipt_total': receiptTotal,
+        'receipt_hash': receiptHash,
+      };
+      unawaited(_service.recordLedgerEvent(scopeId, event));
+
+      // 2. Update pantry items
+      final targetName = scanned.matchedIngredient.isNotEmpty
+          ? scanned.matchedIngredient
+          : scanned.name;
+      final normName = targetName.toLowerCase().trim();
+      final zone = scanned.storageZone;
+
+      final existingIndex = _items.indexWhere(
+        (it) => it.name.toLowerCase().trim() == normName && it.location == zone,
+      );
+
+      if (existingIndex != -1) {
+        final existing = _items[existingIndex];
+        final updated = existing.copyWith(
+          quantity: existing.quantity + scanned.totalQty,
+          updatedAt: now,
+        );
+        _items[existingIndex] = updated;
+        _persistAndSync(updated);
+      } else {
+        final newItem = PantryItemModel(
+          id: _uuid.v4(),
+          householdId: scopeId,
+          name: targetName,
+          quantity: scanned.totalQty,
+          unit: scanned.unit,
+          location: zone,
+          lowStockThreshold: _defaultThreshold(scanned.unit),
+          addedVia: 'receipt_scan',
+          updatedAt: now,
+        );
+        _items.add(newItem);
+        _persistAndSync(newItem);
+      }
+    }
+    notifyListeners();
+  }
+
+  double _defaultThreshold(String unit) {
+    final u = unit.toLowerCase();
+    if (u == 'kg' || u == 'l') return 0.5;
+    if (u == 'pcs') return 2;
+    if (u == 'g' || u == 'ml') return 50;
+    return 1;
   }
 
   void updateItem(PantryItemModel updated) {

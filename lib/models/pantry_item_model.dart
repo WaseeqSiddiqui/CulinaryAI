@@ -11,6 +11,7 @@ class PantryItemModel {
   final String addedVia; // 'manual' or 'receipt_scan'
   final DateTime updatedAt;
   final String? customImageUrl;
+  final bool estimated;
 
   PantryItemModel({
     required this.id,
@@ -23,6 +24,7 @@ class PantryItemModel {
     this.addedVia = 'manual',
     required this.updatedAt,
     this.customImageUrl,
+    this.estimated = false,
   });
 
   bool get isLowStock => quantity <= lowStockThreshold;
@@ -46,6 +48,7 @@ class PantryItemModel {
       'added_via': addedVia,
       'updated_at': updatedAt.toIso8601String(),
       'custom_image_url': customImageUrl,
+      'estimated': estimated,
     };
   }
 
@@ -63,6 +66,7 @@ class PantryItemModel {
           ? DateTime.tryParse(map['updated_at']) ?? DateTime.now()
           : DateTime.now(),
       customImageUrl: map['custom_image_url'],
+      estimated: map['estimated'] as bool? ?? false,
     );
   }
 
@@ -77,6 +81,7 @@ class PantryItemModel {
     String? addedVia,
     DateTime? updatedAt,
     String? customImageUrl,
+    bool? estimated,
   }) {
     return PantryItemModel(
       id: id ?? this.id,
@@ -89,6 +94,7 @@ class PantryItemModel {
       addedVia: addedVia ?? this.addedVia,
       updatedAt: updatedAt ?? this.updatedAt,
       customImageUrl: customImageUrl ?? this.customImageUrl,
+      estimated: estimated ?? this.estimated,
     );
   }
 }

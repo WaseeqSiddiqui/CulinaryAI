@@ -81,4 +81,37 @@ class PantryService {
       }
     }
   }
+
+  Future<void> recordLedgerEvent(
+    String householdId,
+    Map<String, dynamic> event,
+  ) async {
+    // 1. Save to local preferences
+    final prefs = await SharedPreferences.getInstance();
+    final cacheKey = 'culinary_ledger_$householdId';
+    final existingJson = prefs.getString(cacheKey);
+    final list = existingJson != null
+        ? (jsonDecode(existingJson) as List<dynamic>).cast<Map<String, dynamic>>()
+        : <Map<String, dynamic>>[];
+    list.add(event);
+    await prefs.setString(cacheKey, jsonEncode(list));
+
+    // 2. Save to Firestore if available
+    if (_firestore != null) {
+      try {
+        final eventId = event['id'] as String? ??
+            DateTime.now().millisecondsSinceEpoch.toString();
+        await _firestore
+            .collection('households')
+            .doc(householdId)
+            .collection('ledger')
+            .doc(eventId)
+            .set(event);
+      } on FirebaseException catch (error) {
+        if (kDebugMode) {
+          debugPrint('Ledger event queued locally: ${error.code}');
+        }
+      }
+    }
+  }
 }

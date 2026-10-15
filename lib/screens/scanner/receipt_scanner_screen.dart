@@ -4,11 +4,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
-import '../../models/receipt_scanned_item.dart';
+import '../../models/receipt_vision_models.dart';
 import '../../providers/pantry_provider.dart';
 import '../../services/food_image_service.dart';
-import '../../services/receipt_ocr_service.dart';
-import '../../services/receipt_parser_service.dart';
+import '../../services/household_alias_service.dart';
+import '../../services/vision_api_service.dart';
 
 class ReceiptScannerScreen extends StatefulWidget {
   const ReceiptScannerScreen({super.key});
@@ -20,11 +20,15 @@ class ReceiptScannerScreen extends StatefulWidget {
 class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
     with TickerProviderStateMixin {
   _ScanState _scanState = _ScanState.idle;
-  List<ReceiptScannedItem> _scannedItems = [];
+  List<ValidatedReceiptItem> _scannedItems = [];
   final ImagePicker _imagePicker = ImagePicker();
-  final ReceiptOcrService _ocrService = ReceiptOcrService();
+  final VisionApiService _visionService = VisionApiService();
+  final HouseholdAliasService _aliasService = HouseholdAliasService();
+
   Uint8List? _receiptImage;
-  ReceiptOcrResult? _ocrResult;
+  ValidatedReceiptResponse? _validatedResponse;
+  bool _isDuplicateReceipt = false;
+  String? _receiptKey;
   String? _scanError;
 
   late AnimationController _scanLineController;
@@ -56,14 +60,19 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
   void dispose() {
     _scanLineController.dispose();
     _pulseController.dispose();
-    _ocrService.close();
+    _visionService.close();
     super.dispose();
   }
 
   Future<void> _startScan(ImageSource source) async {
     XFile? image;
     try {
-      image = await _imagePicker.pickImage(source: source);
+      image = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 85,
+      );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -81,45 +90,59 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
       _scanError = null;
     });
 
-    await Future.delayed(const Duration(milliseconds: 450));
+    await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted) return;
     setState(() => _scanState = _ScanState.processing);
 
     try {
-      final recognized = await _ocrService.recognize(image.path);
-      final items = ReceiptParserService.parseLines(recognized.lines);
+      final pantry = Provider.of<PantryProvider>(context, listen: false);
+      final householdId = pantry.householdId ?? 'personal_demo_chef';
+
+      // 1. Load household aliases to enhance vision matching
+      final aliases = await _aliasService.getAliases(householdId);
+
+      // 2. Upload downscaled image to /parse-receipt backend
+      final validatedResponse = await _visionService.parseReceipt(
+        imageBytes: bytes,
+        userId: householdId,
+        householdAliases: aliases,
+      );
+
+      // 3. Duplicate check using SHA-256 hash or metadata
+      final receiptKey = validatedResponse.imageHash ??
+          '${validatedResponse.storeName ?? "store"}_${validatedResponse.date ?? "nodate"}_${validatedResponse.receiptTotal ?? 0}';
+      final isDuplicate = await VisionApiService.isDuplicate(householdId, receiptKey);
+
       if (!mounted) return;
 
-      if (items.isEmpty) {
-        if (recognized.rawText.trim().isNotEmpty) {
-          setState(() {
-            _ocrResult = recognized;
-            _scannedItems = [];
-            _scanState = _ScanState.review;
-          });
-          _showReviewSheet();
-          return;
-        }
+      if (validatedResponse.items.isEmpty) {
         setState(() {
-          _ocrResult = recognized;
-          _scanError = 'No text was found. Use a clear, well-lit photo of the full receipt.';
+          _validatedResponse = validatedResponse;
+          _scanError = 'No grocery items were recognized on this receipt. Please ensure good lighting and alignment.';
           _scanState = _ScanState.error;
         });
         return;
       }
 
       setState(() {
-        _ocrResult = recognized;
-        _scannedItems = items;
+        _validatedResponse = validatedResponse;
+        _scannedItems = validatedResponse.items;
+        _isDuplicateReceipt = isDuplicate;
+        _receiptKey = receiptKey;
         _scanState = _ScanState.review;
       });
+
       _showReviewSheet();
-    } catch (error) {
-      debugPrint('Receipt OCR failed: $error');
+    } on VisionApiException catch (e) {
       if (!mounted) return;
       setState(() {
-        _scanError =
-            'The receipt could not be read. Check the image and try again.';
+        _scanError = e.message;
+        _scanState = _ScanState.error;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _scanError = 'Failed to analyze receipt. Check your backend server and connection.';
         _scanState = _ScanState.error;
       });
     }
@@ -130,21 +153,32 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
       _scanState = _ScanState.idle;
       _scannedItems = [];
       _receiptImage = null;
-      _ocrResult = null;
+      _validatedResponse = null;
+      _isDuplicateReceipt = false;
+      _receiptKey = null;
       _scanError = null;
     });
   }
 
   void _showReviewSheet() {
+    final resp = _validatedResponse;
+    if (resp == null) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       isDismissible: false,
       builder: (_) => _ReviewSheet(
+        response: resp,
         items: _scannedItems,
-        diagnosticText: _ocrResult?.diagnosticText ?? '',
+        isDuplicate: _isDuplicateReceipt,
         receiptImage: _receiptImage,
+        onAliasCorrection: (rawText, newName) async {
+          final pantry = Provider.of<PantryProvider>(context, listen: false);
+          final householdId = pantry.householdId ?? 'personal_demo_chef';
+          await _aliasService.saveAlias(householdId, rawText, newName);
+        },
         onConfirm: _confirmItems,
         onRescan: () {
           Navigator.pop(context);
@@ -154,23 +188,31 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
     );
   }
 
-  void _confirmItems(List<ReceiptScannedItem> confirmed) {
+  Future<void> _confirmItems(List<ValidatedReceiptItem> confirmed) async {
     final pantry = Provider.of<PantryProvider>(context, listen: false);
-    for (final item in confirmed.where((i) => i.isSelected)) {
-      pantry.addItem(
-        householdId: 'hh_demo',
-        name: item.name,
-        quantity: item.quantity,
-        unit: item.unit,
-        location: _zoneLabel(item.location),
-        lowStockThreshold: _defaultThreshold(item.unit),
-        addedVia: 'receipt_scan',
-      );
+    final householdId = pantry.householdId ?? 'personal_demo_chef';
+    final resp = _validatedResponse;
+
+    // Ingest confirmed items into pantry inventory & write purchase events to ledger
+    await pantry.ingestReceiptItems(
+      householdId: householdId,
+      items: confirmed,
+      storeName: resp?.storeName,
+      receiptDate: resp?.date,
+      receiptTotal: resp?.receiptTotal,
+      receiptHash: _receiptKey,
+    );
+
+    // Record receipt as processed
+    if (_receiptKey != null) {
+      await VisionApiService.markProcessed(householdId, _receiptKey!);
     }
 
-    Navigator.pop(context); // close sheet
+    if (!mounted) return;
+    Navigator.pop(context); // close review sheet
     setState(() => _scanState = _ScanState.done);
 
+    final addedCount = confirmed.where((i) => i.isSelected).length;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -182,7 +224,7 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
             ),
             const SizedBox(width: 10),
             Text(
-              '${confirmed.where((i) => i.isSelected).length} items added to pantry!',
+              '$addedCount items added to pantry & ledger!',
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ],
@@ -192,27 +234,6 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
-  }
-
-  // Converts internal zone key → display label used in PantryProvider
-  String _zoneLabel(String loc) {
-    switch (loc) {
-      case 'fridge':
-        return 'Fridge';
-      case 'freezer':
-        return 'Freezer';
-      case 'spice_rack':
-        return 'Spice Rack';
-      default:
-        return 'Pantry Shelf';
-    }
-  }
-
-  double _defaultThreshold(String unit) {
-    if (unit == 'kg' || unit == 'L') return 0.5;
-    if (unit == 'pcs') return 2;
-    if (unit == 'g' || unit == 'ml') return 50;
-    return 1;
   }
 
   @override
@@ -225,7 +246,7 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text(
-          'Receipt Scanner',
+          'Gemini Receipt Scanner',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
         leading: IconButton(
@@ -261,24 +282,24 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
   Widget _buildBody() {
     return switch (_scanState) {
       _ScanState.idle => _IdleView(
-        onCamera: () => _startScan(ImageSource.camera),
-        onGallery: () => _startScan(ImageSource.gallery),
-      ),
+          onCamera: () => _startScan(ImageSource.camera),
+          onGallery: () => _startScan(ImageSource.gallery),
+        ),
       _ScanState.scanning => _ScanningView(
-        scanLineAnim: _scanLineAnim,
-        pulseAnim: _pulseAnim,
-        imageBytes: _receiptImage,
-      ),
+          scanLineAnim: _scanLineAnim,
+          pulseAnim: _pulseAnim,
+          imageBytes: _receiptImage,
+        ),
       _ScanState.processing => const _ProcessingView(),
-      _ScanState.review => const _ProcessingView(), // brief flash
+      _ScanState.review => const _ProcessingView(),
       _ScanState.error => _ScanErrorView(
-        message: _scanError ?? 'The receipt could not be read.',
-        onRetry: _resetScan,
-      ),
+          message: _scanError ?? 'The receipt could not be read.',
+          onRetry: _resetScan,
+        ),
       _ScanState.done => _DoneView(
-        itemCount: _scannedItems.where((i) => i.isSelected).length,
-        onNewScan: _resetScan,
-      ),
+          itemCount: _scannedItems.where((i) => i.isSelected).length,
+          onNewScan: _resetScan,
+        ),
     };
   }
 }
@@ -301,10 +322,10 @@ class _IdleView extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Camera viewfinder mock
+                // Viewfinder container
                 Container(
-                  width: 280,
-                  height: 200,
+                  width: 290,
+                  height: 220,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
@@ -315,23 +336,32 @@ class _IdleView extends StatelessWidget {
                   ),
                   child: Stack(
                     children: [
-                      // Corner brackets
                       ..._buildCorners(),
                       Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.receipt_long_rounded,
+                              Icons.document_scanner_rounded,
                               size: 48,
-                              color: Colors.white.withValues(alpha: 0.2),
+                              color: Colors.white.withValues(alpha: 0.25),
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              'Point camera at receipt',
+                              'Point camera at grocery receipt',
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.4),
+                                color: Colors.white.withValues(alpha: 0.6),
                                 fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Powered by Gemini Vision',
+                              style: TextStyle(
+                                color: AppTheme.primaryEmerald.withValues(alpha: 0.8),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
@@ -341,23 +371,22 @@ class _IdleView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 32),
-                // Info chips
                 Wrap(
                   spacing: 10,
                   runSpacing: 8,
                   alignment: WrapAlignment.center,
                   children: const [
                     _InfoChip(
-                      icon: Icons.flash_on_rounded,
-                      label: 'Auto-detects items',
+                      icon: Icons.check_circle_outline_rounded,
+                      label: 'Auto Crop & Deskew',
                     ),
                     _InfoChip(
-                      icon: Icons.edit_rounded,
-                      label: 'Review before adding',
+                      icon: Icons.reviews_outlined,
+                      label: 'Mandatory Review',
                     ),
                     _InfoChip(
-                      icon: Icons.bolt_rounded,
-                      label: 'Batch pantry update',
+                      icon: Icons.history_edu_rounded,
+                      label: 'Ledger Audit',
                     ),
                   ],
                 ),
@@ -365,42 +394,45 @@ class _IdleView extends StatelessWidget {
             ),
           ),
         ),
-        // Bottom action area
+        // Bottom action buttons
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 48),
-          child: Column(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 36),
+          child: Row(
             children: [
-              SizedBox(
-                width: double.infinity,
-                height: 58,
-                child: ElevatedButton.icon(
-                  onPressed: onCamera,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryEmerald,
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onGallery,
+                  icon: const Icon(Icons.photo_library_rounded, size: 20),
+                  label: const Text('Gallery'),
+                  style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
+                    side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    elevation: 0,
-                  ),
-                  icon: const Icon(Icons.camera_alt_rounded, size: 22),
-                  label: const Text(
-                    'Scan Receipt',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
-              TextButton.icon(
-                onPressed: onGallery,
-                icon: const Icon(
-                  Icons.photo_library_outlined,
-                  size: 18,
-                  color: Colors.white54,
-                ),
-                label: const Text(
-                  'Upload from Gallery',
-                  style: TextStyle(color: Colors.white54, fontSize: 14),
+              const SizedBox(width: 14),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: onCamera,
+                  icon: const Icon(Icons.camera_alt_rounded, size: 22),
+                  label: const Text(
+                    'Snap Receipt',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryEmerald,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 4,
+                  ),
                 ),
               ),
             ],
@@ -410,120 +442,70 @@ class _IdleView extends StatelessWidget {
     );
   }
 
-  static List<Widget> _buildCorners() {
-    const color = AppTheme.primaryEmerald;
-    const size = 20.0;
+  List<Widget> _buildCorners() {
+    const size = 18.0;
     const thickness = 3.0;
+    const color = AppTheme.primaryEmerald;
+
     return [
-      // TL
       Positioned(
-        top: 12,
-        left: 12,
-        child: _Corner(
-          top: true,
-          left: true,
-          color: color,
-          size: size,
-          thickness: thickness,
+        top: 10,
+        left: 10,
+        child: Container(
+          width: size,
+          height: size,
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: color, width: thickness),
+              left: BorderSide(color: color, width: thickness),
+            ),
+          ),
         ),
       ),
-      // TR
       Positioned(
-        top: 12,
-        right: 12,
-        child: _Corner(
-          top: true,
-          left: false,
-          color: color,
-          size: size,
-          thickness: thickness,
+        top: 10,
+        right: 10,
+        child: Container(
+          width: size,
+          height: size,
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: color, width: thickness),
+              right: BorderSide(color: color, width: thickness),
+            ),
+          ),
         ),
       ),
-      // BL
       Positioned(
-        bottom: 12,
-        left: 12,
-        child: _Corner(
-          top: false,
-          left: true,
-          color: color,
-          size: size,
-          thickness: thickness,
+        bottom: 10,
+        left: 10,
+        child: Container(
+          width: size,
+          height: size,
+          decoration: const BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: color, width: thickness),
+              left: BorderSide(color: color, width: thickness),
+            ),
+          ),
         ),
       ),
-      // BR
       Positioned(
-        bottom: 12,
-        right: 12,
-        child: _Corner(
-          top: false,
-          left: false,
-          color: color,
-          size: size,
-          thickness: thickness,
+        bottom: 10,
+        right: 10,
+        child: Container(
+          width: size,
+          height: size,
+          decoration: const BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: color, width: thickness),
+              right: BorderSide(color: color, width: thickness),
+            ),
+          ),
         ),
       ),
     ];
   }
-}
-
-class _Corner extends StatelessWidget {
-  final bool top, left;
-  final Color color;
-  final double size, thickness;
-  const _Corner({
-    required this.top,
-    required this.left,
-    required this.color,
-    required this.size,
-    required this.thickness,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(
-        painter: _CornerPainter(
-          top: top,
-          left: left,
-          color: color,
-          thickness: thickness,
-        ),
-      ),
-    );
-  }
-}
-
-class _CornerPainter extends CustomPainter {
-  final bool top, left;
-  final Color color;
-  final double thickness;
-  _CornerPainter({
-    required this.top,
-    required this.left,
-    required this.color,
-    required this.thickness,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = thickness
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    final x = left ? 0.0 : size.width;
-    final y = top ? 0.0 : size.height;
-    final dx = left ? size.width : -size.width;
-    final dy = top ? size.height : -size.height;
-    canvas.drawLine(Offset(x, y), Offset(x + dx, y), paint);
-    canvas.drawLine(Offset(x, y), Offset(x, y + dy), paint);
-  }
-
-  @override
-  bool shouldRepaint(_CornerPainter old) => false;
 }
 
 class _InfoChip extends StatelessWidget {
@@ -534,9 +516,9 @@ class _InfoChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: Colors.white.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
@@ -559,12 +541,13 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
-// ── Scanning View ─────────────────────────────────────────────────────────────
+// ── Scanning View ────────────────────────────────────────────────────────────
 
 class _ScanningView extends StatelessWidget {
   final Animation<double> scanLineAnim;
   final Animation<double> pulseAnim;
   final Uint8List? imageBytes;
+
   const _ScanningView({
     required this.scanLineAnim,
     required this.pulseAnim,
@@ -573,122 +556,54 @@ class _ScanningView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 280,
-            height: 200,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppTheme.primaryEmerald, width: 2),
-              color: Colors.white.withValues(alpha: 0.03),
+    return Stack(
+      children: [
+        if (imageBytes != null)
+          Positioned.fill(
+            child: Image.memory(
+              imageBytes!,
+              fit: BoxFit.cover,
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(18),
-              child: AnimatedBuilder(
-                animation: scanLineAnim,
-                builder: (_, _) => Stack(
-                  children: [
-                    if (imageBytes != null)
-                      Positioned.fill(
-                        child: Image.memory(imageBytes!, fit: BoxFit.cover),
-                      ),
-                    // scan overlay gradient
-                    Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              AppTheme.primaryEmerald.withValues(alpha: 0.0),
-                              AppTheme.primaryEmerald.withValues(alpha: 0.04),
-                              AppTheme.primaryEmerald.withValues(alpha: 0.0),
-                            ],
-                            stops: [
-                              (scanLineAnim.value - 0.1).clamp(0.0, 1.0),
-                              scanLineAnim.value,
-                              (scanLineAnim.value + 0.1).clamp(0.0, 1.0),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    // scan line
-                    Positioned(
-                      top: scanLineAnim.value * 190,
-                      left: 12,
-                      right: 12,
+          ),
+        Container(color: Colors.black.withValues(alpha: 0.45)),
+        Center(
+          child: ScaleTransition(
+            scale: pulseAnim,
+            child: Container(
+              width: 290,
+              height: 420,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppTheme.primaryEmerald, width: 2),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: AnimatedBuilder(
+                  animation: scanLineAnim,
+                  builder: (_, _) {
+                    return Align(
+                      alignment: Alignment(0, (scanLineAnim.value * 2) - 1),
                       child: Container(
-                        height: 2,
+                        height: 3,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.transparent,
-                              AppTheme.primaryEmerald,
-                              Colors.transparent,
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(1),
+                          color: AppTheme.primaryEmerald,
                           boxShadow: [
                             BoxShadow(
-                              color: AppTheme.primaryEmerald.withValues(
-                                alpha: 0.6,
-                              ),
-                              blurRadius: 8,
+                              color: AppTheme.primaryEmerald.withValues(alpha: 0.8),
+                              blurRadius: 12,
+                              spreadRadius: 2,
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 28),
-          AnimatedBuilder(
-            animation: pulseAnim,
-            builder: (_, _) => Transform.scale(
-              scale: pulseAnim.value,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryEmerald.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppTheme.primaryEmerald,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Scanning receipt...',
-                      style: TextStyle(
-                        color: AppTheme.primaryEmerald,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -720,7 +635,7 @@ class _ProcessingView extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           const Text(
-            'Extracting items...',
+            'Analyzing receipt...',
             style: TextStyle(
               color: Colors.white,
               fontSize: 16,
@@ -729,9 +644,9 @@ class _ProcessingView extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Tesseract OCR is reading your receipt on-device',
+            'Gemini Vision is structuring line items & prices',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.4),
+              color: Colors.white.withValues(alpha: 0.5),
               fontSize: 13,
             ),
           ),
@@ -741,7 +656,7 @@ class _ProcessingView extends StatelessWidget {
   }
 }
 
-// ── Done View ────────────────────────────────────────────────────────────────
+// ── Error View ───────────────────────────────────────────────────────────────
 
 class _ScanErrorView extends StatelessWidget {
   final String message;
@@ -758,22 +673,21 @@ class _ScanErrorView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 80,
-              height: 80,
+              width: 72,
+              height: 72,
               decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(24),
+                color: Colors.red.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
               ),
               child: const Icon(
-                Icons.document_scanner_outlined,
-                color: Colors.orange,
-                size: 40,
+                Icons.error_outline_rounded,
+                color: Colors.redAccent,
+                size: 38,
               ),
             ),
             const SizedBox(height: 20),
             const Text(
-              'Could not read this receipt',
-              textAlign: TextAlign.center,
+              'Scan Failed',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 18,
@@ -785,21 +699,25 @@ class _ScanErrorView extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.55),
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 13,
                 height: 1.4,
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Try another receipt'),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Try Again'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryEmerald,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 22,
-                  vertical: 13,
+                  horizontal: 24,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
                 ),
               ),
             ),
@@ -810,9 +728,12 @@ class _ScanErrorView extends StatelessWidget {
   }
 }
 
+// ── Done View ────────────────────────────────────────────────────────────────
+
 class _DoneView extends StatelessWidget {
   final int itemCount;
   final VoidCallback onNewScan;
+
   const _DoneView({required this.itemCount, required this.onNewScan});
 
   @override
@@ -824,69 +745,76 @@ class _DoneView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 96,
-              height: 96,
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
-                gradient: AppTheme.heroGradient,
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryEmerald.withValues(alpha: 0.4),
-                    blurRadius: 28,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
+                color: AppTheme.primaryEmerald.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(24),
               ),
               child: const Icon(
-                Icons.check_rounded,
-                size: 52,
-                color: Colors.white,
+                Icons.check_circle_rounded,
+                color: AppTheme.primaryEmerald,
+                size: 44,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             const Text(
-              'Pantry Updated!',
+              'Stock Ingested Successfully',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              '$itemCount items added from your receipt',
+              '$itemCount items added to pantry inventory & purchase ledger',
+              textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
-                fontSize: 14,
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 13,
               ),
             ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton.icon(
-                onPressed: onNewScan,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryEmerald,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+            const SizedBox(height: 28),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                  label: const Text('Back to Home'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white70,
+                    side: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
-                icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
-                label: const Text(
-                  'Scan Another Receipt',
-                  style: TextStyle(fontWeight: FontWeight.w700),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: onNewScan,
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('Scan Another'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryEmerald,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 22,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Back to Dashboard',
-                style: TextStyle(color: Colors.white54),
-              ),
+              ],
             ),
           ],
         ),
@@ -895,19 +823,23 @@ class _DoneView extends StatelessWidget {
   }
 }
 
-// ── Review Bottom Sheet ───────────────────────────────────────────────────────
+// ── Review Sheet (Mandatory Review) ──────────────────────────────────────────
 
 class _ReviewSheet extends StatefulWidget {
-  final List<ReceiptScannedItem> items;
-  final String diagnosticText;
+  final ValidatedReceiptResponse response;
+  final List<ValidatedReceiptItem> items;
+  final bool isDuplicate;
   final Uint8List? receiptImage;
-  final void Function(List<ReceiptScannedItem>) onConfirm;
+  final void Function(String rawText, String newName) onAliasCorrection;
+  final void Function(List<ValidatedReceiptItem>) onConfirm;
   final VoidCallback onRescan;
 
   const _ReviewSheet({
+    required this.response,
     required this.items,
-    required this.diagnosticText,
+    required this.isDuplicate,
     required this.receiptImage,
+    required this.onAliasCorrection,
     required this.onConfirm,
     required this.onRescan,
   });
@@ -917,19 +849,13 @@ class _ReviewSheet extends StatefulWidget {
 }
 
 class _ReviewSheetState extends State<_ReviewSheet> {
-  late List<ReceiptScannedItem> _items;
-  final _zones = ['fridge', 'freezer', 'pantry_shelf', 'spice_rack'];
-  final _zoneLabels = {
-    'fridge': 'Fridge',
-    'freezer': 'Freezer',
-    'pantry_shelf': 'Pantry Shelf',
-    'spice_rack': 'Spice Rack',
-  };
+  late List<ValidatedReceiptItem> _items;
+  final _zones = PantryProvider.zones;
   final _zoneIcons = {
-    'fridge': Icons.kitchen_rounded,
-    'freezer': Icons.ac_unit_rounded,
-    'pantry_shelf': Icons.shelves,
-    'spice_rack': Icons.spa_rounded,
+    'Fridge': Icons.kitchen_rounded,
+    'Freezer': Icons.ac_unit_rounded,
+    'Pantry Shelf': Icons.shelves,
+    'Spice Rack': Icons.spa_rounded,
   };
 
   @override
@@ -939,93 +865,114 @@ class _ReviewSheetState extends State<_ReviewSheet> {
   }
 
   int get _selectedCount => _items.where((i) => i.isSelected).length;
-  double get _totalPrice => _items
-      .where((i) => i.isSelected && i.price != null)
-      .fold(0.0, (sum, i) => sum + i.price!);
 
-  String get _detectedCurrency {
-    final text = widget.diagnosticText.toLowerCase();
-    if (text.contains('£')) return '£';
-    if (text.contains('€')) return '€';
-    if (text.contains(r'$') || text.contains('usd')) return r'$';
-    if (text.contains('pkr') || text.contains('rs')) return 'PKR ';
-    return '';
-  }
+  double get _totalPrice => _items
+      .where((i) => i.isSelected && i.linePrice != null)
+      .fold(0.0, (sum, i) => sum + i.linePrice!);
 
   Future<bool> _editItem(int index) async {
     final item = _items[index];
+    final originalRaw = item.rawText;
     final formKey = GlobalKey<FormState>();
-    final nameController = TextEditingController(text: item.name);
+    final nameController = TextEditingController(text: item.matchedIngredient.isNotEmpty ? item.matchedIngredient : item.name);
     final quantityController = TextEditingController(
-      text: item.quantity.toStringAsFixed(
-        item.quantity.truncateToDouble() == item.quantity ? 0 : 2,
+      text: item.totalQty.toStringAsFixed(
+        item.totalQty.truncateToDouble() == item.totalQty ? 0 : 2,
       ),
     );
+    final priceController = TextEditingController(
+      text: item.linePrice != null ? item.linePrice!.toStringAsFixed(2) : '',
+    );
     var selectedUnit = item.unit;
+    var selectedZone = item.storageZone;
 
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Correct scanned item'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  autofocus: true,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                    labelText: 'Item name',
-                    prefixIcon: Icon(Icons.edit_outlined),
+          title: const Text('Correct Receipt Item'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Receipt printed: "${item.rawText}"',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Enter the item name'
-                      : null,
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: quantityController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: 'Quantity',
-                        ),
-                        validator: (value) {
-                          final quantity = double.tryParse(value ?? '');
-                          return quantity == null || quantity <= 0
-                              ? 'Invalid quantity'
-                              : null;
-                        },
-                      ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: nameController,
+                    autofocus: true,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      labelText: 'Ingredient Name',
+                      prefixIcon: Icon(Icons.restaurant_rounded),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        initialValue: selectedUnit,
-                        decoration: const InputDecoration(labelText: 'Unit'),
-                        items: PantryProvider.units
-                            .map(
-                              (unit) => DropdownMenuItem(
-                                value: unit,
-                                child: Text(unit),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) => setDialogState(
-                          () => selectedUnit = value ?? selectedUnit,
+                    validator: (value) =>
+                        value == null || value.trim().isEmpty ? 'Enter ingredient name' : null,
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: quantityController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: const InputDecoration(labelText: 'Quantity'),
+                          validator: (value) {
+                            final q = double.tryParse(value ?? '');
+                            return q == null || q <= 0 ? 'Invalid quantity' : null;
+                          },
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: selectedUnit,
+                          decoration: const InputDecoration(labelText: 'Unit'),
+                          items: PantryProvider.units
+                              .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                              .toList(),
+                          onChanged: (val) => setDialogState(() => selectedUnit = val ?? selectedUnit),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: priceController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: const InputDecoration(
+                            labelText: 'Line Price',
+                            prefixText: 'PKR ',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: selectedZone,
+                          decoration: const InputDecoration(labelText: 'Zone'),
+                          items: _zones
+                              .map((z) => DropdownMenuItem(value: z, child: Text(z)))
+                              .toList(),
+                          onChanged: (val) => setDialogState(() => selectedZone = val ?? selectedZone),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
@@ -1038,7 +985,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                 if (formKey.currentState?.validate() != true) return;
                 Navigator.pop(dialogContext, true);
               },
-              child: const Text('Save correction'),
+              child: const Text('Save Correction'),
             ),
           ],
         ),
@@ -1046,30 +993,48 @@ class _ReviewSheetState extends State<_ReviewSheet> {
     );
 
     if (saved == true && mounted) {
+      final newName = nameController.text.trim();
+      final newQty = double.parse(quantityController.text);
+      final newPrice = double.tryParse(priceController.text);
+
       setState(() {
-        item.name = nameController.text.trim();
-        item.quantity = double.parse(quantityController.text);
+        item.name = newName;
+        item.matchedIngredient = newName;
+        item.totalQty = newQty;
         item.unit = selectedUnit;
+        item.storageZone = selectedZone;
+        item.linePrice = newPrice;
+        item.needsReview = false;
+        item.isSelected = true;
       });
+
+      // Save user correction to household alias table
+      if (originalRaw.isNotEmpty) {
+        widget.onAliasCorrection(originalRaw, newName);
+      }
     }
     nameController.dispose();
     quantityController.dispose();
+    priceController.dispose();
     return saved == true;
   }
 
-  Future<void> _addMissingItem() async {
-    final item = ReceiptScannedItem(
-      name: 'New item',
-      quantity: 1,
+  void _addMissingItem() async {
+    final newItem = ValidatedReceiptItem(
+      rawText: 'Manual addition',
+      name: 'New ingredient',
+      matchedIngredient: 'New ingredient',
+      totalQty: 1.0,
       unit: 'pcs',
-      location: 'pantry_shelf',
+      storageZone: 'Pantry Shelf',
       isSelected: true,
+      needsReview: false,
     );
-    setState(() => _items.add(item));
+    setState(() => _items.add(newItem));
     final index = _items.length - 1;
     final saved = await _editItem(index);
     if (!saved && mounted) {
-      setState(() => _items.remove(item));
+      setState(() => _items.remove(newItem));
     }
   }
 
@@ -1077,268 +1042,158 @@ class _ReviewSheetState extends State<_ReviewSheet> {
     setState(() => _items.removeAt(index));
   }
 
-  Future<void> _showDetectedText() async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Receipt OCR details'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: MediaQuery.sizeOf(dialogContext).height * 0.62,
-          child: ListView(
-            children: [
-              if (widget.receiptImage != null) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.memory(
-                    widget.receiptImage!,
-                    height: 220,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              const Text(
-                'Copy this text when reporting a bad scan.',
-                style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-              ),
-              const SizedBox(height: 8),
-              SelectableText(
-                widget.diagnosticText.isEmpty
-                    ? 'No OCR text was detected.'
-                    : widget.diagnosticText,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                  height: 1.35,
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton.icon(
-            onPressed: widget.diagnosticText.isEmpty
-                ? null
-                : () async {
-                    await Clipboard.setData(
-                      ClipboardData(text: widget.diagnosticText),
-                    );
-                    if (!mounted || !dialogContext.mounted) return;
-                    Navigator.pop(dialogContext);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('OCR text copied')),
-                    );
-                  },
-            icon: const Icon(Icons.copy_rounded, size: 17),
-            label: const Text('Copy text'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Done'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final resp = widget.response;
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.92,
-      minChildSize: 0.6,
-      maxChildSize: 0.96,
+      initialChildSize: 0.88,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
       builder: (_, controller) => Container(
         decoration: BoxDecoration(
           color: isDark ? AppTheme.surfaceDark : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 30,
+              offset: const Offset(0, -6),
+            ),
+          ],
         ),
         child: Column(
           children: [
-            // Handle
+            // Drag handle
             Center(
               child: Container(
-                margin: const EdgeInsets.only(top: 12, bottom: 4),
+                margin: const EdgeInsets.only(top: 10, bottom: 8),
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white12 : Colors.black12,
+                  color: Colors.grey.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            // Header
+
+            // Sheet header
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryEmerald.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.receipt_long_rounded,
-                      color: AppTheme.primaryEmerald,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Review Scanned Items',
-                          style: TextStyle(
-                            fontSize: 17,
+                        Text(
+                          resp.storeName ?? 'Receipt Review',
+                          style: const TextStyle(
+                            fontSize: 18,
                             fontWeight: FontWeight.w800,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          '${_items.length} items detected • $_selectedCount selected',
+                          '${resp.date ?? "Detected Date: Today"} • ${resp.currency ?? "PKR"} ${resp.receiptTotal?.toStringAsFixed(0) ?? _totalPrice.toStringAsFixed(0)}',
                           style: const TextStyle(
-                            color: AppTheme.textSecondary,
                             fontSize: 12,
-                          ),
-                        ),
-                        const Text(
-                          'Check every name and quantity before adding.',
-                          style: TextStyle(
                             color: AppTheme.textSecondary,
-                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  TextButton(
-                    onPressed: () => setState(() {
-                      final allSelected = _selectedCount == _items.length;
-                      for (final item in _items) {
-                        item.isSelected = !allSelected;
-                      }
-                    }),
-                    child: Text(
-                      _selectedCount == _items.length ? 'None' : 'All',
-                      style: const TextStyle(
-                        color: AppTheme.primaryEmerald,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  OutlinedButton.icon(
+                    onPressed: _addMissingItem,
+                    icon: const Icon(Icons.add_rounded, size: 16),
+                    label: const Text('Add Item'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 4),
-            // Total price bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
+
+            // Warning Banners
+            if (widget.isDuplicate)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryEmerald.withValues(
-                    alpha: isDark ? 0.08 : 0.06,
-                  ),
+                  color: AppTheme.warmAmber.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppTheme.primaryEmerald.withValues(alpha: 0.15),
-                  ),
+                  border: Border.all(color: AppTheme.warmAmber.withValues(alpha: 0.4)),
                 ),
-                child: Row(
+                child: const Row(
                   children: [
-                    const Icon(
-                      Icons.receipt_rounded,
-                      color: AppTheme.primaryEmerald,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Detected item sum:',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.primaryEmerald,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '$_detectedCurrency${_totalPrice.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.primaryEmerald,
+                    Icon(Icons.copy_rounded, color: AppTheme.warmAmber, size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Duplicate Receipt Warning: This receipt appears to have been scanned previously. Please verify items before confirming.',
+                        style: TextStyle(
+                          color: AppTheme.warmAmber,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _showDetectedText,
-                      icon: const Icon(Icons.text_snippet_outlined, size: 17),
-                      label: const Text('Receipt & OCR'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton.tonalIcon(
-                      onPressed: _addMissingItem,
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('Add missed item'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Items list
-            Expanded(
-              child: _items.isEmpty
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text(
-                          'No reliable rows were found. View the OCR text or add the missed items manually.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: AppTheme.textSecondary),
+
+            if (resp.totalMismatchWarning)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.price_change_rounded, color: Colors.orange, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Total mismatch: Item sum (${resp.calculatedItemsTotal.toStringAsFixed(0)}) differs from printed total (${resp.receiptTotal?.toStringAsFixed(0)}) by ${resp.totalDifferencePercent.toStringAsFixed(1)}%. Review highlighted items below.',
+                        style: const TextStyle(
+                          color: Colors.orange,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    )
-                  : ListView.separated(
-                      controller: controller,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 4,
-                      ),
-                      itemCount: _items.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 4),
-                      itemBuilder: (_, i) => _ReviewItemTile(
-                        item: _items[i],
-                        zones: _zones,
-                        zoneLabels: _zoneLabels,
-                        zoneIcons: _zoneIcons,
-                        isDark: isDark,
-                        onToggle: (val) =>
-                            setState(() => _items[i].isSelected = val),
-                        onZoneChange: (zone) =>
-                            setState(() => _items[i].location = zone),
-                        onEdit: () => _editItem(i),
-                        onDelete: () => _removeItem(i),
-                      ),
                     ),
+                  ],
+                ),
+              ),
+
+            // Items List
+            Expanded(
+              child: ListView.separated(
+                controller: controller,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                itemCount: _items.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 6),
+                itemBuilder: (_, i) => _ReviewItemTile(
+                  item: _items[i],
+                  zones: _zones,
+                  zoneIcons: _zoneIcons,
+                  isDark: isDark,
+                  onToggle: (val) => setState(() => _items[i].isSelected = val),
+                  onZoneChange: (zone) => setState(() => _items[i].storageZone = zone),
+                  onEdit: () => _editItem(i),
+                  onDelete: () => _removeItem(i),
+                ),
+              ),
             ),
-            // Bottom confirm bar
+
+            // Confirm Bottom Bar
             Container(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
               decoration: BoxDecoration(
@@ -1348,13 +1203,6 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                     color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
                   ),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 16,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
               ),
               child: Row(
                 children: [
@@ -1375,9 +1223,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                   Expanded(
                     flex: 2,
                     child: ElevatedButton.icon(
-                      onPressed: _selectedCount == 0
-                          ? null
-                          : () => widget.onConfirm(_items),
+                      onPressed: _selectedCount == 0 ? null : () => widget.onConfirm(_items),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primaryEmerald,
                         foregroundColor: Colors.white,
@@ -1386,9 +1232,9 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      icon: const Icon(Icons.kitchen_rounded, size: 18),
+                      icon: const Icon(Icons.check_circle_rounded, size: 18),
                       label: Text(
-                        'Add $_selectedCount to Pantry',
+                        'Confirm $_selectedCount Items',
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
@@ -1404,9 +1250,8 @@ class _ReviewSheetState extends State<_ReviewSheet> {
 }
 
 class _ReviewItemTile extends StatelessWidget {
-  final ReceiptScannedItem item;
+  final ValidatedReceiptItem item;
   final List<String> zones;
-  final Map<String, String> zoneLabels;
   final Map<String, IconData> zoneIcons;
   final bool isDark;
   final ValueChanged<bool> onToggle;
@@ -1417,7 +1262,6 @@ class _ReviewItemTile extends StatelessWidget {
   const _ReviewItemTile({
     required this.item,
     required this.zones,
-    required this.zoneLabels,
     required this.zoneIcons,
     required this.isDark,
     required this.onToggle,
@@ -1426,13 +1270,18 @@ class _ReviewItemTile extends StatelessWidget {
     required this.onDelete,
   });
 
+  bool get _hasWarning =>
+      item.needsReview ||
+      (item.count == null && item.packSize == null) ||
+      item.confidence < 0.65;
+
   Color get _zoneColor {
-    switch (item.location) {
-      case 'fridge':
+    switch (item.storageZone) {
+      case 'Fridge':
         return AppTheme.zoneFridge;
-      case 'freezer':
+      case 'Freezer':
         return AppTheme.zoneFreezer;
-      case 'spice_rack':
+      case 'Spice Rack':
         return AppTheme.zoneSpice;
       default:
         return AppTheme.zonePantry;
@@ -1443,47 +1292,49 @@ class _ReviewItemTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _zoneColor;
     final isSelected = item.isSelected;
+    final warning = _hasWarning;
 
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 200),
       opacity: isSelected ? 1.0 : 0.45,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: isDark
-              ? (isSelected
-                    ? color.withValues(alpha: 0.07)
-                    : AppTheme.surfaceDark)
-              : (isSelected
-                    ? color.withValues(alpha: 0.04)
-                    : Colors.grey.shade50),
+              ? (warning
+                  ? AppTheme.warmAmber.withValues(alpha: 0.12)
+                  : isSelected
+                      ? color.withValues(alpha: 0.07)
+                      : AppTheme.surfaceDark)
+              : (warning
+                  ? AppTheme.warmAmber.withValues(alpha: 0.08)
+                  : isSelected
+                      ? color.withValues(alpha: 0.04)
+                      : Colors.grey.shade50),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected
-                ? color.withValues(alpha: 0.25)
-                : Colors.transparent,
+            color: warning
+                ? AppTheme.warmAmber
+                : isSelected
+                    ? color.withValues(alpha: 0.3)
+                    : Colors.transparent,
+            width: warning ? 1.5 : 1.0,
           ),
         ),
         child: Row(
           children: [
-            // Checkbox
-            Transform.scale(
-              scale: 1.1,
-              child: Checkbox(
-                value: isSelected,
-                onChanged: (v) => onToggle(v ?? false),
-                activeColor: AppTheme.primaryEmerald,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(5),
-                ),
-              ),
+            Checkbox(
+              value: isSelected,
+              onChanged: (v) => onToggle(v ?? false),
+              activeColor: AppTheme.primaryEmerald,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
             ),
-            const SizedBox(width: 4),
-            // Food Photo Thumbnail
             ClipRRect(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
               child: Image.network(
-                _getScannedItemImage(item.name),
+                FoodImageService.resolveImageUrl(
+                  item.matchedIngredient.isNotEmpty ? item.matchedIngredient : item.name,
+                ),
                 width: 38,
                 height: 38,
                 fit: BoxFit.cover,
@@ -1492,18 +1343,13 @@ class _ReviewItemTile extends StatelessWidget {
                   height: 38,
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(
-                    zoneIcons[item.location] ?? Icons.shelves,
-                    color: color,
-                    size: 18,
-                  ),
+                  child: Icon(zoneIcons[item.storageZone] ?? Icons.shelves, color: color, size: 18),
                 ),
               ),
             ),
             const SizedBox(width: 10),
-            // Name & details
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1512,13 +1358,11 @@ class _ReviewItemTile extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          item.name,
+                          item.matchedIngredient.isNotEmpty ? item.matchedIngredient : item.name,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: isDark
-                                ? AppTheme.textDarkPrimary
-                                : AppTheme.textLightPrimary,
+                            color: isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -1528,46 +1372,47 @@ class _ReviewItemTile extends StatelessWidget {
                         tooltip: 'Correct item',
                         onPressed: onEdit,
                         visualDensity: VisualDensity.compact,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 30,
-                          height: 28,
-                        ),
-                        padding: EdgeInsets.zero,
-                        icon: const Icon(Icons.edit_outlined, size: 15),
+                        constraints: const BoxConstraints.tightFor(width: 30, height: 28),
+                        icon: const Icon(Icons.edit_outlined, size: 16),
                       ),
                       IconButton(
-                        tooltip: 'Remove item',
+                        tooltip: 'Remove',
                         onPressed: onDelete,
                         visualDensity: VisualDensity.compact,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 30,
-                          height: 28,
-                        ),
-                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(width: 30, height: 28),
                         icon: const Icon(Icons.close_rounded, size: 17),
                       ),
                     ],
                   ),
+                  if (warning) ...[
+                    const SizedBox(height: 2),
+                    Wrap(
+                      spacing: 4,
+                      children: [
+                        if (item.count == null && item.packSize == null)
+                          _badge('Null Qty (Tap to fix)', AppTheme.warmAmber),
+                        if (item.confidence < 0.65)
+                          _badge('Low Conf ${(item.confidence * 100).toInt()}%', Colors.orange),
+                        if (item.needsReview && (item.count != null || item.packSize != null))
+                          _badge('Needs Review', AppTheme.warmAmber),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 2),
                   Row(
                     children: [
                       Text(
-                        '${item.quantity.toStringAsFixed(item.quantity.truncateToDouble() == item.quantity ? 0 : 1)} ${item.unit}',
+                        '${item.totalQty.toStringAsFixed(item.totalQty.truncateToDouble() == item.totalQty ? 0 : 1)} ${item.unit}',
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppTheme.textSecondary,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (item.price != null) ...[
-                        const Text(
-                          ' • ',
-                          style: TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
+                      if (item.linePrice != null) ...[
+                        const Text(' • ', style: TextStyle(color: AppTheme.textSecondary)),
                         Text(
-                          'PKR ${item.price!.toStringAsFixed(0)}',
+                          'PKR ${item.linePrice!.toStringAsFixed(0)}',
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppTheme.textSecondary,
@@ -1575,12 +1420,16 @@ class _ReviewItemTile extends StatelessWidget {
                           ),
                         ),
                       ],
+                      if (!item.isFood) ...[
+                        const SizedBox(width: 6),
+                        _badge('Non-food', Colors.grey),
+                      ],
                     ],
                   ),
                 ],
               ),
             ),
-            // Zone dropdown
+            // Storage Zone Dropdown
             PopupMenuButton<String>(
               onSelected: onZoneChange,
               itemBuilder: (_) => zones
@@ -1590,19 +1439,15 @@ class _ReviewItemTile extends StatelessWidget {
                       child: Row(
                         children: [
                           Icon(
-                            zoneIcons[z],
+                            zoneIcons[z] ?? Icons.shelves,
                             size: 16,
-                            color: z == item.location
-                                ? AppTheme.primaryEmerald
-                                : AppTheme.textSecondary,
+                            color: z == item.storageZone ? AppTheme.primaryEmerald : AppTheme.textSecondary,
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            zoneLabels[z] ?? z,
+                            z,
                             style: TextStyle(
-                              fontWeight: z == item.location
-                                  ? FontWeight.w700
-                                  : FontWeight.normal,
+                              fontWeight: z == item.storageZone ? FontWeight.w700 : FontWeight.normal,
                             ),
                           ),
                         ],
@@ -1613,13 +1458,13 @@ class _ReviewItemTile extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(zoneIcons[item.location], color: color, size: 14),
+                    Icon(zoneIcons[item.storageZone] ?? Icons.shelves, color: color, size: 14),
                     const SizedBox(width: 4),
                     Icon(Icons.expand_more_rounded, color: color, size: 14),
                   ],
@@ -1631,7 +1476,22 @@ class _ReviewItemTile extends StatelessWidget {
       ),
     );
   }
-}
 
-String _getScannedItemImage(String name) =>
-    FoodImageService.resolveImageUrl(name);
+  Widget _badge(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
