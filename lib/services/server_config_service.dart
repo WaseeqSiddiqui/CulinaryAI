@@ -1,15 +1,18 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ServerConfigService {
   static const String _prefKey = 'culinary_api_base_url';
 
+  /// Default production cloud backend (Render)
+  static const String defaultProductionUrl = 'https://culinary-ai-backend.onrender.com';
+
   static const String defaultLocalIp = '192.168.100.147';
   static const String defaultPort = '8000';
 
   static const List<String> presetUrls = [
+    defaultProductionUrl,
     'http://192.168.100.147:8000',
     'http://127.0.0.1:8000',
     'http://10.0.2.2:8000',
@@ -20,12 +23,7 @@ class ServerConfigService {
   static String get fallbackDefaultUrl {
     const envUrl = String.fromEnvironment('CULINARY_API_BASE_URL');
     if (envUrl.isNotEmpty) return envUrl;
-
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      // Default to the computer's LAN IP for seamless physical Android device connectivity over Wi-Fi
-      return 'http://$defaultLocalIp:$defaultPort';
-    }
-    return 'http://127.0.0.1:8000';
+    return defaultProductionUrl;
   }
 
   static String get currentBaseUrl {
@@ -37,7 +35,12 @@ class ServerConfigService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getString(_prefKey)?.trim();
-      if (saved != null && saved.isNotEmpty) {
+      // If no URL saved, or if it was an old local Wi-Fi IP, migrate to cloud production URL
+      if (saved != null &&
+          saved.isNotEmpty &&
+          !saved.contains('192.168.') &&
+          !saved.contains('10.0.2.2') &&
+          !saved.contains('127.0.0.1')) {
         _cachedUrl = saved;
         return _cachedUrl;
       }
@@ -45,6 +48,7 @@ class ServerConfigService {
     _cachedUrl = fallbackDefaultUrl;
     return _cachedUrl;
   }
+
 
   static Future<void> setBaseUrl(String url) async {
     final clean = url.trim().replaceFirst(RegExp(r'/+$'), '');

@@ -9,7 +9,7 @@ import '../../providers/pantry_provider.dart';
 import '../../services/food_image_service.dart';
 import '../../services/household_alias_service.dart';
 import '../../services/vision_api_service.dart';
-import '../../widgets/server_settings_modal.dart';
+
 
 class ReceiptScannerScreen extends StatefulWidget {
   const ReceiptScannerScreen({super.key});
@@ -342,11 +342,6 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          IconButton(
-            tooltip: 'Server IP Settings',
-            icon: const Icon(Icons.dns_rounded, color: Colors.white70),
-            onPressed: () => ServerSettingsModal.show(context),
-          ),
           if (_scanState == _ScanState.done)
             TextButton.icon(
               onPressed: _resetScan,
@@ -385,7 +380,6 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
       _ScanState.error => _ScanErrorView(
           message: _scanError ?? 'The receipt could not be read.',
           onRetry: _resetScan,
-          onConfigureServer: () => ServerSettingsModal.show(context),
           onUseDemo: _loadDemoReceipt,
         ),
       _ScanState.done => _DoneView(
@@ -394,6 +388,7 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
         ),
     };
   }
+
 }
 
 enum _ScanState { idle, scanning, processing, review, error, done }
@@ -760,23 +755,16 @@ class _ProcessingView extends StatelessWidget {
 class _ScanErrorView extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
-  final VoidCallback onConfigureServer;
   final VoidCallback onUseDemo;
 
   const _ScanErrorView({
     required this.message,
     required this.onRetry,
-    required this.onConfigureServer,
     required this.onUseDemo,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isConnectionError = message.contains('SocketException') ||
-        message.contains('Connection refused') ||
-        message.contains('connect') ||
-        message.contains('127.0.0.1');
-
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(28),
@@ -815,78 +803,24 @@ class _ScanErrorView extends StatelessWidget {
                 height: 1.4,
               ),
             ),
-            if (isConnectionError) ...[
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppTheme.warmSaffron.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppTheme.warmSaffron.withValues(alpha: 0.35),
-                  ),
+            const SizedBox(height: 22),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryEmerald,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 13,
                 ),
-                child: const Row(
-                  children: [
-                    Icon(
-                      Icons.lightbulb_outline_rounded,
-                      color: AppTheme.warmSaffron,
-                      size: 18,
-                    ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'On physical Android devices, use your PC Wi-Fi IP (192.168.100.147:8000) instead of 127.0.0.1.',
-                        style: TextStyle(
-                          color: AppTheme.warmSaffron,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
                 ),
               ),
-            ],
-            const SizedBox(height: 22),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh_rounded, size: 18),
-                  label: const Text('Try Again'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryEmerald,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 13,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                OutlinedButton.icon(
-                  onPressed: onConfigureServer,
-                  icon: const Icon(Icons.dns_rounded, size: 18),
-                  label: const Text('Server IP'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white38),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 13,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                ),
-              ],
             ),
+
             const SizedBox(height: 12),
             TextButton.icon(
               onPressed: onUseDemo,

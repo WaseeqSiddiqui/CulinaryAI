@@ -20,7 +20,6 @@ import '../scanner/fridge_scanner_screen.dart';
 import '../scanner/receipt_scanner_screen.dart';
 import '../shopping/shopping_list_screen.dart';
 import '../recipes/recipe_hub_screen.dart';
-import '../../widgets/server_settings_modal.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -2979,16 +2978,6 @@ class _KitchenDrawer extends StatelessWidget {
                     onTap: () {
                       Navigator.pop(context);
                       shell?.switchToTab(4);
-                    },
-                  ),
-                  _DrawerNavTile(
-                    icon: Icons.dns_rounded,
-                    title: 'AI Server Connection',
-                    subtitle: 'Configure backend host IP',
-                    isDark: isDark,
-                    onTap: () {
-                      Navigator.pop(context);
-                      ServerSettingsModal.show(context);
                     },
                   ),
 

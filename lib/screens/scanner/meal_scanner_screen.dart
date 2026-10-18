@@ -9,7 +9,7 @@ import '../../models/meal_nutrition_estimate.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/recipe_experience_provider.dart';
 import '../../services/meal_nutrition_service.dart';
-import '../../widgets/server_settings_modal.dart';
+
 
 class MealScannerScreen extends StatefulWidget {
   const MealScannerScreen({super.key});
@@ -76,14 +76,8 @@ class _MealScannerScreenState extends State<MealScannerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Scan a meal'),
-        actions: [
-          IconButton(
-            tooltip: 'Server IP Settings',
-            icon: const Icon(Icons.dns_rounded),
-            onPressed: () => ServerSettingsModal.show(context),
-          ),
-        ],
       ),
+
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -140,18 +134,11 @@ class _MealScannerScreenState extends State<MealScannerScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppTheme.errorRed.withValues(alpha: 0.3)),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(_error!, style: const TextStyle(color: AppTheme.errorRed, fontSize: 13)),
-                  const SizedBox(height: 10),
-                  OutlinedButton.icon(
-                    onPressed: () => ServerSettingsModal.show(context),
-                    icon: const Icon(Icons.dns_rounded, size: 16),
-                    label: const Text('Configure Server IP'),
-                  ),
-                ],
+              child: Text(
+                _error!,
+                style: const TextStyle(color: AppTheme.errorRed, fontSize: 13),
               ),
+
             ),
           ],
           if (result != null) ...[
