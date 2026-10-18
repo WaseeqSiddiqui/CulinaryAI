@@ -75,9 +75,21 @@ app.add_middleware(
 )
 
 
+@app.get("/")
+def root() -> dict:
+    return {
+        "status": "online",
+        "service": "CulinaryAI API",
+        "version": app.version,
+        "health": "/health",
+        "docs": "/docs",
+    }
+
+
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse(status="ok", indexed_recipes=len(repository.recipes))
+
 
 
 @app.post("/match-product", response_model=MatchProductResponse)
