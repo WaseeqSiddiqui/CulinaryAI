@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -115,7 +116,12 @@ class FridgeReconciler:
         now_iso: str,
     ) -> ReconciledFridgeItem:
         # Case 1: Countable item (e.g. eggs, lemons, cans)
-        if detected.count is not None:
+        if (
+            detected.count is not None
+            and detected.fill_level is None
+            and pantry_item.unit.lower()
+            in {"pcs", "piece", "pieces", "pack", "packs"}
+        ):
             detected_qty = float(detected.count)
             current_qty = pantry_item.quantity
 
@@ -226,9 +232,18 @@ class FridgeReconciler:
     def _create_new_item_proposal(self, detected: Any) -> ReconciledFridgeItem:
         match = self.catalog.match(detected.name)
         canonical_name = match.matched_name if not match.needs_review else detected.name.title()
-        unit = match.unit if match.unit else "pcs"
-
-        suggested_qty = float(detected.count) if detected.count is not None else 1.0
+        label_quantity = self._quantity_from_label(detected.label_size_text)
+        if label_quantity is not None:
+            amount, unit = label_quantity
+            packs = float(detected.count or 1)
+            fill = float(detected.fill_level or 1.0)
+            suggested_qty = round(amount * packs * fill, 2)
+        elif detected.count is not None:
+            unit = "pcs"
+            suggested_qty = float(detected.count)
+        else:
+            unit = "pcs"
+            suggested_qty = 1.0
         question = (
             f"Spotted fresh '{canonical_name}' in the fridge, but it is not in your kitchen stock. "
             f"Would you like to add it?"
@@ -248,3 +263,18 @@ class FridgeReconciler:
             unit=unit,
             estimated=True,
         )
+
+    @staticmethod
+    def _quantity_from_label(label: str | None) -> tuple[float, str] | None:
+        if not label:
+            return None
+        match = re.search(
+            r"(\d+(?:\.\d+)?)\s*(kg|g|ml|l)\b",
+            label.lower().replace(",", "."),
+        )
+        if match is None:
+            return None
+        unit = match.group(2)
+        if unit == "l":
+            unit = "L"
+        return float(match.group(1)), unit

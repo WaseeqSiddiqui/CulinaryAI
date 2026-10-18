@@ -14,9 +14,13 @@ class ShoppingService {
 
   String _listKey(String householdId) => 'culinary_shopping_list_$householdId';
   String _ordersKey(String householdId) => 'culinary_orders_$householdId';
+  String _suppressedPantryKey(String householdId) =>
+      'culinary_shopping_suppressed_pantry_$householdId';
 
   Future<bool> hasSavedList(String householdId) async =>
-      (await SharedPreferences.getInstance()).containsKey(_listKey(householdId));
+      (await SharedPreferences.getInstance()).containsKey(
+        _listKey(householdId),
+      );
 
   Future<List<ShoppingListItem>> loadList(String householdId) async {
     final encoded = (await SharedPreferences.getInstance()).getString(
@@ -25,7 +29,11 @@ class ShoppingService {
     if (encoded == null) return [];
     try {
       return (jsonDecode(encoded) as List<dynamic>)
-          .map((item) => ShoppingListItem.fromMap(Map<String, dynamic>.from(item as Map)))
+          .map(
+            (item) => ShoppingListItem.fromMap(
+              Map<String, dynamic>.from(item as Map),
+            ),
+          )
           .toList();
     } catch (_) {
       return [];
@@ -41,6 +49,21 @@ class ShoppingService {
       _listKey(householdId),
       jsonEncode(items.map((item) => item.toMap()).toList()),
     );
+  }
+
+  Future<Set<String>> loadSuppressedPantryIds(String householdId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return (prefs.getStringList(_suppressedPantryKey(householdId)) ?? const [])
+        .toSet();
+  }
+
+  Future<void> saveSuppressedPantryIds(
+    String householdId,
+    Set<String> ids,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final sortedIds = ids.toList()..sort();
+    await prefs.setStringList(_suppressedPantryKey(householdId), sortedIds);
   }
 
   Future<void> createOrder(ShoppingOrder order) async {

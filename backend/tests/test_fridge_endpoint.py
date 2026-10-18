@@ -80,6 +80,7 @@ def test_fridge_reconciliation_count_mismatch():
     assert reconciled.status == "mismatch"
     assert reconciled.current_quantity == 6.0
     assert reconciled.suggested_quantity == 2.0
+    assert reconciled.unit == "pcs"
     assert reconciled.estimated is True
     assert "detected 2 pcs" in reconciled.question.lower()
     assert "pantry lists 6 pcs" in reconciled.question.lower()
@@ -139,6 +140,27 @@ def test_fridge_reconciliation_item_not_in_ledger():
     assert reconciled.suggested_quantity == 2.0
     assert reconciled.estimated is True
     assert "not in your kitchen stock" in reconciled.question.lower()
+
+
+def test_new_liquid_uses_visible_label_and_fill_level_for_quantity():
+    reconciler = FridgeReconciler()
+    detected_scan = GeminiFridgeScan(
+        items=[
+            GeminiFridgeItem(
+                name="Olive Oil",
+                count=1,
+                fill_level=0.8,
+                label_size_text="500 ml",
+                confidence=0.95,
+            )
+        ]
+    )
+
+    result = reconciler.reconcile(detected_scan, [])
+    item = result.reconciled_items[0]
+
+    assert item.unit == "ml"
+    assert item.suggested_quantity == 400
 
 
 def test_fridge_unseen_ledger_items_not_deleted():

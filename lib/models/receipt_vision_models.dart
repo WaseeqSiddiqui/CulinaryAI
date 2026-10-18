@@ -80,6 +80,8 @@ class ValidatedReceiptItem {
   });
 
   factory ValidatedReceiptItem.fromJson(Map<String, dynamic> json) {
+    final isFood = json['is_food'] as bool? ?? true;
+    final needsReview = json['needs_review'] as bool? ?? false;
     return ValidatedReceiptItem(
       rawText: json['raw_text'] as String? ?? '',
       name: json['name'] as String? ?? '',
@@ -89,14 +91,14 @@ class ValidatedReceiptItem {
       count: (json['count'] as num?)?.toDouble(),
       totalQty: (json['total_qty'] as num?)?.toDouble() ?? 1.0,
       linePrice: (json['line_price'] as num?)?.toDouble(),
-      isFood: json['is_food'] as bool? ?? true,
+      isFood: isFood,
       confidence: (json['confidence'] as num?)?.toDouble() ?? 1.0,
-      needsReview: json['needs_review'] as bool? ?? false,
+      needsReview: needsReview,
       storageZone: json['storage_zone'] as String? ?? 'Pantry Shelf',
       reviewReasons: (json['review_reasons'] as List<dynamic>? ?? [])
           .map((r) => r.toString())
           .toList(),
-      isSelected: json['is_food'] as bool? ?? true,
+      isSelected: isFood && !needsReview,
     );
   }
 

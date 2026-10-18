@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../models/pantry_item_model.dart';
 import '../../providers/pantry_provider.dart';
 import '../../services/food_image_service.dart';
+import '../../services/expiry_estimation_service.dart';
+import '../scanner/expiry_label_scanner_screen.dart';
+import '../scanner/fridge_scanner_screen.dart';
+import '../scanner/receipt_scanner_screen.dart';
 
 // ── Zone Metadata ─────────────────────────────────────────────────────────────
 
@@ -123,6 +128,12 @@ class _PantryScreenState extends State<PantryScreen>
                         unit: item.unit,
                         location: item.location,
                         lowStockThreshold: item.lowStockThreshold,
+                        purchaseDate: item.purchaseDate,
+                        expiryDate: item.expiryDate,
+                        openedDate: item.openedDate,
+                        expirySource: item.expirySource,
+                        expiryConfidence: item.expiryConfidence,
+                        expiryUserConfirmed: item.expiryUserConfirmed,
                       );
                     },
                   ),
@@ -264,6 +275,14 @@ class _PantryScreenState extends State<PantryScreen>
             ),
       actions: [
         IconButton(
+          icon: const Icon(Icons.document_scanner_outlined),
+          tooltip: 'Scan fridge',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const FridgeScannerScreen()),
+          ),
+        ),
+        IconButton(
           icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded),
           tooltip: _isSearching ? 'Close Search' : 'Search',
           onPressed: _toggleSearch,
@@ -276,8 +295,65 @@ class _PantryScreenState extends State<PantryScreen>
         const SizedBox(width: 4),
       ],
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(52),
-        child: _buildZoneChips(pantry, isDark),
+        preferredSize: const Size.fromHeight(96),
+        child: Column(
+          children: [
+            _buildZoneChips(pantry, isDark),
+            _buildExpiryChips(pantry),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpiryChips(PantryProvider pantry) {
+    final entries = <(PantryExpiryFilter, String, IconData, int?)>[
+      (
+        PantryExpiryFilter.all,
+        'All dates',
+        Icons.event_available_outlined,
+        null,
+      ),
+      (
+        PantryExpiryFilter.useSoon,
+        'Use soon',
+        Icons.schedule_rounded,
+        pantry.useSoonCount,
+      ),
+      (
+        PantryExpiryFilter.expired,
+        'Expired',
+        Icons.error_outline_rounded,
+        pantry.expiredCount,
+      ),
+      (
+        PantryExpiryFilter.estimated,
+        'Estimated',
+        Icons.auto_awesome_outlined,
+        null,
+      ),
+    ];
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+        itemCount: entries.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (_, index) {
+          final entry = entries[index];
+          final selected = pantry.expiryFilter == entry.$1;
+          return FilterChip(
+            selected: selected,
+            showCheckmark: false,
+            avatar: Icon(entry.$3, size: 15),
+            label: Text(
+              entry.$4 == null ? entry.$2 : '${entry.$2} ${entry.$4}',
+            ),
+            onSelected: (_) => pantry.setExpiryFilter(entry.$1),
+            visualDensity: VisualDensity.compact,
+          );
+        },
       ),
     );
   }
@@ -342,9 +418,23 @@ class _PantryScreenState extends State<PantryScreen>
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-      itemCount: grouped.keys.length,
+      itemCount:
+          grouped.keys.length +
+          (pantry.useSoonCount + pantry.expiredCount > 0 ? 1 : 0),
       itemBuilder: (context, index) {
-        final zone = grouped.keys.elementAt(index);
+        final hasReminder = pantry.useSoonCount + pantry.expiredCount > 0;
+        if (hasReminder && index == 0) {
+          return _ExpiryReminderCard(
+            useSoon: pantry.useSoonCount,
+            expired: pantry.expiredCount,
+            onTap: () => pantry.setExpiryFilter(
+              pantry.expiredCount > 0
+                  ? PantryExpiryFilter.expired
+                  : PantryExpiryFilter.useSoon,
+            ),
+          );
+        }
+        final zone = grouped.keys.elementAt(index - (hasReminder ? 1 : 0));
         final items = grouped[zone]!;
         return _ZoneSection(
           zone: zone,
@@ -390,7 +480,7 @@ class _PantryScreenState extends State<PantryScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              'Tap + below or scan a grocery receipt to stock your kitchen.',
+              'Add an item, scan your fridge, or import a grocery receipt.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: isDark
@@ -398,6 +488,24 @@ class _PantryScreenState extends State<PantryScreen>
                     : AppTheme.textLightSecondary,
                 fontSize: 13,
               ),
+            ),
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FridgeScannerScreen()),
+              ),
+              icon: const Icon(Icons.kitchen_rounded),
+              label: const Text('Scan fridge'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ReceiptScannerScreen()),
+              ),
+              icon: const Icon(Icons.receipt_long_rounded),
+              label: const Text('Scan receipt'),
             ),
           ],
         ),
@@ -461,6 +569,48 @@ class _PantryScreenState extends State<PantryScreen>
 }
 
 // ── Zone Section ──────────────────────────────────────────────────────────────
+
+class _ExpiryReminderCard extends StatelessWidget {
+  final int useSoon;
+  final int expired;
+  final VoidCallback onTap;
+
+  const _ExpiryReminderCard({
+    required this.useSoon,
+    required this.expired,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final urgent = expired > 0;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 14),
+      color: (urgent ? AppTheme.errorRed : AppTheme.warmAmber).withValues(
+        alpha: .10,
+      ),
+      child: ListTile(
+        onTap: onTap,
+        leading: Icon(
+          urgent ? Icons.error_outline_rounded : Icons.schedule_rounded,
+          color: urgent ? AppTheme.errorRed : AppTheme.warmAmber,
+        ),
+        title: Text(
+          urgent
+              ? '$expired expired item${expired == 1 ? '' : 's'} need review'
+              : '$useSoon item${useSoon == 1 ? '' : 's'} should be used soon',
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        subtitle: Text(
+          urgent
+              ? 'Do not use automatically in recipes.'
+              : 'Recipes using these ingredients are prioritized.',
+        ),
+        trailing: const Icon(Icons.chevron_right_rounded),
+      ),
+    );
+  }
+}
 
 class _ZoneSection extends StatefulWidget {
   final String zone;
@@ -736,6 +886,46 @@ class _PantryItemCard extends StatelessWidget {
                             ),
                           ],
                         ),
+                        if (item.expiryDate != null) ...[
+                          const SizedBox(height: 5),
+                          Row(
+                            children: [
+                              Icon(
+                                item.expiryStatus == ExpiryStatus.expired
+                                    ? Icons.error_outline_rounded
+                                    : Icons.schedule_rounded,
+                                size: 13,
+                                color: item.expiryStatus == ExpiryStatus.expired
+                                    ? AppTheme.errorRed
+                                    : item.expiryStatus == ExpiryStatus.useSoon
+                                    ? AppTheme.warmAmber
+                                    : AppTheme.freshHerb,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  item.expiryStatus == ExpiryStatus.expired
+                                      ? 'Expired ${DateFormat('d MMM').format(item.expiryDate!)}'
+                                      : 'Use by ${DateFormat('d MMM').format(item.expiryDate!)}${item.hasEstimatedExpiry ? ' · estimated' : ''}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color:
+                                        item.expiryStatus ==
+                                            ExpiryStatus.expired
+                                        ? AppTheme.errorRed
+                                        : item.expiryStatus ==
+                                              ExpiryStatus.useSoon
+                                        ? AppTheme.warmAmber
+                                        : AppTheme.freshHerb,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1009,6 +1199,12 @@ class _AddEditSheetState extends State<_AddEditSheet> {
   late String _selectedUnit;
   late String _selectedLocation;
   bool _showCustomImageField = false;
+  DateTime? _purchaseDate;
+  DateTime? _expiryDate;
+  DateTime? _openedDate;
+  ExpirySource _expirySource = ExpirySource.unknown;
+  ExpiryConfidence _expiryConfidence = ExpiryConfidence.low;
+  bool _expiryConfirmed = false;
 
   bool get _isEditing => widget.item != null;
 
@@ -1029,6 +1225,12 @@ class _AddEditSheetState extends State<_AddEditSheet> {
 
     _selectedUnit = item?.unit ?? PantryProvider.units.first;
     _selectedLocation = item?.location ?? PantryProvider.zones.first;
+    _purchaseDate = item?.purchaseDate;
+    _expiryDate = item?.expiryDate;
+    _openedDate = item?.openedDate;
+    _expirySource = item?.expirySource ?? ExpirySource.unknown;
+    _expiryConfidence = item?.expiryConfidence ?? ExpiryConfidence.low;
+    _expiryConfirmed = item?.expiryUserConfirmed ?? false;
 
     _nameCtrl.addListener(_onFieldChanged);
     _customImageCtrl.addListener(_onFieldChanged);
@@ -1082,6 +1284,12 @@ class _AddEditSheetState extends State<_AddEditSheet> {
           location: _selectedLocation,
           lowStockThreshold: threshold,
           customImageUrl: customUrl,
+          purchaseDate: _purchaseDate,
+          expiryDate: _expiryDate,
+          openedDate: _openedDate,
+          expirySource: _expirySource,
+          expiryConfidence: _expiryConfidence,
+          expiryUserConfirmed: _expiryConfirmed,
         ),
       );
     } else {
@@ -1093,9 +1301,102 @@ class _AddEditSheetState extends State<_AddEditSheet> {
         location: _selectedLocation,
         lowStockThreshold: threshold,
         customImageUrl: customUrl,
+        purchaseDate: _purchaseDate,
+        expiryDate: _expiryDate,
+        openedDate: _openedDate,
+        expirySource: _expirySource,
+        expiryConfidence: _expiryConfidence,
+        expiryUserConfirmed: _expiryConfirmed,
       );
     }
     Navigator.pop(context);
+  }
+
+  Future<void> _pickExpiry() async {
+    final now = DateTime.now();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _expiryDate ?? now.add(const Duration(days: 7)),
+      firstDate: now.subtract(const Duration(days: 3650)),
+      lastDate: now.add(const Duration(days: 3650)),
+    );
+    if (selected != null && mounted) {
+      setState(() {
+        _expiryDate = selected;
+        _expirySource = ExpirySource.manual;
+        _expiryConfidence = ExpiryConfidence.high;
+        _expiryConfirmed = true;
+      });
+    }
+  }
+
+  Future<void> _pickPurchaseDate() async {
+    final now = DateTime.now();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _purchaseDate ?? now,
+      firstDate: now.subtract(const Duration(days: 3650)),
+      lastDate: now,
+      helpText: 'Purchase date',
+    );
+    if (selected != null && mounted) {
+      setState(() => _purchaseDate = selected);
+    }
+  }
+
+  Future<void> _scanExpiry() async {
+    final result = await Navigator.push<ConfirmedExpiry>(
+      context,
+      MaterialPageRoute(builder: (_) => const ExpiryLabelScannerScreen()),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _expiryDate = result.date;
+        _expirySource = result.source;
+        _expiryConfidence = result.confidence;
+        _expiryConfirmed = true;
+      });
+    }
+  }
+
+  void _estimateExpiry() {
+    final purchasedAt = _purchaseDate ?? DateTime.now();
+    final estimate = ExpiryEstimationService.estimate(
+      itemName: _nameCtrl.text.trim(),
+      storageZone: _selectedLocation,
+      purchasedAt: purchasedAt,
+    );
+    if (estimate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No safe estimate is available for this item.'),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _purchaseDate = purchasedAt;
+      _expiryDate = estimate.date;
+      _expirySource = ExpirySource.receiptEstimate;
+      _expiryConfidence = estimate.confidence;
+      _expiryConfirmed = false;
+    });
+  }
+
+  void _markOpened() {
+    final opened = DateTime.now();
+    final estimate = ExpiryEstimationService.estimateAfterOpening(
+      itemName: _nameCtrl.text.trim(),
+      openedAt: opened,
+      printedExpiry: _expiryDate,
+    );
+    setState(() {
+      _openedDate = opened;
+      _expiryDate = estimate.date;
+      _expirySource = ExpirySource.openedEstimate;
+      _expiryConfidence = estimate.confidence;
+      _expiryConfirmed = false;
+    });
   }
 
   @override
@@ -1415,6 +1716,122 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                   );
                 }).toList(),
                 onChanged: (v) => setState(() => _selectedLocation = v!),
+              ),
+              const SizedBox(height: 14),
+
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.surfaceDark2 : AppTheme.bgLight,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Freshness & expiry',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 10),
+                    InkWell(
+                      onTap: _pickPurchaseDate,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.shopping_bag_outlined, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _purchaseDate == null
+                                  ? 'Add purchase date'
+                                  : 'Purchased ${DateFormat('d MMM yyyy').format(_purchaseDate!)}',
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 20),
+                    InkWell(
+                      onTap: _pickExpiry,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.event_outlined, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _expiryDate == null
+                                  ? 'Add expiry date'
+                                  : 'Expires ${DateFormat('d MMM yyyy').format(_expiryDate!)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          if (_expiryDate != null)
+                            Text(
+                              _expiryConfirmed ? 'Confirmed' : 'Estimated',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: _expiryConfirmed
+                                    ? AppTheme.freshHerb
+                                    : AppTheme.warmAmber,
+                              ),
+                            ),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.chevron_right_rounded),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _scanExpiry,
+                          icon: const Icon(
+                            Icons.document_scanner_outlined,
+                            size: 17,
+                          ),
+                          label: const Text('Scan label'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _estimateExpiry,
+                          icon: const Icon(
+                            Icons.auto_awesome_outlined,
+                            size: 17,
+                          ),
+                          label: const Text('Estimate'),
+                        ),
+                        if (_isEditing && _openedDate == null)
+                          OutlinedButton.icon(
+                            onPressed: _markOpened,
+                            icon: const Icon(Icons.lock_open_rounded, size: 17),
+                            label: const Text('Mark opened'),
+                          ),
+                        if (_expiryDate != null)
+                          TextButton(
+                            onPressed: () => setState(() {
+                              _expiryDate = null;
+                              _openedDate = null;
+                              _expirySource = ExpirySource.unknown;
+                              _expiryConfidence = ExpiryConfidence.low;
+                              _expiryConfirmed = false;
+                            }),
+                            child: const Text('Clear'),
+                          ),
+                      ],
+                    ),
+                    if (_openedDate != null)
+                      Text(
+                        'Opened ${DateFormat('d MMM yyyy').format(_openedDate!)} · expiry adjusted',
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                  ],
+                ),
               ),
               const SizedBox(height: 14),
 
@@ -1768,6 +2185,57 @@ class _ItemDetailModal extends StatelessWidget {
                     ],
                   ),
                 ),
+
+                if (item.expiryDate != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color:
+                          (item.expiryStatus == ExpiryStatus.expired
+                                  ? AppTheme.errorRed
+                                  : item.expiryStatus == ExpiryStatus.useSoon
+                                  ? AppTheme.warmAmber
+                                  : AppTheme.freshHerb)
+                              .withValues(alpha: .10),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.event_available_outlined,
+                          color: item.expiryStatus == ExpiryStatus.expired
+                              ? AppTheme.errorRed
+                              : item.expiryStatus == ExpiryStatus.useSoon
+                              ? AppTheme.warmAmber
+                              : AppTheme.freshHerb,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.expiryStatus == ExpiryStatus.expired
+                                    ? 'Expired'
+                                    : item.expiryStatus == ExpiryStatus.useSoon
+                                    ? 'Use soon'
+                                    : 'Freshness date',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              Text(
+                                '${DateFormat('d MMMM yyyy').format(item.expiryDate!)} · ${item.hasEstimatedExpiry ? 'estimated, please verify' : 'confirmed'}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
                 const SizedBox(height: 20),
 

@@ -67,11 +67,17 @@ void main() {
       pantryItems: pantry,
       servings: 2,
       dietaryPreferences: const ['Balanced', 'halal'],
+      mealsPerDay: 4,
+      targetCaloriesPerPersonPerDay: 1600,
+      pantryFirst: true,
     );
 
     expect(requestBody['servings'], 2);
     expect(requestBody['question'], 'Suggest a quick dinner');
     expect(requestBody['dietary_preferences'], ['halal']);
+    expect(requestBody['meals_per_day'], 4);
+    expect(requestBody['target_calories_per_person_per_day'], 1600);
+    expect(requestBody['pantry_first'], isTrue);
     expect(
       (requestBody['pantry_items'] as List).single['name'],
       'Basmati Rice',

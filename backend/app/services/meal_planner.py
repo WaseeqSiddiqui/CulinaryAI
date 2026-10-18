@@ -12,11 +12,11 @@ from app.models.schemas import (
     MealPlanRecipe,
 )
 
-from .recipe_repository import RetrievedRecipe, VerifiedRecipeRepository
+from .recipe_repository import RecipeRetriever, RetrievedRecipe
 
 
 class MealPlannerService:
-    def __init__(self, repository: VerifiedRecipeRepository) -> None:
+    def __init__(self, repository: RecipeRetriever) -> None:
         self.repository = repository
 
     def generate_plan(self, request: GeneratePlanRequest) -> GeneratePlanResponse:
@@ -31,8 +31,21 @@ class MealPlannerService:
             for candidate in candidates
             if self._matches_filters(candidate.recipe, request)
         ]
+        if request.pantry_first and pantry_names:
+            candidates = [
+                candidate
+                for candidate in candidates
+                if any(
+                    self._has_ingredient(
+                        ingredient["name"], pantry_names
+                    )
+                    for ingredient in candidate.recipe["ingredients_required"]
+                )
+            ]
         candidates.sort(
-            key=lambda candidate: self._combined_score(candidate, pantry_names),
+            key=lambda candidate: self._combined_score(
+                candidate, pantry_names, request
+            ),
             reverse=True,
         )
         meals = [
@@ -42,6 +55,10 @@ class MealPlannerService:
         return GeneratePlanResponse(
             meals=meals,
             pantry_item_count=len(request.pantry_items),
+            retrieval_method=self.repository.retrieval_method,
+            pantry_checked=True,
+            requested_servings=request.servings,
+            target_calories_per_meal=self._calorie_target(request),
         )
 
     def instructions(self, recipe_id: str, servings: int) -> InstructionResponse:
@@ -88,12 +105,14 @@ class MealPlannerService:
             missing_ingredients=missing,
             steps=[CookingStep(**step) for step in recipe["steps"]],
             source=recipe["source"],
+            calories_per_serving=int(recipe.get("calories_per_serving", 0)),
         )
 
     def _combined_score(
         self,
         candidate: RetrievedRecipe,
         pantry_names: list[str],
+        request: GeneratePlanRequest,
     ) -> float:
         ingredients = candidate.recipe["ingredients_required"]
         pantry_match = sum(
@@ -101,7 +120,21 @@ class MealPlannerService:
             for ingredient in ingredients
         ) / len(ingredients)
         normalized_retrieval = max(0.0, candidate.score)
-        return pantry_match * 0.8 + normalized_retrieval * 0.2
+        target = self._calorie_target(request)
+        recipe_calories = int(candidate.recipe.get("calories_per_serving", 0))
+        calorie_score = 0.0
+        if target and recipe_calories:
+            calorie_score = max(
+                0.0, 1.0 - abs(recipe_calories - target) / max(target, 1)
+            )
+        return pantry_match * 0.7 + normalized_retrieval * 0.15 + calorie_score * 0.15
+
+    @staticmethod
+    def _calorie_target(request: GeneratePlanRequest) -> int | None:
+        daily = request.target_calories_per_person_per_day
+        if daily is None:
+            return None
+        return round(daily / request.meals_per_day)
 
     @staticmethod
     def _matches_filters(
@@ -113,7 +146,15 @@ class MealPlannerService:
         ):
             return False
         tags = {tag.lower() for tag in recipe.get("dietary_tags", [])}
-        return all(preference in tags for preference in request.dietary_preferences)
+        if not all(preference in tags for preference in request.dietary_preferences):
+            return False
+        ingredient_text = " ".join(
+            ingredient["name"].lower()
+            for ingredient in recipe.get("ingredients_required", [])
+        )
+        return not any(
+            avoid in ingredient_text for avoid in request.avoid_ingredients
+        )
 
     @staticmethod
     def _normalize(value: str) -> set[str]:

@@ -19,13 +19,15 @@ from app.models.vision_schemas import (
     GeminiReceiptResponse,
     ValidatedReceiptItem,
     ValidatedReceiptResponse,
+    MealNutritionEstimate,
 )
 from app.services.ingredient_catalog import IngredientCatalogService
 
 logger = logging.getLogger(__name__)
 
-# Free Flash model default
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+# Free Flash model default – overridden by GEMINI_MODEL env var
+DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+FALLBACK_MODELS = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.8-flash"]
 
 
 class ScanRateLimiter:
@@ -76,17 +78,36 @@ Rules:
 9. Return valid JSON adhering strictly to the response schema.
 """
 
-FRIDGE_SYSTEM_PROMPT = """You are an expert culinary refrigerator stock auditor.
-Analyze the photo of a refrigerator shelf, crisper, or freezer section and report clearly visible food items.
+FRIDGE_SYSTEM_PROMPT = """You are an expert kitchen inventory visual auditor.
+Analyze a real household fridge photo. It may show the full fridge, several shelves,
+a door compartment, crisper, freezer section, or a cluttered pantry shelf. Food does
+not need to be neatly arranged.
 
 Rules:
-1. One shelf or section per photo.
-2. Report only items that are clearly visible. Do NOT guess or infer hidden items behind visible containers.
-3. name: generic English food/ingredient name (e.g. "milk", "eggs", "cheddar cheese", "yogurt").
-4. count: report count ONLY for individually countable items (e.g. 4 eggs, 2 lemons, 3 apples). Use null if unsure or not countable.
-5. fill_level: estimate fill level between 0.0 and 1.0 ONLY for opened liquids or packaged items (e.g. opened milk carton half full -> 0.5). For unopened items or fresh produce, set to null.
-6. label_size_text: report exact volume/weight ONLY if clearly printed on the visible product label (e.g. "1 L", "500g"). Never state exact volumes or weights unless printed on the label.
-7. Return valid JSON adhering strictly to the response schema.
+1. Scan the entire visible image systematically: top-to-bottom and left-to-right.
+2. Detect recognizable food from shape, packaging, label text, color, or container
+   context even when partially occluded. Lower confidence when uncertain. Never
+   invent a fully hidden item.
+3. Use a useful generic English food name. A visible branded milk carton becomes
+   "milk"; an egg tray becomes "eggs"; produce bags should name the visible produce.
+4. Combine repeated examples of the same item into one result when practical.
+5. count: report count only for visible countable items. Use null when an exact count
+   is blocked or the product is not countable.
+6. fill_level: estimate 0.0 to 1.0 only for opened liquids, jars, sauces, and similar
+   containers whose contents are visible. Otherwise use null.
+7. label_size_text: copy exact volume/weight only when readable on the package.
+8. Ignore cookware, shelves, storage boxes with no visible food identity, and people.
+9. Do not return an empty list merely because the fridge is cluttered. Return every
+   reasonably recognizable food item with honest confidence.
+10. Return valid JSON adhering strictly to the response schema.
+"""
+
+MEAL_NUTRITION_PROMPT = """You are a cautious food photo nutrition estimator.
+Identify the visible meal and estimate nutrition for only the visible portion.
+Return dish name, portion description, calories, protein, carbohydrates, fat,
+fiber, confidence, and short assumptions. Do not claim medical precision. If
+portion size or ingredients are unclear, lower confidence and state assumptions.
+Never identify people or infer health conditions. Return structured JSON only.
 """
 
 
@@ -165,6 +186,42 @@ class GeminiVisionService:
         # 3. Invoke Gemini
         return self._invoke_gemini_fridge(image_bytes, mime_type)
 
+    def analyze_meal(
+        self,
+        image_bytes: bytes,
+        mime_type: str = "image/jpeg",
+        user_id: str = "default_user",
+    ) -> MealNutritionEstimate:
+        self.rate_limiter.check_and_record(user_id)
+        self._validate_image_bytes(image_bytes)
+        client = self._get_client()
+        from google.genai import types
+
+        part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+        last_error: Exception | None = None
+        for model in self._get_candidate_models():
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=[part, MEAL_NUTRITION_PROMPT],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=MealNutritionEstimate,
+                        temperature=0.0,
+                        http_options=types.HttpOptions(timeout=25_000),
+                    ),
+                )
+                if getattr(response, "parsed", None) is not None:
+                    return response.parsed  # type: ignore
+                if response.text:
+                    return MealNutritionEstimate.model_validate_json(response.text)
+            except Exception as err:
+                last_error = err
+                continue
+        if last_error:
+            self._handle_genai_error(last_error)
+        raise HTTPException(status_code=422, detail="The meal could not be estimated from this photo.")
+
     def _validate_image_bytes(self, image_bytes: bytes) -> None:
         if not image_bytes or len(image_bytes) < 10:
             raise HTTPException(
@@ -180,41 +237,63 @@ class GeminiVisionService:
                 detail="The provided file is not a valid or readable image. Please upload a clear JPEG or PNG.",
             ) from err
 
+    def _get_candidate_models(self) -> list[str]:
+        candidates = [self.model_name]
+        for fallback in FALLBACK_MODELS:
+            if fallback not in candidates:
+                candidates.append(fallback)
+        return candidates
+
     def _invoke_gemini_receipt(
         self, image_bytes: bytes, mime_type: str
     ) -> GeminiReceiptResponse:
         client = self._get_client()
         from google.genai import types
 
-        try:
-            part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-            response = client.models.generate_content(
-                model=self.model_name,
-                contents=[part, RECEIPT_SYSTEM_PROMPT],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=GeminiReceiptResponse,
-                    temperature=0.0,
-                ),
-            )
+        candidate_models = self._get_candidate_models()
+        last_error: Exception | None = None
 
-            # Modern google-genai returns parsed pydantic model in response.parsed
-            if getattr(response, "parsed", None) is not None:
-                return response.parsed  # type: ignore
+        for idx, model in enumerate(candidate_models):
+            try:
+                logger.info("Parsing receipt with model: %s (attempt %d/%d)", model, idx + 1, len(candidate_models))
+                part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+                response = client.models.generate_content(
+                    model=model,
+                    contents=[part, RECEIPT_SYSTEM_PROMPT],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=GeminiReceiptResponse,
+                        temperature=0.0,
+                        http_options=types.HttpOptions(timeout=25_000),  # 25s timeout per attempt
+                    ),
+                )
 
-            # Fallback to json text parsing if parsed is None
-            if response.text:
-                return GeminiReceiptResponse.model_validate_json(response.text)
+                if getattr(response, "parsed", None) is not None:
+                    return response.parsed  # type: ignore
 
-            raise HTTPException(
-                status_code=422,
-                detail="Gemini returned an empty response. The receipt may be unreadable.",
-            )
-        except HTTPException:
-            rethrow
-        except Exception as err:
-            self._handle_genai_error(err)
-            raise HTTPException(status_code=500, detail=str(err)) from err
+                if response.text:
+                    return GeminiReceiptResponse.model_validate_json(response.text)
+
+                raise HTTPException(
+                    status_code=422,
+                    detail="Gemini returned an empty response. The receipt may be unreadable.",
+                )
+            except HTTPException:
+                raise
+            except Exception as err:
+                last_error = err
+                err_str = str(err).lower()
+                is_transient = any(kw in err_str for kw in ["503", "504", "deadline", "timeout", "unavailable", "demand", "resource_exhausted", "quota", "429", "404", "not_found"])
+                if is_transient and idx + 1 < len(candidate_models):
+                    logger.warning("Model %s transient error: %s. Trying fallback model %s...", model, err, candidate_models[idx + 1])
+                    continue
+                break
+
+        if last_error:
+            self._handle_genai_error(last_error)
+            raise HTTPException(status_code=500, detail=str(last_error)) from last_error
+
+        raise HTTPException(status_code=500, detail="Failed to parse receipt after all model attempts.")
 
     def _invoke_gemini_fridge(
         self, image_bytes: bytes, mime_type: str
@@ -222,33 +301,55 @@ class GeminiVisionService:
         client = self._get_client()
         from google.genai import types
 
-        try:
-            part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-            response = client.models.generate_content(
-                model=self.model_name,
-                contents=[part, FRIDGE_SYSTEM_PROMPT],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=GeminiFridgeScan,
-                    temperature=0.0,
-                ),
-            )
+        candidate_models = self._get_candidate_models()
+        last_error: Exception | None = None
 
-            if getattr(response, "parsed", None) is not None:
-                return response.parsed  # type: ignore
+        for idx, model in enumerate(candidate_models):
+            try:
+                logger.info("Scanning fridge with model: %s (attempt %d/%d)", model, idx + 1, len(candidate_models))
+                part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+                response = client.models.generate_content(
+                    model=model,
+                    contents=[part, FRIDGE_SYSTEM_PROMPT],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=GeminiFridgeScan,
+                        temperature=0.0,
+                        http_options=types.HttpOptions(timeout=25_000),  # 25s timeout per attempt
+                    ),
+                )
 
-            if response.text:
-                return GeminiFridgeScan.model_validate_json(response.text)
+                if getattr(response, "parsed", None) is not None:
+                    return response.parsed  # type: ignore
 
-            return GeminiFridgeScan(items=[])
-        except HTTPException:
-            rethrow
-        except Exception as err:
-            self._handle_genai_error(err)
-            raise HTTPException(status_code=500, detail=str(err)) from err
+                if response.text:
+                    return GeminiFridgeScan.model_validate_json(response.text)
+
+                return GeminiFridgeScan(items=[])
+            except HTTPException:
+                raise
+            except Exception as err:
+                last_error = err
+                err_str = str(err).lower()
+                is_transient = any(kw in err_str for kw in ["503", "504", "deadline", "timeout", "unavailable", "demand", "resource_exhausted", "quota", "429", "404", "not_found"])
+                if is_transient and idx + 1 < len(candidate_models):
+                    logger.warning("Model %s transient error: %s. Trying fallback model %s...", model, err, candidate_models[idx + 1])
+                    continue
+                break
+
+        if last_error:
+            self._handle_genai_error(last_error)
+            raise HTTPException(status_code=500, detail=str(last_error)) from last_error
+
+        return GeminiFridgeScan(items=[])
 
     def _handle_genai_error(self, err: Exception) -> None:
         err_msg = str(err).lower()
+        if "503" in err_msg or "unavailable" in err_msg or "demand" in err_msg:
+            raise HTTPException(
+                status_code=503,
+                detail="Gemini Vision models are currently experiencing high demand. Please try again shortly.",
+            )
         if "quota" in err_msg or "resource_exhausted" in err_msg or "429" in err_msg:
             raise HTTPException(
                 status_code=429,
@@ -412,3 +513,50 @@ class GeminiVisionService:
             items=validated_items,
             image_hash=image_hash,
         )
+
+    def ask_chef(
+        self,
+        prompt: str,
+        pantry_items: list[dict[str, Any]] | None = None,
+    ) -> str:
+        """Provide friendly, expert culinary and meal planning guidance using Gemini."""
+        pantry_context = ""
+        if pantry_items:
+            items_str = ", ".join(
+                f"{it.get('name')} ({it.get('quantity')} {it.get('unit')})"
+                for it in pantry_items
+            )
+            pantry_context = f"\nThe user currently has these items in their kitchen inventory: {items_str}."
+        else:
+            pantry_context = "\nThe user's kitchen inventory is currently empty."
+
+        system_instruction = (
+            "You are Chef CulinaryAI, an encouraging, expert, and practical kitchen companion. "
+            f"{pantry_context} "
+            "Answer culinary and cooking questions concisely. Suggest meals, step-by-step guidance, "
+            "substitutions, or tips matching their pantry ingredients. Keep your tone encouraging, "
+            "clear, and under 3 short paragraphs."
+        )
+
+        try:
+            client = self._get_client()
+            models_to_try = [self.model_name] + [m for m in FALLBACK_MODELS if m != self.model_name]
+            for model in models_to_try:
+                try:
+                    response = client.models.generate_content(
+                        model=model,
+                        contents=f"{system_instruction}\n\nUser Question: {prompt}",
+                    )
+                    if response and response.text:
+                        return response.text.strip()
+                except Exception as model_err:
+                    logger.warning("Chef chat error on %s: %s", model, model_err)
+                    continue
+        except Exception as err:
+            logger.error("Failed to query Gemini for chef chat: %s", err)
+
+        return (
+            "I'm Chef CulinaryAI! I can help you choose what to cook, find ingredient substitutes, "
+            "and guide you through any recipe. Tell me what flavors you are in the mood for!"
+        )
+

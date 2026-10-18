@@ -63,15 +63,15 @@ class AppTheme {
   static const Color textLightMuted = Color(0xFF9CA3AF);
 
   // ── Dark Surfaces (Warm Obsidian & Truffle Slate — NO COLD BLUE!) ──────────
-  static const Color bgDark = Color(0xFF0F1012); // Deep obsidian slate
-  static const Color surfaceDark = Color(0xFF17181D); // Rich charcoal card
-  static const Color cardDark = surfaceDark; // Rich charcoal card
-  static const Color surfaceDark2 = Color(0xFF202229); // Elevated card & inputs
-  static const Color surfaceDark3 = Color(0xFF282B34); // Active highlight
+  static const Color bgDark = Color(0xFF1A1612);       // Warm truffle obsidian (not cold black)
+  static const Color surfaceDark = Color(0xFF221E19);  // Rich warm charcoal card
+  static const Color cardDark = surfaceDark;           // Rich warm charcoal card
+  static const Color surfaceDark2 = Color(0xFF2B2620); // Elevated card & inputs
+  static const Color surfaceDark3 = Color(0xFF343028); // Active highlight
   static const Color borderDark = Color(
-    0xFF292C35,
-  ); // Delicate dark micro-border
-  static const Color borderDarkSubtle = Color(0xFF1E2027);
+    0xFF3A342C,
+  ); // Warm dark micro-border
+  static const Color borderDarkSubtle = Color(0xFF262018);
   static const Color textDarkPrimary = Color(0xFFF9FAFB); // Soft bright white
   static const Color textDarkSecondary = Color(0xFF9CA3AF); // Warm muted slate
   static const Color textDarkMuted = Color(0xFF6B7280);
@@ -251,7 +251,7 @@ class AppTheme {
             color: states.contains(WidgetState.selected)
                 ? primaryFlame
                 : textLightSecondary,
-            size: 20,
+            size: 22,
           );
         }),
         elevation: 0,
@@ -306,9 +306,9 @@ class AppTheme {
       primaryColor: primaryFlame,
       colorScheme: const ColorScheme.dark(
         primary: primaryFlame,
-        primaryContainer: Color(0xFF351B15),
+        primaryContainer: Color(0xFF3D2518),
         secondary: freshHerb,
-        secondaryContainer: Color(0xFF142E25),
+        secondaryContainer: Color(0xFF1A3328),
         tertiary: warmSaffron,
         surface: surfaceDark,
         error: Color(0xFFF87171),
@@ -438,7 +438,7 @@ class AppTheme {
             color: states.contains(WidgetState.selected)
                 ? primaryFlameLight
                 : textDarkSecondary,
-            size: 20,
+            size: 22,
           );
         }),
         elevation: 0,

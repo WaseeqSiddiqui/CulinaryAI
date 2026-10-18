@@ -7,6 +7,7 @@
       "cuisine": "Pakistani Fusion",
       "cook_time_minutes": 30,
       "servings": 4,
+      "calories_per_serving": 480,
       "tags": ["high protein", "dinner", "one pan"],
       "dietary_tags": ["halal", "gluten-free"],
       "ingredients_required": [
@@ -29,6 +30,7 @@
       "cuisine": "Pakistani",
       "cook_time_minutes": 35,
       "servings": 4,
+      "calories_per_serving": 390,
       "tags": ["comfort food", "budget", "dinner"],
       "dietary_tags": ["halal", "vegetarian", "vegan", "gluten-free"],
       "ingredients_required": [
@@ -52,6 +54,7 @@
       "cuisine": "European",
       "cook_time_minutes": 20,
       "servings": 4,
+      "calories_per_serving": 360,
       "tags": ["breakfast", "quick", "high protein"],
       "dietary_tags": ["halal", "vegetarian", "gluten-free"],
       "ingredients_required": [
@@ -74,6 +77,7 @@
       "cuisine": "Italian",
       "cook_time_minutes": 25,
       "servings": 4,
+      "calories_per_serving": 420,
       "tags": ["quick", "dinner", "family"],
       "dietary_tags": ["halal", "vegetarian"],
       "ingredients_required": [
@@ -97,6 +101,7 @@
       "cuisine": "Modern European",
       "cook_time_minutes": 22,
       "servings": 4,
+      "calories_per_serving": 520,
       "tags": ["high protein", "dinner", "quick"],
       "dietary_tags": ["halal", "gluten-free", "pescatarian"],
       "ingredients_required": [
@@ -119,6 +124,7 @@
       "cuisine": "Italian",
       "cook_time_minutes": 30,
       "servings": 4,
+      "calories_per_serving": 460,
       "tags": ["comfort food", "dinner", "creamy"],
       "dietary_tags": ["halal", "vegetarian", "gluten-free"],
       "ingredients_required": [

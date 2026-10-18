@@ -104,7 +104,7 @@ class TesseractOcrChannel(
             error("Tesseract failed to initialize its English language model.")
         }
 
-        engine.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SINGLE_COLUMN)
+        engine.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SINGLE_BLOCK)
         tessBaseApi = engine
         return engine
     }

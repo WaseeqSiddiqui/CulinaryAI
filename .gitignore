@@ -47,7 +47,23 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 
+# Environment & Secrets
+.env
+*.env
+*.env.*
+*.env.backup
+backend/.env
+
+# Temporary files and scratchpads
+.tmp/
+.tmp*
+
 # Python backend
 backend/.venv/
 **/__pycache__/
 .pytest_cache/
+android/app/build/
+android/build/
+**/android/**/build/
+
+

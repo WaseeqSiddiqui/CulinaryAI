@@ -7,13 +7,16 @@ import 'providers/household_provider.dart';
 import 'providers/pantry_provider.dart';
 import 'providers/shopping_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/recipe_experience_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/main_shell.dart';
 import 'services/firebase_service.dart';
+import 'services/server_config_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await FirebaseService.initialize();
+  await ServerConfigService.init();
   runApp(const CulinaryAiApp());
 }
 
@@ -26,6 +29,7 @@ class CulinaryAiApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => RecipeExperienceProvider()),
         ChangeNotifierProxyProvider<AuthProvider, HouseholdProvider>(
           create: (_) => HouseholdProvider(),
           update: (_, auth, household) {
@@ -42,12 +46,19 @@ class CulinaryAiApp extends StatelessWidget {
             return value;
           },
         ),
-        ChangeNotifierProxyProvider2<HouseholdProvider, PantryProvider,
-            ShoppingProvider>(
+        ChangeNotifierProxyProvider2<
+          HouseholdProvider,
+          PantryProvider,
+          ShoppingProvider
+        >(
           create: (_) => ShoppingProvider(),
           update: (_, household, pantry, shopping) {
             final value = shopping ?? ShoppingProvider();
-            value.bindHousehold(household.pantryScopeId, pantry.allItems);
+            value.bindHousehold(
+              household.pantryScopeId,
+              pantry.allItems,
+              pantryReady: pantry.hasLoaded,
+            );
             return value;
           },
         ),

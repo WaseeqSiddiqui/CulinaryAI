@@ -14,6 +14,47 @@ class ProductMatchingService {
   final http.Client _client;
   final Uri _baseUri;
 
+  Future<ShoppingQueryNormalization> normalize(ShoppingListItem wanted) async {
+    final response = await _client
+        .post(
+          _baseUri.resolve('/normalize-shopping-query'),
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'name': wanted.name,
+            'quantity': wanted.quantity,
+            'unit': wanted.unit,
+          }),
+        )
+        .timeout(const Duration(seconds: 12));
+    if (response.statusCode != 200) {
+      throw StateError('Query normalizer returned ${response.statusCode}');
+    }
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final query = body['search_query']?.toString().trim() ?? '';
+    final canonical = body['canonical_name']?.toString().trim() ?? '';
+    final confidence = (body['confidence'] as num?)?.toDouble();
+    final changed = body['changed'];
+    final reason = body['reason']?.toString().trim() ?? '';
+    if (query.isEmpty ||
+        query.length > 120 ||
+        canonical.isEmpty ||
+        canonical.length > 120 ||
+        confidence == null ||
+        confidence < 0 ||
+        confidence > 1 ||
+        changed is! bool ||
+        reason.isEmpty) {
+      throw const FormatException('Invalid shopping query normalization');
+    }
+    return ShoppingQueryNormalization(
+      searchQuery: query,
+      canonicalName: canonical,
+      confidence: confidence,
+      changed: changed,
+      reason: reason,
+    );
+  }
+
   Future<ProductMatch> match(
     ShoppingListItem wanted,
     List<ProductCandidate> candidates,
@@ -29,9 +70,22 @@ class ProductMatchingService {
             'candidates': candidates.map((item) => item.toMap()).toList(),
           }),
         )
-        .timeout(const Duration(seconds: 20));
+        .timeout(const Duration(seconds: 24));
     if (response.statusCode != 200) {
-      throw StateError('Product matcher returned ${response.statusCode}');
+      var detail = '';
+      try {
+        final errorBody = jsonDecode(response.body);
+        if (errorBody is Map<String, dynamic>) {
+          detail = errorBody['detail']?.toString().trim() ?? '';
+        }
+      } catch (_) {
+        // Keep the status-only fallback for non-JSON proxy responses.
+      }
+      throw StateError(
+        detail.isEmpty
+            ? 'Product matcher returned ${response.statusCode}'
+            : 'Product matcher returned ${response.statusCode}: $detail',
+      );
     }
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     final index = body['chosen_index'] as int?;

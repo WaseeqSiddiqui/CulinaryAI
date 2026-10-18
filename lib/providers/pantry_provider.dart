@@ -3,21 +3,21 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../models/fridge_vision_models.dart';
 import '../models/pantry_item_model.dart';
 import '../models/receipt_vision_models.dart';
 import '../services/pantry_service.dart';
+import '../services/pantry_zone_resolver.dart';
+import '../services/expiry_estimation_service.dart';
+
+enum PantryExpiryFilter { all, useSoon, expired, estimated }
 
 class PantryProvider extends ChangeNotifier {
   PantryProvider({PantryService? service})
     : _service = service ?? PantryService();
 
   static const _uuid = Uuid();
-  static const List<String> zones = [
-    'Fridge',
-    'Freezer',
-    'Pantry Shelf',
-    'Spice Rack',
-  ];
+  static const List<String> zones = PantryZoneResolver.zones;
   static const List<String> units = [
     'pcs',
     'g',
@@ -36,14 +36,18 @@ class PantryProvider extends ChangeNotifier {
   String? _householdId;
   String _searchQuery = '';
   String? _selectedZone;
+  PantryExpiryFilter _expiryFilter = PantryExpiryFilter.all;
   bool _isLoading = false;
+  bool _hasLoaded = false;
   bool _receivedRemoteSnapshot = false;
   String? _errorMessage;
 
   String get searchQuery => _searchQuery;
   String? get selectedZone => _selectedZone;
+  PantryExpiryFilter get expiryFilter => _expiryFilter;
   String? get householdId => _householdId;
   bool get isLoading => _isLoading;
+  bool get hasLoaded => _hasLoaded;
   String? get errorMessage => _errorMessage;
   List<PantryItemModel> get allItems => List.unmodifiable(_items);
 
@@ -54,16 +58,35 @@ class PantryProvider extends ChangeNotifier {
       final matchesSearch =
           _searchQuery.isEmpty ||
           item.name.toLowerCase().contains(_searchQuery.toLowerCase());
-      return matchesZone && matchesSearch;
-    }).toList()..sort((a, b) => a.name.compareTo(b.name));
+      final matchesExpiry = switch (_expiryFilter) {
+        PantryExpiryFilter.all => true,
+        PantryExpiryFilter.useSoon => item.expiryStatus == ExpiryStatus.useSoon,
+        PantryExpiryFilter.expired => item.expiryStatus == ExpiryStatus.expired,
+        PantryExpiryFilter.estimated => item.hasEstimatedExpiry,
+      };
+      return matchesZone && matchesSearch && matchesExpiry;
+    }).toList()..sort((a, b) {
+      final aDays = a.daysUntilExpiry ?? 100000;
+      final bDays = b.daysUntilExpiry ?? 100000;
+      final expiryOrder = aDays.compareTo(bDays);
+      return expiryOrder != 0 ? expiryOrder : a.name.compareTo(b.name);
+    });
   }
 
   Map<String, List<PantryItemModel>> get itemsByZone {
+    return _groupByZone(filteredItems);
+  }
+
+  Map<String, List<PantryItemModel>> get allItemsByZone {
+    return _groupByZone(_items);
+  }
+
+  Map<String, List<PantryItemModel>> _groupByZone(
+    Iterable<PantryItemModel> source,
+  ) {
     final grouped = <String, List<PantryItemModel>>{};
     for (final zone in zones) {
-      final zoneItems = filteredItems
-          .where((item) => item.location == zone)
-          .toList();
+      final zoneItems = source.where((item) => item.location == zone).toList();
       if (zoneItems.isNotEmpty) grouped[zone] = zoneItems;
     }
     return grouped;
@@ -71,6 +94,10 @@ class PantryProvider extends ChangeNotifier {
 
   int get totalCount => _items.length;
   int get lowStockCount => _items.where((item) => item.isLowStock).length;
+  int get useSoonCount =>
+      _items.where((item) => item.expiryStatus == ExpiryStatus.useSoon).length;
+  int get expiredCount =>
+      _items.where((item) => item.expiryStatus == ExpiryStatus.expired).length;
 
   void bindHousehold(String? householdId) {
     if (_householdId == householdId) return;
@@ -78,6 +105,7 @@ class PantryProvider extends ChangeNotifier {
     _items.clear();
     _subscription?.cancel();
     _subscription = null;
+    _hasLoaded = false;
     _receivedRemoteSnapshot = false;
     if (householdId == null) {
       _isLoading = false;
@@ -90,16 +118,19 @@ class PantryProvider extends ChangeNotifier {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
-    final localItems = await _service.loadLocal(householdId);
+    final loadedItems = await _service.loadLocal(householdId);
+    final localItems = _canonicalizeStoredItems(loadedItems);
     if (_householdId != householdId) return;
     _items
       ..clear()
       ..addAll(localItems);
+    await _saveZoneCorrections(householdId, loadedItems, localItems);
     if (_items.isEmpty && householdId == 'personal_demo_chef') {
       _items.addAll(_demoPantry(householdId));
       await _service.saveLocal(householdId, _items);
     }
     _isLoading = false;
+    _hasLoaded = true;
     notifyListeners();
 
     _subscription = _service
@@ -107,8 +138,9 @@ class PantryProvider extends ChangeNotifier {
         .listen(
           (remoteItems) async {
             if (_householdId != householdId) return;
+            final canonicalItems = _canonicalizeStoredItems(remoteItems);
             if (!_receivedRemoteSnapshot &&
-                remoteItems.isEmpty &&
+                canonicalItems.isEmpty &&
                 _items.isNotEmpty) {
               _receivedRemoteSnapshot = true;
               for (final item in _items) {
@@ -119,8 +151,14 @@ class PantryProvider extends ChangeNotifier {
             _receivedRemoteSnapshot = true;
             _items
               ..clear()
-              ..addAll(remoteItems);
+              ..addAll(canonicalItems);
             await _service.saveLocal(householdId, _items);
+            await _saveZoneCorrections(
+              householdId,
+              remoteItems,
+              canonicalItems,
+              saveLocal: false,
+            );
             notifyListeners();
           },
           onError: (Object error) {
@@ -170,7 +208,12 @@ class PantryProvider extends ChangeNotifier {
   }
 
   void setZoneFilter(String? zone) {
-    _selectedZone = zone;
+    _selectedZone = zone == null ? null : PantryZoneResolver.normalize(zone);
+    notifyListeners();
+  }
+
+  void setExpiryFilter(PantryExpiryFilter value) {
+    _expiryFilter = value;
     notifyListeners();
   }
 
@@ -183,6 +226,12 @@ class PantryProvider extends ChangeNotifier {
     double lowStockThreshold = 1.0,
     String? customImageUrl,
     String addedVia = 'manual',
+    DateTime? purchaseDate,
+    DateTime? expiryDate,
+    DateTime? openedDate,
+    ExpirySource expirySource = ExpirySource.unknown,
+    ExpiryConfidence expiryConfidence = ExpiryConfidence.low,
+    bool expiryUserConfirmed = false,
   }) {
     final scopeId = _householdId ?? householdId;
     final item = PantryItemModel(
@@ -196,6 +245,12 @@ class PantryProvider extends ChangeNotifier {
       addedVia: addedVia,
       updatedAt: DateTime.now(),
       customImageUrl: customImageUrl,
+      purchaseDate: purchaseDate,
+      expiryDate: expiryDate,
+      openedDate: openedDate,
+      expirySource: expirySource,
+      expiryConfidence: expiryConfidence,
+      expiryUserConfirmed: expiryUserConfirmed,
     );
     _items.add(item);
     _persistAndSync(item);
@@ -212,6 +267,9 @@ class PantryProvider extends ChangeNotifier {
   }) async {
     final scopeId = _householdId ?? householdId;
     final now = DateTime.now();
+    final purchasedAt = receiptDate == null
+        ? now
+        : DateTime.tryParse(receiptDate) ?? now;
 
     for (final scanned in items.where((i) => i.isSelected)) {
       // 1. Record purchase event in the ledger (source="receipt")
@@ -238,17 +296,43 @@ class PantryProvider extends ChangeNotifier {
           ? scanned.matchedIngredient
           : scanned.name;
       final normName = targetName.toLowerCase().trim();
-      final zone = scanned.storageZone;
+      final zone = PantryZoneResolver.resolveForItem(
+        targetName,
+        suggestedZone: scanned.storageZone,
+      );
+      final estimate = ExpiryEstimationService.estimate(
+        itemName: targetName,
+        storageZone: zone,
+        purchasedAt: purchasedAt,
+      );
 
-      final existingIndex = _items.indexWhere(
+      var existingIndex = _items.indexWhere(
         (it) => it.name.toLowerCase().trim() == normName && it.location == zone,
       );
+      if (existingIndex == -1) {
+        existingIndex = _items.indexWhere(
+          (it) =>
+              it.name.toLowerCase().trim() == normName &&
+              it.addedVia == 'receipt_scan',
+        );
+      }
 
       if (existingIndex != -1) {
         final existing = _items[existingIndex];
         final updated = existing.copyWith(
           quantity: existing.quantity + scanned.totalQty,
+          location: existing.addedVia == 'receipt_scan'
+              ? zone
+              : existing.location,
           updatedAt: now,
+          purchaseDate: purchasedAt,
+          expiryDate: _preferredExpiry(existing, estimate),
+          expirySource: existing.expiryUserConfirmed || estimate == null
+              ? existing.expirySource
+              : ExpirySource.receiptEstimate,
+          expiryConfidence: existing.expiryUserConfirmed || estimate == null
+              ? existing.expiryConfidence
+              : estimate.confidence,
         );
         _items[existingIndex] = updated;
         _persistAndSync(updated);
@@ -263,6 +347,97 @@ class PantryProvider extends ChangeNotifier {
           lowStockThreshold: _defaultThreshold(scanned.unit),
           addedVia: 'receipt_scan',
           updatedAt: now,
+          purchaseDate: purchasedAt,
+          expiryDate: estimate?.date,
+          expirySource: estimate == null
+              ? ExpirySource.unknown
+              : ExpirySource.receiptEstimate,
+          expiryConfidence: estimate?.confidence ?? ExpiryConfidence.low,
+        );
+        _items.add(newItem);
+        _persistAndSync(newItem);
+      }
+    }
+    notifyListeners();
+  }
+
+  DateTime? _preferredExpiry(
+    PantryItemModel existing,
+    ExpiryEstimate? estimate,
+  ) {
+    if (existing.expiryUserConfirmed || estimate == null) {
+      return existing.expiryDate;
+    }
+    final current = existing.expiryDate;
+    if (current == null || estimate.date.isBefore(current)) {
+      return estimate.date;
+    }
+    return current;
+  }
+
+  Future<void> reconcileFridgeItems({
+    required String householdId,
+    required List<ReconciledFridgeItem> reconciledItems,
+  }) async {
+    final scopeId = _householdId ?? householdId;
+    final now = DateTime.now();
+
+    for (final item in reconciledItems) {
+      if (!item.isAccepted) continue;
+
+      if (item.status == 'mismatch') {
+        // Find existing pantry item by ID or name
+        final index = _items.indexWhere(
+          (it) =>
+              it.id == item.matchedPantryId ||
+              it.name.toLowerCase() == item.detectedName.toLowerCase(),
+        );
+        if (index != -1 && item.suggestedQuantity != null) {
+          final existing = _items[index];
+          final estimate = existing.expiryDate == null
+              ? ExpiryEstimationService.estimate(
+                  itemName: existing.name,
+                  storageZone: existing.location,
+                  purchasedAt: now,
+                )
+              : null;
+          final updated = existing.copyWith(
+            quantity: item.suggestedQuantity!,
+            estimated: true,
+            updatedAt: now,
+            expiryDate: estimate?.date ?? existing.expiryDate,
+            expirySource: estimate == null
+                ? existing.expirySource
+                : ExpirySource.receiptEstimate,
+            expiryConfidence: estimate?.confidence ?? existing.expiryConfidence,
+          );
+          _items[index] = updated;
+          _persistAndSync(updated);
+        }
+      } else if (item.status == 'new_item') {
+        final targetName = item.matchedName ?? item.detectedName;
+        final expiry = ExpiryEstimationService.estimate(
+          itemName: targetName,
+          storageZone: 'Fridge',
+          purchasedAt: now,
+        );
+        final newItem = PantryItemModel(
+          id: _uuid.v4(),
+          householdId: scopeId,
+          name: targetName,
+          quantity: item.suggestedQuantity ?? 1.0,
+          unit: item.unit,
+          location: 'Fridge',
+          lowStockThreshold: _defaultThreshold(item.unit),
+          addedVia: 'fridge_scan',
+          estimated: true,
+          updatedAt: now,
+          purchaseDate: now,
+          expiryDate: expiry?.date,
+          expirySource: expiry == null
+              ? ExpirySource.unknown
+              : ExpirySource.receiptEstimate,
+          expiryConfidence: expiry?.confidence ?? ExpiryConfidence.low,
         );
         _items.add(newItem);
         _persistAndSync(newItem);
@@ -279,11 +454,50 @@ class PantryProvider extends ChangeNotifier {
     return 1;
   }
 
+  List<PantryItemModel> _canonicalizeStoredItems(
+    Iterable<PantryItemModel> items,
+  ) {
+    return items.map((item) {
+      final canonicalZone = item.addedVia == 'receipt_scan'
+          ? PantryZoneResolver.resolveForItem(
+              item.name,
+              suggestedZone: item.location,
+            )
+          : PantryZoneResolver.normalize(item.location);
+      return canonicalZone == item.location
+          ? item
+          : item.copyWith(location: canonicalZone);
+    }).toList();
+  }
+
+  Future<void> _saveZoneCorrections(
+    String householdId,
+    List<PantryItemModel> original,
+    List<PantryItemModel> canonical, {
+    bool saveLocal = true,
+  }) async {
+    final originalById = {for (final item in original) item.id: item};
+    final corrected = canonical.where(
+      (item) => originalById[item.id]?.location != item.location,
+    );
+    if (corrected.isEmpty) return;
+    if (saveLocal) {
+      await _service.saveLocal(householdId, canonical);
+    }
+    for (final item in corrected) {
+      unawaited(_service.upsert(item));
+    }
+  }
+
   void updateItem(PantryItemModel updated) {
     final index = _items.indexWhere((item) => item.id == updated.id);
     if (index == -1) return;
+    final previous = _items[index];
     final item = updated.copyWith(
       householdId: _householdId ?? updated.householdId,
+      addedVia: previous.location == updated.location
+          ? updated.addedVia
+          : 'manual',
       updatedAt: DateTime.now(),
     );
     _items[index] = item;

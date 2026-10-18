@@ -8,7 +8,10 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/fridge_vision_models.dart';
+import '../models/pantry_item_model.dart';
 import '../models/receipt_vision_models.dart';
+import 'server_config_service.dart';
 
 class VisionApiException implements Exception {
   final String message;
@@ -21,17 +24,21 @@ class VisionApiException implements Exception {
 }
 
 class VisionApiService {
+  static String get defaultBaseUrl => ServerConfigService.currentBaseUrl;
+
   static const configuredBaseUrl = String.fromEnvironment(
     'CULINARY_API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000',
+    defaultValue: 'http://192.168.100.147:8000',
   );
 
   VisionApiService({
     http.Client? client,
-    String baseUrl = configuredBaseUrl,
-    this.timeout = const Duration(seconds: 35),
-  })  : _client = client ?? http.Client(),
-        baseUri = Uri.parse(baseUrl.replaceFirst(RegExp(r'/$'), ''));
+    String? baseUrl,
+    this.timeout = const Duration(seconds: 45),
+  }) : _client = client ?? http.Client(),
+       baseUri = Uri.parse(
+         (baseUrl ?? defaultBaseUrl).replaceFirst(RegExp(r'/$'), ''),
+       );
 
   final http.Client _client;
   final Uri baseUri;
@@ -87,15 +94,32 @@ class VisionApiService {
     return crypto.sha256.convert(bytes).toString();
   }
 
+  static bool _isPng(Uint8List bytes) =>
+      bytes.length >= 8 &&
+      bytes[0] == 0x89 &&
+      bytes[1] == 0x50 &&
+      bytes[2] == 0x4E &&
+      bytes[3] == 0x47;
+
+  static MediaType _contentType(Uint8List bytes) =>
+      _isPng(bytes) ? MediaType('image', 'png') : MediaType('image', 'jpeg');
+
+  static String _imageFilename(String stem, Uint8List bytes) =>
+      '$stem.${_isPng(bytes) ? 'png' : 'jpg'}';
+
   /// Checks if a receipt hash or key was already processed
   static Future<bool> isDuplicate(String householdId, String identifier) async {
     final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList('culinary_receipt_hashes_$householdId') ?? [];
+    final list =
+        prefs.getStringList('culinary_receipt_hashes_$householdId') ?? [];
     return list.contains(identifier);
   }
 
   /// Records that a receipt has been processed
-  static Future<void> markProcessed(String householdId, String identifier) async {
+  static Future<void> markProcessed(
+    String householdId,
+    String identifier,
+  ) async {
     final prefs = await SharedPreferences.getInstance();
     final key = 'culinary_receipt_hashes_$householdId';
     final list = prefs.getStringList(key) ?? [];
@@ -128,8 +152,8 @@ class VisionApiService {
       http.MultipartFile.fromBytes(
         'file',
         preparedBytes,
-        filename: 'receipt.jpg',
-        contentType: MediaType('image', 'jpeg'),
+        filename: _imageFilename('receipt', preparedBytes),
+        contentType: _contentType(preparedBytes),
       ),
     );
 
@@ -140,7 +164,9 @@ class VisionApiService {
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         if (decoded is! Map<String, dynamic>) {
-          throw const VisionApiException('Invalid response from receipt vision service.');
+          throw const VisionApiException(
+            'Invalid response from receipt vision service.',
+          );
         }
         return ValidatedReceiptResponse.fromJson(decoded);
       }
@@ -169,7 +195,9 @@ class VisionApiService {
         );
       }
 
-      final errorMsg = _extractDetail(response.body) ?? 'Server error (${response.statusCode})';
+      final errorMsg =
+          _extractDetail(response.body) ??
+          'Server error (${response.statusCode})';
       throw VisionApiException(errorMsg, statusCode: response.statusCode);
     } on TimeoutException {
       throw const VisionApiException(
@@ -179,7 +207,96 @@ class VisionApiService {
     } on VisionApiException {
       rethrow;
     } catch (e) {
-      throw VisionApiException('Could not connect to receipt vision service: $e');
+      throw VisionApiException(
+        'Could not connect to receipt vision service: $e',
+      );
+    }
+  }
+
+  /// Uploads fridge shelf photo to POST /scan-fridge for visual verification & reconciliation
+  Future<FridgeScanResponse> scanFridge({
+    required Uint8List imageBytes,
+    required String userId,
+    required List<PantryItemModel> existingItems,
+  }) async {
+    // Preserve more detail for labels and partially visible items in a
+    // cluttered fridge while keeping uploads phone-friendly.
+    final preparedBytes = await downscaleImage(imageBytes, maxDimension: 2048);
+
+    final uri = baseUri.resolve('/scan-fridge');
+    final request = http.MultipartRequest('POST', uri);
+
+    request.headers['X-User-Id'] = userId;
+    request.fields['user_id'] = userId;
+
+    final pantryJsonList = existingItems
+        .map(
+          (i) => {
+            'id': i.id,
+            'name': i.name,
+            'quantity': i.quantity,
+            'unit': i.unit,
+            'location': i.location,
+            'estimated': i.estimated,
+          },
+        )
+        .toList();
+    request.fields['pantry_items'] = jsonEncode(pantryJsonList);
+
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        preparedBytes,
+        filename: _imageFilename('fridge', preparedBytes),
+        contentType: _contentType(preparedBytes),
+      ),
+    );
+
+    try {
+      final streamedResponse = await _client.send(request).timeout(timeout);
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is! Map<String, dynamic>) {
+          throw const VisionApiException(
+            'Invalid response from fridge vision service.',
+          );
+        }
+        return FridgeScanResponse.fromJson(decoded);
+      }
+
+      if (response.statusCode == 429) {
+        final detail = _extractDetail(response.body);
+        throw VisionApiException(
+          detail ?? 'Daily fridge scanning limit reached (max 20 scans/day). Please try again tomorrow.',
+          statusCode: 429,
+        );
+      }
+
+      if (response.statusCode == 400) {
+        final detail = _extractDetail(response.body);
+        throw VisionApiException(
+          detail ?? 'This image file could not be read. Try the camera or choose another image file.',
+          statusCode: 400,
+        );
+      }
+
+      final errorMsg =
+          _extractDetail(response.body) ??
+          'Server error (${response.statusCode})';
+      throw VisionApiException(errorMsg, statusCode: response.statusCode);
+    } on TimeoutException {
+      throw const VisionApiException(
+        'Fridge scan timed out. Check the connection, then try the camera or gallery again.',
+        statusCode: 504,
+      );
+    } on VisionApiException {
+      rethrow;
+    } catch (e) {
+      throw VisionApiException(
+        'Could not connect to fridge vision service: $e',
+      );
     }
   }
 

@@ -4,9 +4,11 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/chef_name_formatter.dart';
 import '../../models/backend_meal_recommendation.dart';
+import '../../models/pantry_item_model.dart';
 import '../../models/recipe_recommendation_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/pantry_provider.dart';
+import '../../providers/recipe_experience_provider.dart';
 import '../../services/chef_chat_service.dart';
 import '../../services/meal_planning_api_service.dart';
 import '../cooking/guided_cooking_screen.dart';
@@ -58,7 +60,15 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   Future<void> _send([String? value]) async {
     final question = (value ?? _controller.text).trim();
     if (question.isEmpty || _isReplying) return;
-    final pantryItems = context.read<PantryProvider>().allItems;
+    final pantryItems = context
+        .read<PantryProvider>()
+        .allItems
+        .where(
+          (item) =>
+              item.quantity > 0 && item.expiryStatus != ExpiryStatus.expired,
+        )
+        .toList();
+    final preferences = context.read<RecipeExperienceProvider>().preferences;
     final dietaryPreference = context
         .read<AuthProvider>()
         .currentUser
@@ -76,20 +86,33 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     String? serviceNotice;
     var recommendations = const <BackendMealRecommendation>[];
 
-    if (ChefChatService.isMealPlanningQuestion(question)) {
+    if (_isWeeklyPlanRequest(question)) {
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+      answer = 'Weekly planning has its own clean screen. Open the menu and choose 7-day meal plan; it will use your pantry, people count, and calorie target.';
+    } else if (ChefChatService.isMealPlanningQuestion(question)) {
       try {
         final plan = await _mealPlanningApi.generatePlan(
           question: question,
           pantryItems: pantryItems,
+          servings: preferences.servings,
+          mealCount: 1,
           dietaryPreferences:
               dietaryPreference == null || dietaryPreference.isEmpty
-              ? const []
-              : [dietaryPreference],
+              ? preferences.dietaryNeeds
+              : [...preferences.dietaryNeeds, dietaryPreference],
+          maxCookTimeMinutes: preferences.maxCookMinutes,
+          avoidIngredients: [
+            ...preferences.allergens,
+            ...preferences.dislikedIngredients,
+          ],
+          mealsPerDay: preferences.mealsPerDay,
+          targetCaloriesPerPersonPerDay: preferences.calorieTarget,
+          pantryFirst: true,
         );
         recommendations = plan.meals;
         answer = recommendations.isEmpty
             ? 'The verified recipe service did not find a suitable meal. Try changing your dietary preference or adding more pantry items.'
-            : 'I found ${recommendations.length} verified recipes using your live pantry. Pick one to start guided cooking.';
+            : 'I checked your pantry first and found this recipe for ${preferences.servings} people. It targets about ${(preferences.calorieTarget / preferences.mealsPerDay).round()} kcal per person for this meal.';
         serviceNotice =
             'Live backend • ${plan.retrievalMethod} • ${plan.pantryItemCount} pantry items';
       } on MealPlanningApiException catch (error) {
@@ -97,8 +120,13 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         serviceNotice = error.message;
       }
     } else {
-      await Future<void>.delayed(const Duration(milliseconds: 250));
-      answer = ChefChatService.answer(question, pantryItems);
+      final result = await ChefChatService.askChefApi(question, pantryItems);
+      answer = result.reply;
+      if (!result.isLiveAi) {
+        serviceNotice = 'Offline Chef · Connect backend for live AI';
+      } else {
+        serviceNotice = 'Live AI · chef-chat backend';
+      }
     }
     if (!mounted) return;
     setState(() {
@@ -113,6 +141,14 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       _isReplying = false;
     });
     _scrollToBottom();
+  }
+
+  bool _isWeeklyPlanRequest(String question) {
+    final normalized = question.toLowerCase();
+    return normalized.contains('7 day') ||
+        normalized.contains('7-day') ||
+        normalized.contains('weekly plan') ||
+        normalized.contains('week plan');
   }
 
   void _startCooking(RecipeRecommendationModel recipe) {

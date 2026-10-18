@@ -1,209 +1,246 @@
-import 'package:culinary_ai/services/receipt_ocr_service.dart';
+/// Tests for [FridgeScanResponse] and [ReconciledFridgeItem] JSON parsing,
+/// and [VisionApiService.scanFridge] HTTP integration.
+///
+/// The old Tesseract hOCR / layout-reconstruction tests have been removed
+/// because all OCR is now delegated to the Gemini Vision backend endpoint
+/// (POST /scan-fridge). This file covers the equivalent surface area on the
+/// Flutter side: JSON deserialization and HTTP transport logic.
+library;
+
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:culinary_ai/models/fridge_vision_models.dart';
+import 'package:culinary_ai/services/vision_api_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  test('parses Tesseract hOCR words with geometry and confidence', () {
-    const hocr = '''
-      <div class='ocr_page' id='page_1'>
-        <span class='ocr_line' id='line_1_1'
-              title="bbox 20 100 450 140; baseline 0.02 -3">
-          <span class='ocrx_word' id='word_1_1'
-                title='bbox 20 100 150 122; x_wconf 94'>KTC</span>
-          <span class='ocrx_word' id='word_1_2'
-                title='bbox 165 103 270 125; x_wconf 88'>CHICK&amp;PEAS</span>
-          <span class='ocrx_word' id='word_1_3'
-                title='bbox 390 108 450 130; x_wconf 97'>&pound;4.75</span>
-        </span>
-      </div>
-    ''';
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-    final words = ReceiptOcrService.parseHocrWords(hocr);
-
-    expect(words.map((word) => word.text), ['KTC', 'CHICK&PEAS', '£4.75']);
-    expect(words.first.confidence, 0.94);
-    expect(words.first.left, 20);
-    expect(words.first.angle, closeTo(1.1458, 0.001));
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
   });
 
-  test(
-    'recognizes a receipt through an injected Tesseract hOCR engine',
-    () async {
-      const hocr = '''
-      <span class='ocr_line' title='bbox 20 100 330 125; baseline 0 0'>
-        <span class='ocrx_word' title='bbox 20 100 100 120; x_wconf 95'>BREAD</span>
-        <span class='ocrx_word' title='bbox 270 101 330 121; x_wconf 93'>220.00</span>
-      </span>
-    ''';
-      final service = ReceiptOcrService(
-        extractor: (_) async =>
-            const ReceiptOcrEngineOutput(hocr: hocr, text: 'BREAD 220.00'),
+  // ─────────────────────────────────────────────────────────────────────────
+  // JSON deserialization
+  // ─────────────────────────────────────────────────────────────────────────
+
+  group('FridgeScanResponse JSON parsing', () {
+    test('parses verified, mismatch and new_item rows correctly', () {
+      final json = {
+        'scan_id': 'fridge_9999',
+        'reconciled_items': [
+          {
+            'detected_name': 'Milk',
+            'matched_pantry_id': 'item_1',
+            'matched_name': 'Milk',
+            'detected_count': null,
+            'detected_fill_level': 0.6,
+            'label_size_text': '1 L',
+            'confidence': 0.95,
+            'status': 'verified',
+            'question': null,
+            'current_quantity': 2.0,
+            'suggested_quantity': 2.0,
+            'unit': 'L',
+            'estimated': false,
+            'verified_at': '2026-10-15T10:00:00Z',
+          },
+          {
+            'detected_name': 'Yogurt',
+            'matched_pantry_id': 'item_2',
+            'matched_name': 'Greek Yogurt',
+            'detected_count': 3,
+            'detected_fill_level': null,
+            'label_size_text': '500g',
+            'confidence': 0.72,
+            'status': 'mismatch',
+            'question': 'Detected 3 pots, pantry shows 1. Update to 3?',
+            'current_quantity': 1.0,
+            'suggested_quantity': 3.0,
+            'unit': 'pcs',
+            'estimated': true,
+            'verified_at': null,
+          },
+          {
+            'detected_name': 'Cheddar Cheese',
+            'matched_pantry_id': null,
+            'matched_name': null,
+            'detected_count': 1,
+            'detected_fill_level': null,
+            'label_size_text': null,
+            'confidence': 0.88,
+            'status': 'new_item',
+            'question': null,
+            'current_quantity': null,
+            'suggested_quantity': 1.0,
+            'unit': 'pcs',
+            'estimated': true,
+            'verified_at': null,
+          },
+        ],
+        'verified_count': 1,
+        'mismatch_count': 1,
+        'new_items_count': 1,
+      };
+
+      final response = FridgeScanResponse.fromJson(json);
+
+      expect(response.scanId, 'fridge_9999');
+      expect(response.reconciledItems, hasLength(3));
+      expect(response.verifiedCount, 1);
+      expect(response.mismatchCount, 1);
+      expect(response.newItemsCount, 1);
+
+      final milk = response.reconciledItems[0];
+      expect(milk.detectedName, 'Milk');
+      expect(milk.status, 'verified');
+      expect(milk.detectedFillLevel, 0.6);
+      expect(milk.labelSizeText, '1 L');
+      expect(milk.isAccepted, isTrue); // verified items auto-accepted
+
+      final yogurt = response.reconciledItems[1];
+      expect(yogurt.status, 'mismatch');
+      expect(yogurt.detectedCount, 3);
+      expect(yogurt.suggestedQuantity, 3.0);
+      expect(yogurt.question, contains('3 pots'));
+      expect(yogurt.isAccepted, isFalse); // mismatches need explicit confirm
+
+      final cheese = response.reconciledItems[2];
+      expect(cheese.status, 'new_item');
+      expect(cheese.matchedPantryId, isNull);
+    });
+
+    test('handles empty reconciled_items list gracefully', () {
+      final json = {
+        'scan_id': 'fridge_empty',
+        'reconciled_items': <dynamic>[],
+        'verified_count': 0,
+        'mismatch_count': 0,
+        'new_items_count': 0,
+      };
+
+      final response = FridgeScanResponse.fromJson(json);
+      expect(response.reconciledItems, isEmpty);
+    });
+
+    test('applies safe defaults for optional fields', () {
+      final json = {
+        'scan_id': 'fridge_minimal',
+        'reconciled_items': [
+          {'detected_name': 'Apple', 'status': 'new_item'},
+        ],
+      };
+
+      final response = FridgeScanResponse.fromJson(json);
+      final apple = response.reconciledItems.first;
+
+      expect(apple.detectedName, 'Apple');
+      expect(apple.confidence, 1.0);
+      expect(apple.unit, 'pcs');
+      expect(apple.estimated, isTrue);
+      expect(apple.matchedPantryId, isNull);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // HTTP transport: VisionApiService.scanFridge
+  // ─────────────────────────────────────────────────────────────────────────
+
+  group('VisionApiService.scanFridge HTTP integration', () {
+    test('sends multipart request to /scan-fridge and parses 200 response', () async {
+      final mockClient = MockClient((request) async {
+        expect(request.url.path, '/scan-fridge');
+        expect(request.headers['X-User-Id'], 'hh_fridge_1');
+        expect(request.method, 'POST');
+
+        return http.Response(
+          jsonEncode({
+            'scan_id': 'fridge_mock',
+            'reconciled_items': [
+              {
+                'detected_name': 'Eggs',
+                'status': 'verified',
+                'confidence': 0.97,
+                'detected_count': 6,
+                'unit': 'pcs',
+                'estimated': false,
+              },
+            ],
+            'verified_count': 1,
+            'mismatch_count': 0,
+            'new_items_count': 0,
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final service = VisionApiService(client: mockClient);
+      final result = await service.scanFridge(
+        imageBytes: Uint8List.fromList(List.generate(100, (i) => i % 256)),
+        userId: 'hh_fridge_1',
+        existingItems: [],
       );
 
-      final result = await service.recognize('receipt.jpg');
+      expect(result.scanId, 'fridge_mock');
+      expect(result.reconciledItems, hasLength(1));
+      expect(result.reconciledItems.first.detectedName, 'Eggs');
+      expect(result.reconciledItems.first.detectedCount, 6);
+      expect(result.verifiedCount, 1);
+    });
 
-      expect(result.engine, 'Tesseract OCR');
-      expect(result.lines, ['BREAD 220.00']);
-      expect(result.rawText, 'BREAD 220.00');
-    },
-  );
+    test('throws VisionApiException with friendly message on 429', () async {
+      final mockClient = MockClient((_) async {
+        return http.Response(
+          jsonEncode({'detail': 'Daily fridge scanning limit reached (20 scans/day).'}),
+          429,
+        );
+      });
 
-  test('reconstructs receipt rows from separately detected columns', () {
-    const fragments = [
-      ReceiptOcrLine(
-        text: 'MILK 1L',
-        confidence: 0.92,
-        left: 20,
-        top: 100,
-        right: 130,
-        bottom: 120,
-      ),
-      ReceiptOcrLine(
-        text: '2',
-        confidence: 0.96,
-        left: 180,
-        top: 101,
-        right: 195,
-        bottom: 121,
-      ),
-      ReceiptOcrLine(
-        text: '620.00',
-        confidence: 0.94,
-        left: 270,
-        top: 99,
-        right: 330,
-        bottom: 120,
-      ),
-      ReceiptOcrLine(
-        text: 'BREAD',
-        confidence: 0.9,
-        left: 20,
-        top: 130,
-        right: 100,
-        bottom: 150,
-      ),
-      ReceiptOcrLine(
-        text: '220.00',
-        confidence: 0.91,
-        left: 270,
-        top: 131,
-        right: 330,
-        bottom: 151,
-      ),
-    ];
+      final service = VisionApiService(client: mockClient);
+      expect(
+        () => service.scanFridge(
+          imageBytes: Uint8List.fromList([1, 2, 3]),
+          userId: 'hh_rate',
+          existingItems: [],
+        ),
+        throwsA(
+          isA<VisionApiException>().having(
+            (e) => e.statusCode,
+            'statusCode',
+            429,
+          ),
+        ),
+      );
+    });
 
-    final rows = ReceiptOcrService.reconstructRows(fragments);
+    test('throws VisionApiException with 400 message on bad image', () async {
+      final mockClient = MockClient((_) async {
+        return http.Response(
+          jsonEncode({'detail': 'The provided file is not a valid or readable image.'}),
+          400,
+        );
+      });
 
-    expect(rows.map((row) => row.text), ['MILK 1L 2 620.00', 'BREAD 220.00']);
-    expect(rows.first.confidence, closeTo(0.94, 0.001));
-  });
-
-  test('does not merge vertically adjacent printed rows', () {
-    const fragments = [
-      ReceiptOcrLine(
-        text: 'MILK',
-        confidence: null,
-        left: 10,
-        top: 10,
-        right: 80,
-        bottom: 25,
-      ),
-      ReceiptOcrLine(
-        text: 'BREAD',
-        confidence: null,
-        left: 10,
-        top: 28,
-        right: 80,
-        bottom: 43,
-      ),
-    ];
-
-    final rows = ReceiptOcrService.reconstructRows(fragments);
-
-    expect(rows, hasLength(2));
-  });
-
-  test('deskews slanted receipt columns before reconstructing rows', () {
-    const angle = 6.45;
-    const fragments = [
-      ReceiptOcrLine(
-        text: 'KTC CHICK PEAS CASE',
-        confidence: 0.94,
-        left: 20,
-        top: 100,
-        right: 160,
-        bottom: 120,
-        angle: angle,
-      ),
-      ReceiptOcrLine(
-        text: '12x400G',
-        confidence: 0.93,
-        left: 210,
-        top: 118,
-        right: 290,
-        bottom: 138,
-        angle: angle,
-      ),
-      ReceiptOcrLine(
-        text: '1',
-        confidence: 0.97,
-        left: 320,
-        top: 128,
-        right: 335,
-        bottom: 148,
-        angle: angle,
-      ),
-      ReceiptOcrLine(
-        text: '4.75',
-        confidence: 0.95,
-        left: 400,
-        top: 138,
-        right: 450,
-        bottom: 158,
-        angle: angle,
-      ),
-      ReceiptOcrLine(
-        text: 'ONION INDIAN',
-        confidence: 0.92,
-        left: 20,
-        top: 137,
-        right: 170,
-        bottom: 157,
-        angle: angle,
-      ),
-      ReceiptOcrLine(
-        text: 'BAG',
-        confidence: 0.94,
-        left: 210,
-        top: 155,
-        right: 255,
-        bottom: 175,
-        angle: angle,
-      ),
-      ReceiptOcrLine(
-        text: '1',
-        confidence: 0.98,
-        left: 320,
-        top: 165,
-        right: 335,
-        bottom: 185,
-        angle: angle,
-      ),
-      ReceiptOcrLine(
-        text: '2.99',
-        confidence: 0.96,
-        left: 400,
-        top: 175,
-        right: 450,
-        bottom: 195,
-        angle: angle,
-      ),
-    ];
-
-    final rows = ReceiptOcrService.reconstructRows(fragments);
-
-    expect(rows.map((row) => row.text), [
-      'KTC CHICK PEAS CASE 12x400G 1 4.75',
-      'ONION INDIAN BAG 1 2.99',
-    ]);
+      final service = VisionApiService(client: mockClient);
+      expect(
+        () => service.scanFridge(
+          imageBytes: Uint8List.fromList([0xff, 0xfe]),
+          userId: 'hh_bad',
+          existingItems: [],
+        ),
+        throwsA(
+          isA<VisionApiException>().having(
+            (e) => e.message,
+            'message',
+            contains('readable image'),
+          ),
+        ),
+      );
+    });
   });
 }

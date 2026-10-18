@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:culinary_ai/providers/auth_provider.dart';
 import 'package:culinary_ai/providers/pantry_provider.dart';
+import 'package:culinary_ai/providers/recipe_experience_provider.dart';
 import 'package:culinary_ai/screens/chat/chatbot_screen.dart';
 import 'package:culinary_ai/services/meal_planning_api_service.dart';
 import 'package:flutter/material.dart';
@@ -68,6 +69,7 @@ void main() {
         providers: [
           ChangeNotifierProvider.value(value: pantry),
           ChangeNotifierProvider(create: (_) => AuthProvider()),
+          ChangeNotifierProvider(create: (_) => RecipeExperienceProvider()),
         ],
         child: MaterialApp(home: ChatbotScreen(mealPlanningApi: api)),
       ),

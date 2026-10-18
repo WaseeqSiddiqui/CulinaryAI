@@ -41,6 +41,9 @@ class RecipeRecommendationModel {
     for (final req in requiredIngredients) {
       final reqLower = req.toLowerCase();
       final hasIt = pantryItems.any((item) {
+        if (item.expiryStatus == ExpiryStatus.expired || item.quantity <= 0) {
+          return false;
+        }
         final nameLower = item.name.toLowerCase();
         return nameLower.contains(reqLower) || reqLower.contains(nameLower);
       });
@@ -61,6 +64,9 @@ class RecipeRecommendationModel {
     return requiredIngredients.where((req) {
       final reqLower = req.toLowerCase();
       return pantryItems.any((item) {
+        if (item.expiryStatus == ExpiryStatus.expired || item.quantity <= 0) {
+          return false;
+        }
         final nameLower = item.name.toLowerCase();
         return nameLower.contains(reqLower) || reqLower.contains(nameLower);
       });
@@ -72,6 +78,9 @@ class RecipeRecommendationModel {
     return requiredIngredients.where((req) {
       final reqLower = req.toLowerCase();
       return !pantryItems.any((item) {
+        if (item.expiryStatus == ExpiryStatus.expired || item.quantity <= 0) {
+          return false;
+        }
         final nameLower = item.name.toLowerCase();
         return nameLower.contains(reqLower) || reqLower.contains(nameLower);
       });

@@ -15,7 +15,7 @@ class ReceiptParserService {
   static final _unitPattern = RegExp(
     r'\b(\d+(?:[.,]\d+)?)\s*(kg|kgs|kilogram|kilograms|g|gm|gms|gram|grams|'
     r'ml|millilitre|millilitres|milliliter|milliliters|l|ltr|ltrs|litre|litres|'
-    r'liter|liters|cc|pcs|pc|piece|pieces|dozen|pack|packs|packet|packets|pkt|pkts|'
+    r'liter|liters|cc|pcs|pc|piece|pieces|dozen|pack|packs|packet|packets|pk|pkt|pkts|'
     r'bottle|bottles|can|cans|tin|tins|box|boxes)\b',
     caseSensitive: false,
   );
@@ -35,7 +35,7 @@ class ReceiptParserService {
   static final _packageCount = RegExp(
     r'\b(\d+(?:[.,]\d+)?)\s*(?:[xX×@*])\s*'
     r'(?=\d+(?:[.,]\d+)?\s*(?:kg|kgs|g|gm|gms|ml|cc|l|ltr|ltrs|pcs|pc|'
-    r'dozen|pack|packs|packet|packets|pkt|pkts|bottle|bottles|can|cans|'
+    r'dozen|pack|packs|packet|packets|pk|pkt|pkts|bottle|bottles|can|cans|'
     r'tin|tins|box|boxes)\b)',
     caseSensitive: false,
   );
@@ -81,13 +81,48 @@ class ReceiptParserService {
     r'\bper\s+(?:kg|kilo|kilogram|lb|pound)\b',
     caseSensitive: false,
   );
+  static final _lineTaxFlag = RegExp(
+    r'(\d+(?:,\d{3})*\.\d{2})\s+F[A-Z]\s*$',
+    caseSensitive: false,
+  );
+  static final _quantityAtUnitPriceDetail = RegExp(
+    r'^\s*(\d+(?:[.,]\d+)?)\s*[xX×*]\s*'
+    r'(?:(?:rs\.?|pkr|usd|eur|gbp)\s*|[$£€₹]\s*)?'
+    r'(\d+(?:[.,]\d{1,2})?)\s*$',
+    caseSensitive: false,
+  );
+  static final _storeNumberLine = RegExp(
+    r'^\s*store\s*#?\s*\d+\s*$',
+    caseSensitive: false,
+  );
+  static final _streetAddressLine = RegExp(
+    r'^\s*\d+\s+.+\b(?:street|st|road|rd|avenue|ave|pike|boulevard|blvd|'
+    r'lane|ln|drive|dr|highway|hwy)\.?\s*$',
+    caseSensitive: false,
+  );
+  static final _cityStateLine = RegExp(
+    r"^\s*[A-Za-z .'-]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?\s*$",
+  );
+  static final _itemCountFooter = RegExp(
+    r'^\s*\d+\s+items?\s*$',
+    caseSensitive: false,
+  );
   static final _barcode = RegExp(r'(?<!\d)\d{5,14}(?!\d)');
   static final _currency = RegExp(
     r'\b(?:rs\.?|pkr|usd|eur|gbp)\b|[$£€₹]',
     caseSensitive: false,
   );
-  static final _nonNameCharacters = RegExp(r"[^a-zA-Z0-9&+\-'\s]");
+  static final _nonNameCharacters = RegExp(r"[^a-zA-Z0-9&+\-'.\s]");
   static final _multipleSpaces = RegExp(r'\s+');
+  static final _explicitWrappedContinuation = RegExp(
+    r'^(?:stock\b|cont(?:ainer)?\b|(?:small|medium|large)\b)|'
+    r'\b(?:multipk|multi[\s-]*pack)\b',
+    caseSensitive: false,
+  );
+  static final _explicitUnitPriceNameContinuation = RegExp(
+    r'^rolls?$',
+    caseSensitive: false,
+  );
 
   static List<ReceiptScannedItem> parseLines(List<String> recognizedLines) {
     final prepared = recognizedLines
@@ -98,8 +133,12 @@ class ReceiptParserService {
 
     for (var index = 0; index < prepared.length; index++) {
       var line = prepared[index];
-      if (_shouldIgnore(line)) continue;
 
+      if (parsed.isNotEmpty &&
+          _applyQuantityAtUnitPriceDetail(line, parsed.last)) {
+        continue;
+      }
+      if (_shouldIgnore(line)) continue;
       if (parsed.isNotEmpty && _applyWeightedDetail(line, parsed.last)) {
         continue;
       }
@@ -113,6 +152,7 @@ class ReceiptParserService {
         if (nextIndex < prepared.length &&
             !_shouldIgnore(prepared[nextIndex]) &&
             !_isDetailOnlyLine(prepared[nextIndex]) &&
+            _explicitWrappedContinuation.hasMatch(prepared[nextIndex]) &&
             _parseLine(prepared[nextIndex]) != null) {
           line = '$line ${prepared[nextIndex]}';
           index = nextIndex;
@@ -128,13 +168,67 @@ class ReceiptParserService {
           detailIndex++;
           detailsAdded++;
         }
+
+        if (_looksLikeNameOnly(line)) {
+          parsed.add(_needsReviewCandidate(line));
+          continue;
+        }
       }
 
       final item = _parseLine(line);
       if (item != null) parsed.add(item);
     }
 
-    return _mergeDuplicates(parsed);
+    return parsed;
+  }
+
+  static bool _applyQuantityAtUnitPriceDetail(
+    String line,
+    ReceiptScannedItem previous,
+  ) {
+    final match = _quantityAtUnitPriceDetail.firstMatch(line);
+    final quantity = _number(match?.group(1));
+    final unitPrice = _number(match?.group(2));
+    final total = previous.price;
+    if (match == null ||
+        quantity == null ||
+        quantity <= 0 ||
+        unitPrice == null ||
+        unitPrice <= 0 ||
+        total == null) {
+      return false;
+    }
+
+    final calculatedTotal = quantity * unitPrice;
+    const tolerance = 0.02;
+    if ((calculatedTotal - total).abs() > tolerance) return false;
+
+    final nearWholeQuantity = (quantity - quantity.round()).abs() < 0.001;
+    if (nearWholeQuantity) {
+      previous.quantity *= quantity.round();
+    } else {
+      previous.needsReview = true;
+    }
+    previous.sourceText = _appendSourceText(previous.sourceText, line);
+    return true;
+  }
+
+  static ReceiptScannedItem _needsReviewCandidate(String sourceText) {
+    final cleanedName = sourceText
+        .replaceAll(_barcode, ' ')
+        .replaceAll(_nonNameCharacters, ' ')
+        .replaceAll(_multipleSpaces, ' ')
+        .trim();
+    final name = _titleCase(cleanedName);
+    return ReceiptScannedItem(
+      name: name,
+      quantity: 1,
+      unit: 'pcs',
+      location: _suggestLocation(name),
+      isSelected: false,
+      sourceText: sourceText,
+      needsReview: true,
+    );
   }
 
   static bool _applyWeightedDetail(String line, ReceiptScannedItem previous) {
@@ -145,6 +239,7 @@ class ReceiptParserService {
     if (quantity == null || quantity <= 0) return false;
     previous.quantity = quantity;
     previous.unit = _normalizeUnit(match.group(2)!);
+    previous.sourceText = _appendSourceText(previous.sourceText, line);
     return true;
   }
 
@@ -159,16 +254,25 @@ class ReceiptParserService {
       return false;
     }
 
+    final continuation = match.group(1)!.trim();
+    if (!_explicitUnitPriceNameContinuation.hasMatch(continuation)) {
+      return false;
+    }
+
     final inferredCount = total / unitPrice;
     final nearWholeCount = (inferredCount - inferredCount.round()).abs() < 0.03;
     if (!nearWholeCount || inferredCount < 1 || inferredCount > 100) {
       return false;
     }
 
-    previous.name = '${previous.name} ${_titleCase(match.group(1)!)}';
+    previous.name = '${previous.name} ${_titleCase(continuation)}';
     previous.location = _suggestLocation(previous.name);
+    previous.sourceText = _appendSourceText(previous.sourceText, line);
     return true;
   }
+
+  static String _appendSourceText(String existing, String next) =>
+      existing.isEmpty ? next : '$existing\n$next';
 
   static String _normalizeLine(String line) => line
       .replaceAll('Ã—', '×')
@@ -177,7 +281,7 @@ class ReceiptParserService {
       .trim();
 
   static ReceiptScannedItem? _parseLine(String original) {
-    var working = original;
+    var working = _withoutLineTaxFlag(original);
     var purchaseCount = 1.0;
     var packageMultiplier = 1.0;
     var packageQuantity = 1.0;
@@ -186,6 +290,15 @@ class ReceiptParserService {
     var hasPurchaseCount = false;
     var hasUnit = false;
     var hasPurchaseSignal = false;
+
+    final leadingUnit = _unitPattern.matchAsPrefix(working);
+    if (leadingUnit != null) {
+      packageQuantity = _number(leadingUnit.group(1)) ?? 1;
+      unit = _normalizeUnit(leadingUnit.group(2)!);
+      working = working.replaceFirst(leadingUnit.group(0)!, '').trim();
+      hasUnit = true;
+      hasPurchaseSignal = true;
+    }
 
     final leading = _leadingCount.firstMatch(working);
     if (leading != null) {
@@ -297,6 +410,8 @@ class ReceiptParserService {
       location: _suggestLocation(name),
       price: price,
       isSelected: true,
+      sourceText: original,
+      needsReview: false,
     );
   }
 
@@ -319,7 +434,7 @@ class ReceiptParserService {
         .replaceAll(
           RegExp(
             r'\b(?:kg|kgs|g|gm|gms|ml|cc|l|ltr|ltrs|pcs|pc|each|dozen|pack|packs|'
-            r'packet|packets|pkt|pkts|bottle|bottles|can|cans|tin|tins|box|boxes)\b',
+            r'packet|packets|pk|pkt|pkts|bottle|bottles|can|cans|tin|tins|box|boxes)\b',
             caseSensitive: false,
           ),
           ' ',
@@ -333,17 +448,29 @@ class ReceiptParserService {
 
   static bool _shouldIgnore(String line) {
     if (_ignoredLine.hasMatch(line)) return true;
+    if (line.toLowerCase() == 'market place' ||
+        _storeNumberLine.hasMatch(line) ||
+        _streetAddressLine.hasMatch(line) ||
+        _cityStateLine.hasMatch(line) ||
+        _itemCountFooter.hasMatch(line)) {
+      return true;
+    }
     if (!line.contains(RegExp(r'[a-zA-Z]'))) return true;
     return false;
   }
 
-  static bool _looksLikeNameOnly(String line) =>
-      !_shouldIgnore(line) &&
-      !_unitPattern.hasMatch(line) &&
-      !_eachUnit.hasMatch(line) &&
-      !_leadingCount.hasMatch(line) &&
-      !_priceAtEnd.hasMatch(line) &&
-      _isPlausibleName(line);
+  static bool _looksLikeNameOnly(String line) {
+    final parsingText = _withoutLineTaxFlag(line);
+    return !_shouldIgnore(line) &&
+        !_unitPattern.hasMatch(parsingText) &&
+        !_eachUnit.hasMatch(parsingText) &&
+        !_leadingCount.hasMatch(parsingText) &&
+        !_priceAtEnd.hasMatch(parsingText) &&
+        _isPlausibleName(parsingText);
+  }
+
+  static String _withoutLineTaxFlag(String line) =>
+      line.replaceFirstMapped(_lineTaxFlag, (match) => match.group(1)!).trim();
 
   static bool _isPlausibleName(String value) {
     final letters = value.replaceAll(RegExp(r'[^a-zA-Z]'), '');
@@ -450,25 +577,4 @@ class ReceiptParserService {
             : '${word[0].toUpperCase()}${word.substring(1)}',
       )
       .join(' ');
-
-  static List<ReceiptScannedItem> _mergeDuplicates(
-    List<ReceiptScannedItem> items,
-  ) {
-    final merged = <String, ReceiptScannedItem>{};
-    for (final item in items) {
-      final key = '${item.name.toLowerCase()}|${item.unit}';
-      final existing = merged[key];
-      if (existing == null) {
-        merged[key] = item;
-      } else {
-        merged[key] = existing.copyWith(
-          quantity: existing.quantity + item.quantity,
-          price: existing.price == null && item.price == null
-              ? null
-              : (existing.price ?? 0) + (item.price ?? 0),
-        );
-      }
-    }
-    return merged.values.toList();
-  }
 }

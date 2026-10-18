@@ -8,5 +8,7 @@ class AutomationFailureGuard {
     return _consecutiveFailures >= maximumConsecutiveFailures;
   }
 
+  void reset() => _consecutiveFailures = 0;
+
   int get consecutiveFailures => _consecutiveFailures;
 }

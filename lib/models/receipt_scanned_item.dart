@@ -5,6 +5,8 @@ class ReceiptScannedItem {
   String location;
   double? price;
   bool isSelected;
+  String sourceText;
+  bool needsReview;
 
   ReceiptScannedItem({
     required this.name,
@@ -13,6 +15,8 @@ class ReceiptScannedItem {
     required this.location,
     this.price,
     this.isSelected = true,
+    this.sourceText = '',
+    this.needsReview = false,
   });
 
   ReceiptScannedItem copyWith({
@@ -22,6 +26,8 @@ class ReceiptScannedItem {
     String? location,
     double? price,
     bool? isSelected,
+    String? sourceText,
+    bool? needsReview,
   }) {
     return ReceiptScannedItem(
       name: name ?? this.name,
@@ -30,6 +36,8 @@ class ReceiptScannedItem {
       location: location ?? this.location,
       price: price ?? this.price,
       isSelected: isSelected ?? this.isSelected,
+      sourceText: sourceText ?? this.sourceText,
+      needsReview: needsReview ?? this.needsReview,
     );
   }
 }

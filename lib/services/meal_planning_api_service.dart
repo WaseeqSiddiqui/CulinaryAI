@@ -6,6 +6,8 @@ import 'package:http/http.dart' as http;
 import '../models/backend_meal_recommendation.dart';
 import '../models/pantry_item_model.dart';
 
+import 'server_config_service.dart';
+
 class MealPlanningApiException implements Exception {
   final String message;
 
@@ -16,17 +18,21 @@ class MealPlanningApiException implements Exception {
 }
 
 class MealPlanningApiService {
+  static String get defaultBaseUrl => ServerConfigService.currentBaseUrl;
+
   static const configuredBaseUrl = String.fromEnvironment(
     'CULINARY_API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000',
+    defaultValue: 'http://192.168.100.147:8000',
   );
 
   MealPlanningApiService({
     http.Client? client,
-    String baseUrl = configuredBaseUrl,
+    String? baseUrl,
     this.timeout = const Duration(seconds: 8),
   }) : _client = client ?? http.Client(),
-       baseUri = Uri.parse(baseUrl.replaceFirst(RegExp(r'/$'), ''));
+       baseUri = Uri.parse(
+         (baseUrl ?? defaultBaseUrl).replaceFirst(RegExp(r'/$'), ''),
+       );
 
   final http.Client _client;
   final Uri baseUri;
@@ -39,6 +45,10 @@ class MealPlanningApiService {
     int mealCount = 3,
     List<String> dietaryPreferences = const [],
     int? maxCookTimeMinutes,
+    List<String> avoidIngredients = const [],
+    int mealsPerDay = 3,
+    int? targetCaloriesPerPersonPerDay,
+    bool pantryFirst = true,
   }) async {
     final effectivePreferences = dietaryPreferences
         .map((preference) => preference.trim().toLowerCase())
@@ -57,6 +67,13 @@ class MealPlanningApiService {
       'servings': servings,
       'meal_count': mealCount,
       'dietary_preferences': effectivePreferences,
+      'avoid_ingredients': avoidIngredients
+          .map((value) => value.trim().toLowerCase())
+          .where((value) => value.isNotEmpty)
+          .toList(),
+      'meals_per_day': mealsPerDay.clamp(1, 6),
+      'target_calories_per_person_per_day': ?targetCaloriesPerPersonPerDay,
+      'pantry_first': pantryFirst,
       'max_cook_time_minutes': ?maxCookTimeMinutes,
     };
 

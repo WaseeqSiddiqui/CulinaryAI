@@ -9,6 +9,13 @@ class StoreSelectorConfig {
   String get homeUrl => values['home_url'] ?? '';
   String value(String key) => values[key] ?? '';
 
+  List<String> list(String key) =>
+      value(key)
+          .split(',')
+          .map((entry) => entry.trim())
+          .where((entry) => entry.isNotEmpty)
+          .toList(growable: false);
+
   bool hasAll(Iterable<String> keys) =>
       keys.every((key) => value(key).trim().isNotEmpty);
 

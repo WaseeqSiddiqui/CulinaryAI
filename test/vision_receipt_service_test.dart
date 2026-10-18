@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:culinary_ai/models/pantry_item_model.dart';
 import 'package:culinary_ai/models/receipt_vision_models.dart';
 import 'package:culinary_ai/providers/pantry_provider.dart';
 import 'package:culinary_ai/services/household_alias_service.dart';

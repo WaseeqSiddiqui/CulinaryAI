@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from .embedding_service import HashEmbeddingService
 
@@ -12,6 +12,20 @@ from .embedding_service import HashEmbeddingService
 class RetrievedRecipe:
     recipe: dict[str, Any]
     score: float
+
+
+class RecipeRetriever(Protocol):
+    """Stable seam for the upcoming vector/RAG recipe repository."""
+
+    @property
+    def recipes(self) -> list[dict[str, Any]]: ...
+
+    @property
+    def retrieval_method(self) -> str: ...
+
+    def get(self, recipe_id: str) -> dict[str, Any] | None: ...
+
+    def search(self, query: str, limit: int = 5) -> list[RetrievedRecipe]: ...
 
 
 class VerifiedRecipeRepository:
@@ -33,6 +47,10 @@ class VerifiedRecipeRepository:
     @property
     def recipes(self) -> list[dict[str, Any]]:
         return list(self._recipes)
+
+    @property
+    def retrieval_method(self) -> str:
+        return "verified-recipe-hash-embedding-v1"
 
     def get(self, recipe_id: str) -> dict[str, Any] | None:
         return next(

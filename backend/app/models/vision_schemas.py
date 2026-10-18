@@ -84,7 +84,12 @@ class ValidatedReceiptItem(BaseModel):
     is_food: bool = True
     confidence: float = 1.0
     needs_review: bool = False
-    storage_zone: str = "Pantry Shelf"
+    storage_zone: Literal[
+        "Fridge",
+        "Freezer",
+        "Pantry Shelf",
+        "Spice Rack",
+    ] = "Pantry Shelf"
     review_reasons: list[str] = Field(default_factory=list)
 
 
@@ -173,3 +178,15 @@ class FridgeScanResponse(BaseModel):
     verified_count: int = 0
     mismatch_count: int = 0
     new_items_count: int = 0
+
+
+class MealNutritionEstimate(BaseModel):
+    dish_name: str = Field(min_length=1, max_length=120)
+    portion_description: str = Field(min_length=1, max_length=160)
+    calories: float = Field(ge=0, le=10000)
+    protein_grams: float = Field(ge=0, le=1000)
+    carbohydrate_grams: float = Field(ge=0, le=2000)
+    fat_grams: float = Field(ge=0, le=1000)
+    fiber_grams: float = Field(ge=0, le=500)
+    confidence: float = Field(ge=0, le=1)
+    assumptions: list[str] = Field(default_factory=list, max_length=8)

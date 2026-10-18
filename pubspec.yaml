@@ -48,7 +48,7 @@ dependencies:
   http: ^1.6.0
   crypto: ^3.0.6
   http_parser: ^4.1.2
-
+  flutter_inappwebview: 6.2.0-beta.3
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -80,7 +80,7 @@ flutter:
 
   assets:
     - assets/images/
-    - assets/tessdata/
+    - assets/store_selectors.json
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

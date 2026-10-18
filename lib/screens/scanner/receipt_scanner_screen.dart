@@ -9,6 +9,7 @@ import '../../providers/pantry_provider.dart';
 import '../../services/food_image_service.dart';
 import '../../services/household_alias_service.dart';
 import '../../services/vision_api_service.dart';
+import '../../widgets/server_settings_modal.dart';
 
 class ReceiptScannerScreen extends StatefulWidget {
   const ReceiptScannerScreen({super.key});
@@ -236,17 +237,101 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
     );
   }
 
+  void _loadDemoReceipt() {
+    final demoResponse = ValidatedReceiptResponse(
+      scanId: 'demo_receipt_001',
+      storeName: 'Carrefour Market',
+      date: '2026-10-18',
+      receiptTotal: 1850.0,
+      totalMismatchWarning: false,
+      items: [
+        ValidatedReceiptItem(
+          rawText: 'WHOLE MILK 1L X 2',
+          name: 'Whole Milk',
+          matchedIngredient: 'Whole Milk',
+          totalQty: 2.0,
+          unit: 'litres',
+          linePrice: 580.0,
+          confidence: 0.98,
+          storageZone: 'Fridge',
+          isFood: true,
+          isSelected: true,
+        ),
+        ValidatedReceiptItem(
+          rawText: 'FARM EGGS 12 PK',
+          name: 'Eggs',
+          matchedIngredient: 'Eggs',
+          totalQty: 12.0,
+          unit: 'pcs',
+          linePrice: 360.0,
+          confidence: 0.95,
+          storageZone: 'Fridge',
+          isFood: true,
+          isSelected: true,
+        ),
+        ValidatedReceiptItem(
+          rawText: 'BASMATI RICE 1KG',
+          name: 'Basmati Rice',
+          matchedIngredient: 'Basmati Rice',
+          totalQty: 1.0,
+          unit: 'kg',
+          linePrice: 450.0,
+          confidence: 0.97,
+          storageZone: 'Pantry Shelf',
+          isFood: true,
+          isSelected: true,
+        ),
+        ValidatedReceiptItem(
+          rawText: 'FRESH TOMATOES 500G',
+          name: 'Tomato',
+          matchedIngredient: 'Tomato',
+          totalQty: 4.0,
+          unit: 'pcs',
+          linePrice: 160.0,
+          confidence: 0.94,
+          storageZone: 'Fridge',
+          isFood: true,
+          isSelected: true,
+        ),
+        ValidatedReceiptItem(
+          rawText: 'BONELESS CHICKEN 500G',
+          name: 'Chicken',
+          matchedIngredient: 'Chicken',
+          totalQty: 500.0,
+          unit: 'g',
+          linePrice: 520.0,
+          confidence: 0.96,
+          storageZone: 'Freezer',
+          isFood: true,
+          isSelected: true,
+        ),
+      ],
+    );
+
+    setState(() {
+      _validatedResponse = demoResponse;
+      _scannedItems = demoResponse.items;
+      _isDuplicateReceipt = false;
+      _receiptKey = 'demo_receipt_preview';
+      _scanState = _ScanState.review;
+    });
+
+    _showReviewSheet();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.bgDark : const Color(0xFF14161B),
+      // Receipt scanner is intentionally a dark camera-first experience;
+      // dark mode uses the warm truffle obsidian, light mode uses a warm camera-dark.
+      backgroundColor: isDark ? AppTheme.bgDark : const Color(0xFF2A2420),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text(
-          'Gemini Receipt Scanner',
+          'Receipt Scanner',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
         leading: IconButton(
@@ -257,6 +342,11 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Server IP Settings',
+            icon: const Icon(Icons.dns_rounded, color: Colors.white70),
+            onPressed: () => ServerSettingsModal.show(context),
+          ),
           if (_scanState == _ScanState.done)
             TextButton.icon(
               onPressed: _resetScan,
@@ -295,6 +385,8 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
       _ScanState.error => _ScanErrorView(
           message: _scanError ?? 'The receipt could not be read.',
           onRetry: _resetScan,
+          onConfigureServer: () => ServerSettingsModal.show(context),
+          onUseDemo: _loadDemoReceipt,
         ),
       _ScanState.done => _DoneView(
           itemCount: _scannedItems.where((i) => i.isSelected).length,
@@ -357,7 +449,7 @@ class _IdleView extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Powered by Gemini Vision',
+                              'AI-powered receipt scanning',
                               style: TextStyle(
                                 color: AppTheme.primaryEmerald.withValues(alpha: 0.8),
                                 fontSize: 11,
@@ -396,9 +488,14 @@ class _IdleView extends StatelessWidget {
         ),
         // Bottom action buttons
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 36),
-          child: Row(
-            children: [
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: SafeArea(
+            top: false,
+            minimum: const EdgeInsets.only(bottom: 24),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: onGallery,
@@ -435,7 +532,9 @@ class _IdleView extends StatelessWidget {
                   ),
                 ),
               ),
-            ],
+                ],
+              ),
+            ),
           ),
         ),
       ],
@@ -644,7 +743,7 @@ class _ProcessingView extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Gemini Vision is structuring line items & prices',
+            'Reading line items & prices',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.5),
               fontSize: 13,
@@ -661,14 +760,26 @@ class _ProcessingView extends StatelessWidget {
 class _ScanErrorView extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
+  final VoidCallback onConfigureServer;
+  final VoidCallback onUseDemo;
 
-  const _ScanErrorView({required this.message, required this.onRetry});
+  const _ScanErrorView({
+    required this.message,
+    required this.onRetry,
+    required this.onConfigureServer,
+    required this.onUseDemo,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final isConnectionError = message.contains('SocketException') ||
+        message.contains('Connection refused') ||
+        message.contains('connect') ||
+        message.contains('127.0.0.1');
+
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -685,7 +796,7 @@ class _ScanErrorView extends StatelessWidget {
                 size: 38,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
             const Text(
               'Scan Failed',
               style: TextStyle(
@@ -699,25 +810,96 @@ class _ScanErrorView extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
-                fontSize: 13,
+                color: Colors.white.withValues(alpha: 0.65),
+                fontSize: 12.5,
                 height: 1.4,
               ),
             ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Try Again'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryEmerald,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 14,
+            if (isConnectionError) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.warmSaffron.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppTheme.warmSaffron.withValues(alpha: 0.35),
+                  ),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.lightbulb_outline_rounded,
+                      color: AppTheme.warmSaffron,
+                      size: 18,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'On physical Android devices, use your PC Wi-Fi IP (192.168.100.147:8000) instead of 127.0.0.1.',
+                        style: TextStyle(
+                          color: AppTheme.warmSaffron,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 22),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Try Again'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryEmerald,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 13,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: onConfigureServer,
+                  icon: const Icon(Icons.dns_rounded, size: 18),
+                  label: const Text('Server IP'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white38),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 13,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: onUseDemo,
+              icon: const Icon(
+                Icons.receipt_long_rounded,
+                size: 18,
+                color: AppTheme.warmSaffron,
+              ),
+              label: const Text(
+                'Test with Sample Demo Receipt',
+                style: TextStyle(
+                  color: AppTheme.warmSaffron,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
@@ -776,8 +958,10 @@ class _DoneView extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 28),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 12,
+              runSpacing: 10,
               children: [
                 OutlinedButton.icon(
                   onPressed: () => Navigator.pop(context),
@@ -797,7 +981,6 @@ class _DoneView extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
                 ElevatedButton.icon(
                   onPressed: onNewScan,
                   icon: const Icon(Icons.add_rounded, size: 18),
@@ -1195,7 +1378,6 @@ class _ReviewSheetState extends State<_ReviewSheet> {
 
             // Confirm Bottom Bar
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
               decoration: BoxDecoration(
                 color: isDark ? AppTheme.surfaceDark : Colors.white,
                 border: Border(
@@ -1204,8 +1386,13 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                   ),
                 ),
               ),
-              child: Row(
-                children: [
+              child: SafeArea(
+                top: false,
+                minimum: const EdgeInsets.only(bottom: 16),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  child: Row(
+                    children: [
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: widget.onRescan,
@@ -1239,7 +1426,9 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                       ),
                     ),
                   ),
-                ],
+                    ],
+                  ),
+                ),
               ),
             ),
           ],

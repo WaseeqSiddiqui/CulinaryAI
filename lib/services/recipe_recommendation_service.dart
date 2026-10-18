@@ -190,18 +190,14 @@ class RecipeRecommendationService {
     // Score all catalog recipes against active pantry inventory
     final scoredList = List<RecipeRecommendationModel>.from(catalog);
     scoredList.sort((a, b) {
-      final matchA = a.matchPercentage(pantryItems);
-      final matchB = b.matchPercentage(pantryItems);
-      return matchB.compareTo(matchA); // highest matches first
+      return _score(b, pantryItems).compareTo(_score(a, pantryItems));
     });
 
     // Identify top contenders (recipes with equal top score or >= 70%)
-    final topScore = scoredList.first.matchPercentage(pantryItems);
+    final topScore = _score(scoredList.first, pantryItems);
     final topContenders = scoredList
         .where(
-          (r) =>
-              r.matchPercentage(pantryItems) >=
-              (topScore > 50 ? topScore - 25 : 0),
+          (r) => _score(r, pantryItems) >= (topScore > 50 ? topScore - 25 : 0),
         )
         .toList();
 
@@ -213,12 +209,33 @@ class RecipeRecommendationService {
 
   /// Returns recommended recipes ordered by match score
   static List<RecipeRecommendationModel> getRecommendedList(
-    List<PantryItemModel> pantryItems,
-  ) {
-    final list = List<RecipeRecommendationModel>.from(catalog);
+    List<PantryItemModel> pantryItems, {
+    int? targetCaloriesPerMeal,
+    bool pantryFirst = true,
+  }) {
+    final usablePantry = pantryItems
+        .where(
+          (item) =>
+              item.quantity > 0 && item.expiryStatus != ExpiryStatus.expired,
+        )
+        .toList();
+    var list = List<RecipeRecommendationModel>.from(catalog);
+    if (pantryFirst && usablePantry.isNotEmpty) {
+      list = list
+          .where((recipe) => recipe.matchedCount(usablePantry) > 0)
+          .toList();
+    }
     list.sort((a, b) {
-      final scoreA = a.matchPercentage(pantryItems);
-      final scoreB = b.matchPercentage(pantryItems);
+      final scoreA = _score(
+        a,
+        usablePantry,
+        targetCaloriesPerMeal: targetCaloriesPerMeal,
+      );
+      final scoreB = _score(
+        b,
+        usablePantry,
+        targetCaloriesPerMeal: targetCaloriesPerMeal,
+      );
       return scoreB.compareTo(scoreA);
     });
     return list;
@@ -226,4 +243,30 @@ class RecipeRecommendationService {
 
   /// Returns all recipes available in the catalog
   static List<RecipeRecommendationModel> getAllRecipes() => catalog;
+
+  /// Pantry match remains dominant; each soon-to-expire ingredient adds a
+  /// zero-waste boost. Expired food is excluded by the recipe model.
+  static double _score(
+    RecipeRecommendationModel recipe,
+    List<PantryItemModel> pantryItems, {
+    int? targetCaloriesPerMeal,
+  }) {
+    var urgency = 0;
+    for (final required in recipe.requiredIngredients) {
+      final wanted = required.toLowerCase();
+      final match = pantryItems.where((item) {
+        final available = item.name.toLowerCase();
+        return item.expiryStatus == ExpiryStatus.useSoon &&
+            (available.contains(wanted) || wanted.contains(available));
+      });
+      if (match.isNotEmpty) urgency += 12;
+    }
+    var calorieFit = 0.0;
+    if (targetCaloriesPerMeal != null && targetCaloriesPerMeal > 0) {
+      final difference = (recipe.calories - targetCaloriesPerMeal).abs();
+      calorieFit =
+          (1 - difference / targetCaloriesPerMeal).clamp(0.0, 1.0) * 20;
+    }
+    return recipe.matchPercentage(pantryItems) + urgency + calorieFit;
+  }
 }

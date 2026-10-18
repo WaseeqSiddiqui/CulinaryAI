@@ -14,63 +14,117 @@ class ShoppingProvider extends ChangeNotifier {
   static const _uuid = Uuid();
   final ShoppingService _service;
   final List<ShoppingListItem> _items = [];
+  final Set<String> _suppressedPantryIds = {};
+  List<PantryItemModel> _latestPantryItems = const [];
   String? _householdId;
   bool _loading = false;
-  bool _maySeedFromPantry = false;
+  bool _ready = false;
+  bool _pantryReady = false;
+  bool _syncingPantry = false;
+  bool _pantrySyncRequested = false;
 
   List<ShoppingListItem> get items => List.unmodifiable(_items);
   bool get isLoading => _loading;
   String? get householdId => _householdId;
 
-  void bindHousehold(String? householdId, List<PantryItemModel> pantryItems) {
+  void bindHousehold(
+    String? householdId,
+    List<PantryItemModel> pantryItems, {
+    bool pantryReady = true,
+  }) {
+    _latestPantryItems = List.of(pantryItems);
+    _pantryReady = pantryReady;
     if (_householdId == householdId) {
-      if (_maySeedFromPantry && !_loading && pantryItems.isNotEmpty) {
-        unawaited(_seedFromPantry(pantryItems));
+      if (_ready && !_loading) {
+        unawaited(_syncLowStockItems());
       }
       return;
     }
     _householdId = householdId;
     _items.clear();
-    _maySeedFromPantry = false;
+    _suppressedPantryIds.clear();
+    _ready = false;
     if (householdId == null) return;
-    Future.microtask(() => _load(householdId, pantryItems));
+    Future.microtask(() => _load(householdId));
   }
 
-  Future<void> _load(
-    String householdId,
-    List<PantryItemModel> pantryItems,
-  ) async {
+  Future<void> _load(String householdId) async {
     _loading = true;
     notifyListeners();
-    final hadSavedList = await _service.hasSavedList(householdId);
     final stored = await _service.loadList(householdId);
+    final suppressed = await _service.loadSuppressedPantryIds(householdId);
     if (_householdId != householdId) return;
     _items.addAll(stored);
-    if (_items.isEmpty && !hadSavedList) {
-      _maySeedFromPantry = true;
-      if (pantryItems.isNotEmpty) await _seedFromPantry(pantryItems);
-    }
+    _suppressedPantryIds.addAll(suppressed);
+    _ready = true;
+    await _syncLowStockItems(notify: false);
     _loading = false;
     notifyListeners();
   }
 
-  Future<void> _seedFromPantry(List<PantryItemModel> pantryItems) async {
-    if (!_maySeedFromPantry) return;
-    _items.addAll(
-      pantryItems
-          .where((item) => item.isLowStock)
-          .map(
-            (item) => ShoppingListItem(
-              id: item.id,
-              name: item.name,
-              quantity: _restockQuantity(item),
-              unit: item.unit,
+  Future<void> _syncLowStockItems({bool notify = true}) async {
+    if (!_ready || !_pantryReady || _householdId == null) return;
+    if (_syncingPantry) {
+      _pantrySyncRequested = true;
+      return;
+    }
+
+    _syncingPantry = true;
+    var changedAtLeastOnce = false;
+    try {
+      do {
+        _pantrySyncRequested = false;
+        final pantryById = {
+          for (final item in _latestPantryItems) item.id: item,
+        };
+        final lowStockById = {
+          for (final item in _latestPantryItems.where(
+            (item) => item.isLowStock,
+          ))
+            item.id: item,
+        };
+
+        var changed = false;
+        final suppressionCount = _suppressedPantryIds.length;
+        _suppressedPantryIds.removeWhere((id) => !lowStockById.containsKey(id));
+        changed = changed || suppressionCount != _suppressedPantryIds.length;
+
+        final beforeRemoval = _items.length;
+        _items.removeWhere(
+          (item) =>
+              pantryById.containsKey(item.id) &&
+              !lowStockById.containsKey(item.id),
+        );
+        changed = changed || beforeRemoval != _items.length;
+
+        final existingIds = _items.map((item) => item.id).toSet();
+        for (final pantryItem in lowStockById.values) {
+          if (existingIds.contains(pantryItem.id) ||
+              _suppressedPantryIds.contains(pantryItem.id)) {
+            continue;
+          }
+          _items.add(
+            ShoppingListItem(
+              id: pantryItem.id,
+              name: pantryItem.name,
+              quantity: _restockQuantity(pantryItem),
+              unit: pantryItem.unit,
             ),
-          ),
-    );
-    _maySeedFromPantry = false;
-    await _persist();
-    notifyListeners();
+          );
+          existingIds.add(pantryItem.id);
+          changed = true;
+        }
+
+        if (changed) {
+          changedAtLeastOnce = true;
+          await _persist();
+          await _persistSuppressedPantryIds();
+        }
+      } while (_pantrySyncRequested && _householdId != null);
+    } finally {
+      _syncingPantry = false;
+    }
+    if (notify && changedAtLeastOnce) notifyListeners();
   }
 
   static double _restockQuantity(PantryItemModel item) {
@@ -93,7 +147,37 @@ class ShoppingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> addManualItem({
+    required String name,
+    required double quantity,
+    required String unit,
+  }) async {
+    final trimmedName = name.trim();
+    final trimmedUnit = unit.trim();
+    if (_householdId == null ||
+        trimmedName.isEmpty ||
+        trimmedUnit.isEmpty ||
+        !quantity.isFinite ||
+        quantity <= 0) {
+      return;
+    }
+    _items.add(
+      ShoppingListItem(
+        id: _uuid.v4(),
+        name: trimmedName,
+        quantity: quantity,
+        unit: trimmedUnit,
+      ),
+    );
+    await _persist();
+    notifyListeners();
+  }
+
   Future<void> remove(String id) async {
+    if (_latestPantryItems.any((item) => item.id == id && item.isLowStock)) {
+      _suppressedPantryIds.add(id);
+      await _persistSuppressedPantryIds();
+    }
     _items.removeWhere((item) => item.id == id);
     await _persist();
     notifyListeners();
@@ -110,8 +194,12 @@ class ShoppingProvider extends ChangeNotifier {
       createdAt: DateTime.now(),
     );
     await _service.createOrder(order);
+    _suppressPendingLowStockItems(
+      _items.where((item) => !item.keepAfterOrder).map((item) => item.id),
+    );
     _items.removeWhere((item) => !item.keepAfterOrder);
     await _persist();
+    await _persistSuppressedPantryIds();
     notifyListeners();
     return order;
   }
@@ -136,10 +224,12 @@ class ShoppingProvider extends ChangeNotifier {
       total: total,
     );
     await _service.createOrder(order);
+    _suppressPendingLowStockItems(purchasedItemIds);
     _items.removeWhere(
       (item) => purchasedItemIds.contains(item.id) && !item.keepAfterOrder,
     );
     await _persist();
+    await _persistSuppressedPantryIds();
     notifyListeners();
     return order;
   }
@@ -147,5 +237,20 @@ class ShoppingProvider extends ChangeNotifier {
   Future<void> _persist() async {
     final householdId = _householdId;
     if (householdId != null) await _service.saveList(householdId, _items);
+  }
+
+  void _suppressPendingLowStockItems(Iterable<String> ids) {
+    final lowStockIds = _latestPantryItems
+        .where((item) => item.isLowStock)
+        .map((item) => item.id)
+        .toSet();
+    _suppressedPantryIds.addAll(ids.where(lowStockIds.contains));
+  }
+
+  Future<void> _persistSuppressedPantryIds() async {
+    final householdId = _householdId;
+    if (householdId != null) {
+      await _service.saveSuppressedPantryIds(householdId, _suppressedPantryIds);
+    }
   }
 }

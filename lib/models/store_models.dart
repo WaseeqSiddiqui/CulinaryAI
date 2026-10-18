@@ -7,6 +7,7 @@ class ProductCandidate {
     required this.inStock,
     required this.index,
     this.size,
+    this.storeId,
   });
 
   final String name;
@@ -14,6 +15,7 @@ class ProductCandidate {
   final double price;
   final bool inStock;
   final int index;
+  final String? storeId;
 
   Map<String, dynamic> toMap() => {
     'name': name,
@@ -37,6 +39,22 @@ class ProductMatch {
   final String reason;
 }
 
+class ShoppingQueryNormalization {
+  const ShoppingQueryNormalization({
+    required this.searchQuery,
+    required this.canonicalName,
+    required this.confidence,
+    required this.changed,
+    required this.reason,
+  });
+
+  final String searchQuery;
+  final String canonicalName;
+  final double confidence;
+  final bool changed;
+  final String reason;
+}
+
 class AddResult {
   const AddResult(this.status, this.message);
   final AddStatus status;
@@ -49,10 +67,12 @@ class CartLine {
     required this.name,
     required this.quantity,
     required this.price,
+    this.storeId,
   });
   final String name;
   final int quantity;
   final double price;
+  final String? storeId;
 }
 
 enum CheckoutState { placed, needsManualCompletion, failed }
@@ -65,6 +85,7 @@ class CheckoutResult {
 
 class AutomationItemResult {
   const AutomationItemResult({
+    this.wantedItemId,
     required this.wantedName,
     required this.wantedQuantity,
     required this.wantedUnit,
@@ -75,6 +96,7 @@ class AutomationItemResult {
     this.unitPrice,
   });
 
+  final String? wantedItemId;
   final String wantedName;
   final double wantedQuantity;
   final String wantedUnit;
@@ -86,7 +108,30 @@ class AutomationItemResult {
 }
 
 class CartComparison {
-  const CartComparison({required this.matched, required this.missing});
+  const CartComparison({
+    required this.matched,
+    required this.missing,
+    this.quantityMismatches = const [],
+    this.unexpected = const [],
+  });
+
   final List<CartLine> matched;
   final List<String> missing;
+  final List<CartQuantityMismatch> quantityMismatches;
+  final List<CartLine> unexpected;
+
+  bool get isVerified =>
+      missing.isEmpty && quantityMismatches.isEmpty && unexpected.isEmpty;
+}
+
+class CartQuantityMismatch {
+  const CartQuantityMismatch({
+    required this.name,
+    required this.expected,
+    required this.actual,
+  });
+
+  final String name;
+  final int expected;
+  final int actual;
 }

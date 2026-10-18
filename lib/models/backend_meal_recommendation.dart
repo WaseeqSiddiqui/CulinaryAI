@@ -35,7 +35,7 @@ class BackendMealRecommendation {
         subtitle: '$cuisine recipe selected from the verified kitchen catalog.',
         imageUrl: '',
         cookTimeMinutes: _integer(json['cook_time_minutes']),
-        calories: 0,
+        calories: _integer(json['calories_per_serving']),
         difficulty: 'Chef verified',
         mealType: cuisine,
         servings: _integer(json['servings'], fallback: 4),

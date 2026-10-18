@@ -1,6 +1,11 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
 import '../models/pantry_item_model.dart';
 import '../models/recipe_recommendation_model.dart';
 import 'recipe_recommendation_service.dart';
+import 'server_config_service.dart';
 
 class ChefChatService {
   ChefChatService._();
@@ -20,6 +25,50 @@ class ChefChatService {
     ]);
   }
 
+  static Future<({String reply, bool isLiveAi})> askChefApi(
+    String question,
+    List<PantryItemModel> pantryItems, {
+    http.Client? client,
+  }) async {
+    final httpClient = client ?? http.Client();
+    final baseUrl = ServerConfigService.currentBaseUrl;
+    final uri = Uri.parse('$baseUrl/chef-chat');
+
+    try {
+      final body = jsonEncode({
+        'message': question.trim(),
+        'pantry_items': [
+          for (final item in pantryItems)
+            {'name': item.name, 'quantity': item.quantity, 'unit': item.unit},
+        ],
+      });
+
+      final res = await httpClient
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: body,
+          )
+          .timeout(const Duration(seconds: 8));
+
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map && decoded['reply'] is String) {
+          final replyText = (decoded['reply'] as String).trim();
+          if (replyText.isNotEmpty) {
+            return (reply: replyText, isLiveAi: true);
+          }
+        }
+      }
+    } catch (_) {
+      // Fallback to offline rule-based chef
+    } finally {
+      if (client == null) httpClient.close();
+    }
+
+    return (reply: answer(question, pantryItems), isLiveAi: false);
+  }
+
   static String answer(String question, List<PantryItemModel> pantryItems) {
     final cleanQuestion = question.trim();
     final query = cleanQuestion.toLowerCase();
@@ -27,8 +76,20 @@ class ChefChatService {
       return 'Ask me about your pantry, recipe ideas, missing ingredients, cooking time, or cooking steps.';
     }
 
-    if (_containsAny(query, ['hello', 'hi ', 'hey', 'salam', 'assalam'])) {
-      return 'Hello! I can check your pantry and help you choose or cook a meal. What are you in the mood for?';
+    final greetings = [
+      'hello',
+      'hi',
+      'hey',
+      'salam',
+      'assalam',
+      'good morning',
+      'good afternoon',
+      'good evening',
+    ];
+    if (greetings.any(
+      (g) => query == g || query.startsWith('$g ') || query.startsWith('$g!'),
+    )) {
+      return 'Hello Chef! I can check your pantry inventory, suggest recipes, calculate calories, or guide you through cooking. What are you looking to cook today?';
     }
 
     if (_containsAny(query, ['low stock', 'running out', 'need to buy'])) {
@@ -45,10 +106,18 @@ class ChefChatService {
       'list pantry',
     ])) {
       if (pantryItems.isEmpty) {
-        return 'Your pantry is empty right now. Add a few ingredients and I can recommend matching meals.';
+        return 'Your pantry is empty right now. Add a few ingredients or scan a receipt and I can recommend matching meals.';
       }
       final names = pantryItems.map((item) => item.name).toList()..sort();
       return 'You currently have ${_joinNames(names)}.';
+    }
+
+    if (_containsAny(query, ['substitute', 'replace'])) {
+      return 'Common kitchen substitutes:\n• Heavy Cream: Whole milk + butter (or plain Greek yogurt)\n• Olive Oil: Canola, vegetable, or coconut oil\n• Eggs (baking): Applesauce or mashed banana\n• Lemon Juice: Vinegar or lime juice';
+    }
+
+    if (_containsAny(query, ['help', 'who are you', 'what can you do', 'features'])) {
+      return 'I am Chef CulinaryAI, your smart kitchen assistant! Here is what I can do:\n• Scan grocery receipts and fridge shelves to manage stock\n• Recommend recipes based on what ingredients you actually have\n• Alert you when ingredients are running low\n• Guide you step-by-step through interactive cooking';
     }
 
     final recipe = _findRecipe(query);
@@ -119,6 +188,9 @@ class ChefChatService {
       'recommend',
       'suggest',
     ])) {
+      if (pantryItems.isEmpty) {
+        return 'Your kitchen pantry is currently empty! You can scan a grocery receipt or scan your fridge to stock it in seconds.\n\nIn the meantime, here are popular dishes you can explore:\n• Lemon Garlic Chicken Skillet with Rice (25 min)\n• Rustic San Marzano Tomato & Basil Pasta (20 min)\n• Farmhouse Cheddar & Herb Frittata (18 min)';
+      }
       final suggestions = RecipeRecommendationService.getRecommendedList(
         pantryItems,
       ).take(3).toList();
