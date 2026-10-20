@@ -7,3 +7,9 @@ google-genai>=2.0.0
 pillow>=11.0.0
 python-multipart>=0.0.18
 python-dotenv>=1.0.0
+# RAG + LangGraph dependencies
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-google-genai>=2.0.0
+chromadb>=0.5.0
+langchain-community>=0.3.0

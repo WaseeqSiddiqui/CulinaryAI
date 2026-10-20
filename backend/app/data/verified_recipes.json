@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "recipes": [
     {
       "recipe_id": "rec_chicken_rice",
@@ -31,7 +31,7 @@
       "cook_time_minutes": 35,
       "servings": 4,
       "calories_per_serving": 390,
-      "tags": ["comfort food", "budget", "dinner"],
+      "tags": ["comfort food", "budget", "dinner", "dal"],
       "dietary_tags": ["halal", "vegetarian", "vegan", "gluten-free"],
       "ingredients_required": [
         {"name": "Lentils", "quantity": 300, "unit": "g"},
@@ -55,7 +55,7 @@
       "cook_time_minutes": 20,
       "servings": 4,
       "calories_per_serving": 360,
-      "tags": ["breakfast", "quick", "high protein"],
+      "tags": ["breakfast", "quick", "high protein", "eggs"],
       "dietary_tags": ["halal", "vegetarian", "gluten-free"],
       "ingredients_required": [
         {"name": "Eggs", "quantity": 6, "unit": "pcs"},
@@ -78,7 +78,7 @@
       "cook_time_minutes": 25,
       "servings": 4,
       "calories_per_serving": 420,
-      "tags": ["quick", "dinner", "family"],
+      "tags": ["quick", "dinner", "family", "pasta"],
       "dietary_tags": ["halal", "vegetarian"],
       "ingredients_required": [
         {"name": "Pasta", "quantity": 400, "unit": "g"},
@@ -102,7 +102,7 @@
       "cook_time_minutes": 22,
       "servings": 4,
       "calories_per_serving": 520,
-      "tags": ["high protein", "dinner", "quick"],
+      "tags": ["high protein", "dinner", "quick", "fish"],
       "dietary_tags": ["halal", "gluten-free", "pescatarian"],
       "ingredients_required": [
         {"name": "Salmon", "quantity": 600, "unit": "g"},
@@ -125,7 +125,7 @@
       "cook_time_minutes": 30,
       "servings": 4,
       "calories_per_serving": 460,
-      "tags": ["comfort food", "dinner", "creamy"],
+      "tags": ["comfort food", "dinner", "creamy", "rice"],
       "dietary_tags": ["halal", "vegetarian", "gluten-free"],
       "ingredients_required": [
         {"name": "Rice", "quantity": 320, "unit": "g"},
@@ -138,6 +138,543 @@
         {"step_number": 2, "instruction": "Add hot stock gradually while stirring.", "timer_seconds": 1200},
         {"step_number": 3, "instruction": "Continue until the rice is tender and creamy.", "timer_seconds": 300},
         {"step_number": 4, "instruction": "Fold in parmesan and rest briefly before serving.", "timer_seconds": 120}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_chicken_karahi",
+      "name": "Chicken Karahi",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 45,
+      "servings": 4,
+      "calories_per_serving": 510,
+      "tags": ["dinner", "desi", "spicy", "karahi", "dhaba style"],
+      "dietary_tags": ["halal", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Chicken", "quantity": 1000, "unit": "g"},
+        {"name": "Tomatoes", "quantity": 4, "unit": "pcs"},
+        {"name": "Garlic Cloves", "quantity": 6, "unit": "cloves"},
+        {"name": "Ginger", "quantity": 2, "unit": "inch"},
+        {"name": "Cooking Oil", "quantity": 60, "unit": "ml"},
+        {"name": "Green Chilies", "quantity": 4, "unit": "pcs"},
+        {"name": "Cumin Seeds", "quantity": 1, "unit": "tsp"},
+        {"name": "Coriander Powder", "quantity": 2, "unit": "tsp"},
+        {"name": "Fresh Coriander", "quantity": 30, "unit": "g"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Heat oil in a karahi on high flame. Add chicken and sear until golden.", "timer_seconds": 600},
+        {"step_number": 2, "instruction": "Add crushed garlic and ginger paste. Stir for 2 minutes.", "timer_seconds": 120},
+        {"step_number": 3, "instruction": "Add chopped tomatoes, cumin, and coriander powder. Cook until oil separates.", "timer_seconds": 900},
+        {"step_number": 4, "instruction": "Add green chilies and cook on high flame for another 5 minutes.", "timer_seconds": 300},
+        {"step_number": 5, "instruction": "Garnish with fresh coriander and ginger julienne. Serve with naan.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_biryani",
+      "name": "Chicken Biryani",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 90,
+      "servings": 6,
+      "calories_per_serving": 620,
+      "tags": ["dinner", "desi", "special occasion", "biryani", "rice"],
+      "dietary_tags": ["halal", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Chicken", "quantity": 1000, "unit": "g"},
+        {"name": "Basmati Rice", "quantity": 500, "unit": "g"},
+        {"name": "Yogurt", "quantity": 200, "unit": "g"},
+        {"name": "Onion", "quantity": 3, "unit": "pcs"},
+        {"name": "Tomatoes", "quantity": 2, "unit": "pcs"},
+        {"name": "Garlic Cloves", "quantity": 6, "unit": "cloves"},
+        {"name": "Ginger", "quantity": 2, "unit": "inch"},
+        {"name": "Biryani Masala", "quantity": 3, "unit": "tbsp"},
+        {"name": "Cooking Oil", "quantity": 80, "unit": "ml"},
+        {"name": "Fresh Mint", "quantity": 20, "unit": "g"},
+        {"name": "Saffron", "quantity": 0.5, "unit": "tsp"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Soak basmati rice for 30 minutes. Marinate chicken with yogurt, biryani masala, garlic-ginger paste for 1 hour.", "timer_seconds": 1800},
+        {"step_number": 2, "instruction": "Fry sliced onions until golden brown (barista). Set aside.", "timer_seconds": 900},
+        {"step_number": 3, "instruction": "Cook marinated chicken in oil with tomatoes until masala is done and oil separates.", "timer_seconds": 1200},
+        {"step_number": 4, "instruction": "Boil rice until 70% done. Drain.", "timer_seconds": 600},
+        {"step_number": 5, "instruction": "Layer: rice then chicken masala then fried onions then mint. Add saffron water on top. Seal and dum cook on low.", "timer_seconds": 1200},
+        {"step_number": 6, "instruction": "Gently mix from sides before serving with raita.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_aloo_gosht",
+      "name": "Aloo Gosht (Mutton Potato Curry)",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 75,
+      "servings": 4,
+      "calories_per_serving": 580,
+      "tags": ["dinner", "desi", "curry", "mutton", "comfort food"],
+      "dietary_tags": ["halal", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Mutton", "quantity": 700, "unit": "g"},
+        {"name": "Potatoes", "quantity": 400, "unit": "g"},
+        {"name": "Onion", "quantity": 2, "unit": "pcs"},
+        {"name": "Tomatoes", "quantity": 3, "unit": "pcs"},
+        {"name": "Garlic Cloves", "quantity": 5, "unit": "cloves"},
+        {"name": "Ginger", "quantity": 1, "unit": "inch"},
+        {"name": "Cooking Oil", "quantity": 60, "unit": "ml"},
+        {"name": "Turmeric Powder", "quantity": 1, "unit": "tsp"},
+        {"name": "Red Chili Powder", "quantity": 2, "unit": "tsp"},
+        {"name": "Coriander Powder", "quantity": 2, "unit": "tsp"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Brown sliced onions in hot oil until golden. Add garlic-ginger paste.", "timer_seconds": 600},
+        {"step_number": 2, "instruction": "Add mutton pieces and cook on high heat until browned all over.", "timer_seconds": 600},
+        {"step_number": 3, "instruction": "Add spices (turmeric, red chili, coriander), tomatoes. Cook until oil separates.", "timer_seconds": 1200},
+        {"step_number": 4, "instruction": "Add water, cover and pressure cook or simmer until mutton is tender.", "timer_seconds": 2400},
+        {"step_number": 5, "instruction": "Add cubed potatoes and cook until soft. Adjust seasoning.", "timer_seconds": 900},
+        {"step_number": 6, "instruction": "Garnish with fresh coriander and serve with chapati or rice.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_daal_makhani",
+      "name": "Daal Makhani",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 60,
+      "servings": 4,
+      "calories_per_serving": 420,
+      "tags": ["dinner", "desi", "dal", "creamy", "lentils", "comfort food"],
+      "dietary_tags": ["halal", "vegetarian", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Black Lentils", "quantity": 250, "unit": "g"},
+        {"name": "Kidney Beans", "quantity": 100, "unit": "g"},
+        {"name": "Butter", "quantity": 50, "unit": "g"},
+        {"name": "Cream", "quantity": 100, "unit": "ml"},
+        {"name": "Tomatoes", "quantity": 3, "unit": "pcs"},
+        {"name": "Onion", "quantity": 1, "unit": "pcs"},
+        {"name": "Garlic Cloves", "quantity": 4, "unit": "cloves"},
+        {"name": "Ginger", "quantity": 1, "unit": "inch"},
+        {"name": "Cumin Seeds", "quantity": 1, "unit": "tsp"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Soak black lentils and kidney beans overnight. Pressure cook until completely soft.", "timer_seconds": 2400},
+        {"step_number": 2, "instruction": "Fry onion, garlic, ginger in butter until golden.", "timer_seconds": 480},
+        {"step_number": 3, "instruction": "Add tomatoes and cook until soft and oil separates.", "timer_seconds": 600},
+        {"step_number": 4, "instruction": "Add the cooked dal to the tomato masala. Simmer on low heat for 20 minutes, stirring.", "timer_seconds": 1200},
+        {"step_number": 5, "instruction": "Stir in cream, adjust seasoning. Simmer for 5 more minutes.", "timer_seconds": 300},
+        {"step_number": 6, "instruction": "Finish with a dollop of butter and serve with naan.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_halwa_puri",
+      "name": "Halwa Puri with Chana",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 60,
+      "servings": 4,
+      "calories_per_serving": 680,
+      "tags": ["breakfast", "desi", "special", "weekend", "puri"],
+      "dietary_tags": ["halal", "vegetarian"],
+      "ingredients_required": [
+        {"name": "All Purpose Flour", "quantity": 300, "unit": "g"},
+        {"name": "Semolina", "quantity": 200, "unit": "g"},
+        {"name": "Sugar", "quantity": 150, "unit": "g"},
+        {"name": "Chickpeas", "quantity": 250, "unit": "g"},
+        {"name": "Cooking Oil", "quantity": 200, "unit": "ml"},
+        {"name": "Cardamom Powder", "quantity": 1, "unit": "tsp"},
+        {"name": "Turmeric Powder", "quantity": 0.5, "unit": "tsp"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Make soft dough with flour, salt, and water. Rest for 20 minutes.", "timer_seconds": 1200},
+        {"step_number": 2, "instruction": "For sooji halwa: roast semolina in ghee until golden. Add sugar syrup with cardamom. Stir until thick.", "timer_seconds": 600},
+        {"step_number": 3, "instruction": "For chana: cook boiled chickpeas with onions, tomatoes, and spices.", "timer_seconds": 900},
+        {"step_number": 4, "instruction": "Roll out small rounds of dough. Deep fry puris until puffed and golden.", "timer_seconds": 600},
+        {"step_number": 5, "instruction": "Serve hot puris with warm halwa and spiced chana.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_saag",
+      "name": "Saag (Spinach Mustard Curry)",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 50,
+      "servings": 4,
+      "calories_per_serving": 320,
+      "tags": ["dinner", "desi", "vegetarian", "winter", "saag", "spinach"],
+      "dietary_tags": ["halal", "vegetarian", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Spinach", "quantity": 500, "unit": "g"},
+        {"name": "Mustard Leaves", "quantity": 300, "unit": "g"},
+        {"name": "Butter", "quantity": 60, "unit": "g"},
+        {"name": "Onion", "quantity": 2, "unit": "pcs"},
+        {"name": "Garlic Cloves", "quantity": 6, "unit": "cloves"},
+        {"name": "Ginger", "quantity": 2, "unit": "inch"},
+        {"name": "Green Chilies", "quantity": 3, "unit": "pcs"},
+        {"name": "Cornmeal", "quantity": 3, "unit": "tbsp"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Wash and roughly chop spinach and mustard leaves. Boil with green chilies until completely wilted.", "timer_seconds": 900},
+        {"step_number": 2, "instruction": "Mash the greens coarsely. Add cornmeal and cook for 10 more minutes.", "timer_seconds": 600},
+        {"step_number": 3, "instruction": "Make tadka: fry onions, garlic, ginger in butter until golden.", "timer_seconds": 600},
+        {"step_number": 4, "instruction": "Mix tadka into the saag. Simmer together for 10 minutes.", "timer_seconds": 600},
+        {"step_number": 5, "instruction": "Top with a large knob of butter. Serve with makki ki roti.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_keema_matar",
+      "name": "Keema Matar (Mince with Peas)",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 35,
+      "servings": 4,
+      "calories_per_serving": 450,
+      "tags": ["dinner", "desi", "mince", "keema", "quick"],
+      "dietary_tags": ["halal", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Minced Beef", "quantity": 500, "unit": "g"},
+        {"name": "Frozen Peas", "quantity": 200, "unit": "g"},
+        {"name": "Onion", "quantity": 2, "unit": "pcs"},
+        {"name": "Tomatoes", "quantity": 2, "unit": "pcs"},
+        {"name": "Garlic Cloves", "quantity": 4, "unit": "cloves"},
+        {"name": "Ginger", "quantity": 1, "unit": "inch"},
+        {"name": "Cumin Seeds", "quantity": 1, "unit": "tsp"},
+        {"name": "Red Chili Powder", "quantity": 1, "unit": "tsp"},
+        {"name": "Cooking Oil", "quantity": 40, "unit": "ml"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Fry onions in oil until golden. Add garlic-ginger paste and cumin.", "timer_seconds": 420},
+        {"step_number": 2, "instruction": "Add minced beef. Cook on high, breaking up lumps, until browned.", "timer_seconds": 600},
+        {"step_number": 3, "instruction": "Add tomatoes and spices. Cook until oil separates.", "timer_seconds": 600},
+        {"step_number": 4, "instruction": "Add peas and 100ml water. Cover and cook for 10 minutes.", "timer_seconds": 600},
+        {"step_number": 5, "instruction": "Garnish with fresh coriander and serve with chapati.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_anda_paratha",
+      "name": "Anda Paratha (Egg Paratha)",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 20,
+      "servings": 2,
+      "calories_per_serving": 490,
+      "tags": ["breakfast", "quick", "desi", "eggs", "paratha"],
+      "dietary_tags": ["halal", "vegetarian"],
+      "ingredients_required": [
+        {"name": "All Purpose Flour", "quantity": 200, "unit": "g"},
+        {"name": "Eggs", "quantity": 2, "unit": "pcs"},
+        {"name": "Butter", "quantity": 30, "unit": "g"},
+        {"name": "Green Chilies", "quantity": 2, "unit": "pcs"},
+        {"name": "Onion", "quantity": 0.5, "unit": "pcs"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Knead flour with water and salt into a smooth dough. Rest 10 minutes.", "timer_seconds": 600},
+        {"step_number": 2, "instruction": "Roll out a flat circle. Brush with butter, fold and roll again (layered).", "timer_seconds": 0},
+        {"step_number": 3, "instruction": "Cook on tawa until half done. Crack egg on top with chopped onion and chili.", "timer_seconds": 120},
+        {"step_number": 4, "instruction": "Fold paratha over egg. Press gently and cook with butter until golden.", "timer_seconds": 180},
+        {"step_number": 5, "instruction": "Serve hot with chai and yogurt.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_nihari",
+      "name": "Nihari (Slow Cooked Beef Stew)",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 180,
+      "servings": 6,
+      "calories_per_serving": 620,
+      "tags": ["dinner", "desi", "slow cook", "nihari", "special occasion", "beef"],
+      "dietary_tags": ["halal", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Beef Shank", "quantity": 1000, "unit": "g"},
+        {"name": "Cooking Oil", "quantity": 100, "unit": "ml"},
+        {"name": "Onion", "quantity": 3, "unit": "pcs"},
+        {"name": "Garlic Cloves", "quantity": 8, "unit": "cloves"},
+        {"name": "Ginger", "quantity": 3, "unit": "inch"},
+        {"name": "Nihari Masala", "quantity": 4, "unit": "tbsp"},
+        {"name": "All Purpose Flour", "quantity": 3, "unit": "tbsp"},
+        {"name": "Fresh Coriander", "quantity": 30, "unit": "g"},
+        {"name": "Green Chilies", "quantity": 4, "unit": "pcs"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Heat oil, fry sliced onions until dark golden. Add beef shank.", "timer_seconds": 600},
+        {"step_number": 2, "instruction": "Add garlic-ginger paste and nihari masala. Fry for 5 minutes.", "timer_seconds": 300},
+        {"step_number": 3, "instruction": "Add 1.5 litres of water. Bring to boil, then simmer covered for 2 hours.", "timer_seconds": 7200},
+        {"step_number": 4, "instruction": "Mix flour with water to make slurry. Add to nihari to thicken.", "timer_seconds": 300},
+        {"step_number": 5, "instruction": "Simmer another 20 minutes until gravy is thick and beef falls off bone.", "timer_seconds": 1200},
+        {"step_number": 6, "instruction": "Garnish with fresh ginger, green chilies, coriander, and lemon. Serve with naan.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_chana_masala",
+      "name": "Chana Masala (Spiced Chickpeas)",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 30,
+      "servings": 4,
+      "calories_per_serving": 380,
+      "tags": ["dinner", "desi", "vegetarian", "chickpeas", "chana", "quick", "budget"],
+      "dietary_tags": ["halal", "vegetarian", "vegan", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Chickpeas", "quantity": 400, "unit": "g"},
+        {"name": "Onion", "quantity": 2, "unit": "pcs"},
+        {"name": "Tomatoes", "quantity": 3, "unit": "pcs"},
+        {"name": "Garlic Cloves", "quantity": 4, "unit": "cloves"},
+        {"name": "Ginger", "quantity": 1, "unit": "inch"},
+        {"name": "Cooking Oil", "quantity": 40, "unit": "ml"},
+        {"name": "Cumin Seeds", "quantity": 1, "unit": "tsp"},
+        {"name": "Chana Masala Powder", "quantity": 2, "unit": "tbsp"},
+        {"name": "Fresh Coriander", "quantity": 20, "unit": "g"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Fry cumin seeds in oil, add onions and cook until golden.", "timer_seconds": 480},
+        {"step_number": 2, "instruction": "Add garlic-ginger paste and cook for 2 minutes.", "timer_seconds": 120},
+        {"step_number": 3, "instruction": "Add chopped tomatoes and chana masala powder. Cook until oil separates.", "timer_seconds": 600},
+        {"step_number": 4, "instruction": "Add drained chickpeas and 200ml water. Simmer for 15 minutes.", "timer_seconds": 900},
+        {"step_number": 5, "instruction": "Mash a few chickpeas for thicker gravy. Garnish with coriander and lemon.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_shahi_tukray",
+      "name": "Shahi Tukray (Royal Bread Pudding)",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 25,
+      "servings": 4,
+      "calories_per_serving": 450,
+      "tags": ["dessert", "desi", "sweet", "special", "milk", "bread"],
+      "dietary_tags": ["halal", "vegetarian"],
+      "ingredients_required": [
+        {"name": "Bread", "quantity": 6, "unit": "slices"},
+        {"name": "Milk", "quantity": 500, "unit": "ml"},
+        {"name": "Sugar", "quantity": 100, "unit": "g"},
+        {"name": "Cream", "quantity": 100, "unit": "ml"},
+        {"name": "Cardamom Powder", "quantity": 1, "unit": "tsp"},
+        {"name": "Cooking Oil", "quantity": 50, "unit": "ml"},
+        {"name": "Saffron", "quantity": 0.25, "unit": "tsp"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Deep fry or pan fry bread slices until golden and crisp.", "timer_seconds": 300},
+        {"step_number": 2, "instruction": "Boil milk with sugar, cardamom, and saffron until slightly thickened.", "timer_seconds": 600},
+        {"step_number": 3, "instruction": "Dip fried bread slices in the sweet milk.", "timer_seconds": 0},
+        {"step_number": 4, "instruction": "Arrange in a dish, pour remaining milk over. Top with cream and nuts.", "timer_seconds": 0},
+        {"step_number": 5, "instruction": "Chill for 30 minutes and serve cold.", "timer_seconds": 1800}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_seekh_kebab",
+      "name": "Seekh Kebab",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 30,
+      "servings": 4,
+      "calories_per_serving": 380,
+      "tags": ["dinner", "desi", "bbq", "mince", "kebab", "high protein"],
+      "dietary_tags": ["halal", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Minced Beef", "quantity": 500, "unit": "g"},
+        {"name": "Onion", "quantity": 1, "unit": "pcs"},
+        {"name": "Green Chilies", "quantity": 3, "unit": "pcs"},
+        {"name": "Fresh Coriander", "quantity": 30, "unit": "g"},
+        {"name": "Garlic Cloves", "quantity": 3, "unit": "cloves"},
+        {"name": "Ginger", "quantity": 1, "unit": "inch"},
+        {"name": "Red Chili Powder", "quantity": 1, "unit": "tsp"},
+        {"name": "Cumin Seeds", "quantity": 1, "unit": "tsp"},
+        {"name": "Garam Masala", "quantity": 1, "unit": "tsp"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Blend all spices, onion, garlic, ginger, and coriander into a paste.", "timer_seconds": 0},
+        {"step_number": 2, "instruction": "Mix paste thoroughly into minced beef. Refrigerate for 30 minutes.", "timer_seconds": 1800},
+        {"step_number": 3, "instruction": "Shape meat mixture around skewers, pressing firmly.", "timer_seconds": 0},
+        {"step_number": 4, "instruction": "Grill or pan fry on high heat, turning until cooked through and charred.", "timer_seconds": 900},
+        {"step_number": 5, "instruction": "Serve with mint chutney, naan, and sliced onions.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_aloo_palak",
+      "name": "Aloo Palak (Potato and Spinach Curry)",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 30,
+      "servings": 4,
+      "calories_per_serving": 280,
+      "tags": ["dinner", "vegetarian", "desi", "potato", "spinach", "quick", "budget"],
+      "dietary_tags": ["halal", "vegetarian", "vegan", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Potatoes", "quantity": 400, "unit": "g"},
+        {"name": "Spinach", "quantity": 400, "unit": "g"},
+        {"name": "Onion", "quantity": 1, "unit": "pcs"},
+        {"name": "Tomatoes", "quantity": 2, "unit": "pcs"},
+        {"name": "Garlic Cloves", "quantity": 3, "unit": "cloves"},
+        {"name": "Cooking Oil", "quantity": 30, "unit": "ml"},
+        {"name": "Cumin Seeds", "quantity": 1, "unit": "tsp"},
+        {"name": "Turmeric Powder", "quantity": 0.5, "unit": "tsp"},
+        {"name": "Red Chili Powder", "quantity": 1, "unit": "tsp"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Peel and cube potatoes. Roughly chop spinach.", "timer_seconds": 0},
+        {"step_number": 2, "instruction": "Fry cumin in oil, add onion and garlic. Cook until golden.", "timer_seconds": 420},
+        {"step_number": 3, "instruction": "Add tomatoes, turmeric, red chili. Cook until oil separates.", "timer_seconds": 480},
+        {"step_number": 4, "instruction": "Add potatoes and stir to coat. Add 200ml water, cover and cook 10 minutes.", "timer_seconds": 600},
+        {"step_number": 5, "instruction": "Add spinach, fold in and cook 5 more minutes until wilted.", "timer_seconds": 300},
+        {"step_number": 6, "instruction": "Serve with roti.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_chicken_corn_soup",
+      "name": "Chicken Corn Soup",
+      "cuisine": "Pakistani Chinese",
+      "cook_time_minutes": 20,
+      "servings": 4,
+      "calories_per_serving": 220,
+      "tags": ["starter", "soup", "quick", "winter", "desi chinese"],
+      "dietary_tags": ["halal", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Chicken Breast", "quantity": 200, "unit": "g"},
+        {"name": "Sweet Corn", "quantity": 200, "unit": "g"},
+        {"name": "Eggs", "quantity": 2, "unit": "pcs"},
+        {"name": "Chicken Stock", "quantity": 1000, "unit": "ml"},
+        {"name": "Corn Flour", "quantity": 3, "unit": "tbsp"},
+        {"name": "Soy Sauce", "quantity": 2, "unit": "tbsp"},
+        {"name": "White Pepper", "quantity": 0.5, "unit": "tsp"},
+        {"name": "Vinegar", "quantity": 1, "unit": "tbsp"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Boil chicken breast in stock. Remove, shred the chicken.", "timer_seconds": 900},
+        {"step_number": 2, "instruction": "Return shredded chicken to stock. Add sweet corn. Bring to boil.", "timer_seconds": 300},
+        {"step_number": 3, "instruction": "Add soy sauce, white pepper, and vinegar.", "timer_seconds": 0},
+        {"step_number": 4, "instruction": "Mix corn flour with cold water. Slowly stir into soup to thicken.", "timer_seconds": 120},
+        {"step_number": 5, "instruction": "Beat eggs and slowly drizzle into simmering soup while stirring.", "timer_seconds": 60},
+        {"step_number": 6, "instruction": "Serve hot with chili sauce and soy sauce on the side.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_chapli_kebab",
+      "name": "Chapli Kebab",
+      "cuisine": "Pakistani (Peshwari)",
+      "cook_time_minutes": 25,
+      "servings": 4,
+      "calories_per_serving": 420,
+      "tags": ["dinner", "desi", "kebab", "mince", "peshwari", "high protein"],
+      "dietary_tags": ["halal"],
+      "ingredients_required": [
+        {"name": "Minced Beef", "quantity": 500, "unit": "g"},
+        {"name": "Onion", "quantity": 1, "unit": "pcs"},
+        {"name": "Tomatoes", "quantity": 1, "unit": "pcs"},
+        {"name": "Eggs", "quantity": 1, "unit": "pcs"},
+        {"name": "Green Chilies", "quantity": 4, "unit": "pcs"},
+        {"name": "Fresh Coriander", "quantity": 30, "unit": "g"},
+        {"name": "Pomegranate Seeds", "quantity": 2, "unit": "tbsp"},
+        {"name": "Cumin Seeds", "quantity": 1, "unit": "tsp"},
+        {"name": "Red Chili Powder", "quantity": 1, "unit": "tsp"},
+        {"name": "Cooking Oil", "quantity": 60, "unit": "ml"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Mix mince with chopped onion, tomato, chili, coriander, egg, pomegranate seeds, and spices.", "timer_seconds": 0},
+        {"step_number": 2, "instruction": "Refrigerate mixture for 30 minutes to firm up.", "timer_seconds": 1800},
+        {"step_number": 3, "instruction": "Shape into flat, wide patties (chapli shape).", "timer_seconds": 0},
+        {"step_number": 4, "instruction": "Shallow fry in hot oil on each side until cooked through and crispy.", "timer_seconds": 600},
+        {"step_number": 5, "instruction": "Serve with naan and raita.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_khichdi",
+      "name": "Masala Khichdi",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 30,
+      "servings": 4,
+      "calories_per_serving": 340,
+      "tags": ["comfort food", "budget", "quick", "rice", "dal", "one pot", "easy"],
+      "dietary_tags": ["halal", "vegetarian", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Basmati Rice", "quantity": 200, "unit": "g"},
+        {"name": "Lentils", "quantity": 100, "unit": "g"},
+        {"name": "Onion", "quantity": 1, "unit": "pcs"},
+        {"name": "Garlic Cloves", "quantity": 3, "unit": "cloves"},
+        {"name": "Butter", "quantity": 30, "unit": "g"},
+        {"name": "Turmeric Powder", "quantity": 0.5, "unit": "tsp"},
+        {"name": "Cumin Seeds", "quantity": 1, "unit": "tsp"},
+        {"name": "Garam Masala", "quantity": 0.5, "unit": "tsp"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Wash rice and lentils together. Soak for 15 minutes.", "timer_seconds": 900},
+        {"step_number": 2, "instruction": "Fry cumin and onion in butter until golden. Add garlic.", "timer_seconds": 360},
+        {"step_number": 3, "instruction": "Add rice and lentils with turmeric. Stir to coat.", "timer_seconds": 60},
+        {"step_number": 4, "instruction": "Add 3 cups water. Bring to boil, cover and cook on low until done.", "timer_seconds": 1200},
+        {"step_number": 5, "instruction": "Finish with garam masala and more butter. Serve with yogurt.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_raita",
+      "name": "Mint Cucumber Raita",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 5,
+      "servings": 4,
+      "calories_per_serving": 90,
+      "tags": ["side dish", "quick", "cooling", "desi", "yogurt"],
+      "dietary_tags": ["halal", "vegetarian", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Yogurt", "quantity": 400, "unit": "g"},
+        {"name": "Cucumber", "quantity": 1, "unit": "pcs"},
+        {"name": "Fresh Mint", "quantity": 20, "unit": "g"},
+        {"name": "Cumin Seeds", "quantity": 0.5, "unit": "tsp"},
+        {"name": "Red Chili Powder", "quantity": 0.25, "unit": "tsp"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Whisk yogurt until smooth.", "timer_seconds": 0},
+        {"step_number": 2, "instruction": "Grate or finely chop cucumber. Add to yogurt.", "timer_seconds": 0},
+        {"step_number": 3, "instruction": "Add chopped mint, roasted cumin, and chili powder.", "timer_seconds": 0},
+        {"step_number": 4, "instruction": "Mix well. Chill and serve alongside biryani or kebabs.", "timer_seconds": 0}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_omelette_masala",
+      "name": "Desi Masala Omelette",
+      "cuisine": "Pakistani",
+      "cook_time_minutes": 10,
+      "servings": 1,
+      "calories_per_serving": 310,
+      "tags": ["breakfast", "quick", "easy", "eggs", "desi", "high protein"],
+      "dietary_tags": ["halal", "vegetarian", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Eggs", "quantity": 3, "unit": "pcs"},
+        {"name": "Onion", "quantity": 0.5, "unit": "pcs"},
+        {"name": "Tomatoes", "quantity": 1, "unit": "pcs"},
+        {"name": "Green Chilies", "quantity": 2, "unit": "pcs"},
+        {"name": "Fresh Coriander", "quantity": 10, "unit": "g"},
+        {"name": "Butter", "quantity": 15, "unit": "g"},
+        {"name": "Red Chili Powder", "quantity": 0.25, "unit": "tsp"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Beat eggs with salt and red chili powder.", "timer_seconds": 0},
+        {"step_number": 2, "instruction": "Finely chop onion, tomato, green chili, and coriander.", "timer_seconds": 0},
+        {"step_number": 3, "instruction": "Heat butter in a pan. Add onions and cook briefly.", "timer_seconds": 60},
+        {"step_number": 4, "instruction": "Pour in egg mixture. Add tomatoes and chilies on top.", "timer_seconds": 0},
+        {"step_number": 5, "instruction": "Cook until set, fold and serve hot with paratha.", "timer_seconds": 120}
+      ],
+      "source": "CulinaryAI verified kitchen catalog"
+    },
+    {
+      "recipe_id": "rec_banana_smoothie",
+      "name": "Banana Date Smoothie",
+      "cuisine": "Healthy",
+      "cook_time_minutes": 5,
+      "servings": 2,
+      "calories_per_serving": 280,
+      "tags": ["breakfast", "quick", "healthy", "smoothie", "drink"],
+      "dietary_tags": ["halal", "vegetarian", "gluten-free"],
+      "ingredients_required": [
+        {"name": "Banana", "quantity": 2, "unit": "pcs"},
+        {"name": "Milk", "quantity": 300, "unit": "ml"},
+        {"name": "Dates", "quantity": 5, "unit": "pcs"},
+        {"name": "Yogurt", "quantity": 100, "unit": "g"}
+      ],
+      "steps": [
+        {"step_number": 1, "instruction": "Pit the dates and soak in warm water for 5 minutes.", "timer_seconds": 300},
+        {"step_number": 2, "instruction": "Add all ingredients to blender.", "timer_seconds": 0},
+        {"step_number": 3, "instruction": "Blend until completely smooth.", "timer_seconds": 30},
+        {"step_number": 4, "instruction": "Pour into glasses and serve immediately.", "timer_seconds": 0}
       ],
       "source": "CulinaryAI verified kitchen catalog"
     }

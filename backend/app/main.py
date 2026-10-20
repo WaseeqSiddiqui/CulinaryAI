@@ -8,6 +8,10 @@ from dotenv import load_dotenv
 # Load .env from the backend directory (one level up from app/)
 load_dotenv()
 
+# ── RAG imports ──────────────────────────────────────────────────────────────
+from app.rag.vector_store import RecipeVectorStore
+from app.rag.langgraph_agent import build_chef_agent
+
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -46,6 +50,10 @@ catalog_service = IngredientCatalogService()
 vision_service = GeminiVisionService(catalog_service=catalog_service)
 fridge_reconciler = FridgeReconciler(catalog=catalog_service)
 product_matcher = ProductMatcher()
+
+# ── RAG: Vector Store + LangGraph Agent ───────────────────────────────────
+vector_store = RecipeVectorStore()
+chef_agent = build_chef_agent(vector_store)
 
 app = FastAPI(
     title="CulinaryAI API",
@@ -106,13 +114,45 @@ async def normalize_shopping_query(
 
 @app.post("/chef-chat", response_model=ChefChatResponse)
 async def chef_chat(request: ChefChatRequest) -> ChefChatResponse:
+    """
+    AI Chef Chat powered by a 4-node LangGraph RAG pipeline:
+      1. parse_intent   — Detect what the user wants
+      2. retrieve_recipes — ChromaDB semantic search (Gemini embeddings)
+      3. filter_by_pantry — Re-rank by pantry availability
+      4. generate_response — Gemini LLM with retrieved recipe context
+    """
     pantry_dicts = [item.model_dump() for item in request.pantry_items]
-    reply = await asyncio.to_thread(
-        vision_service.ask_chef,
-        prompt=request.message,
-        pantry_items=pantry_dicts,
+
+    result = await asyncio.to_thread(
+        chef_agent.invoke,
+        {
+            "user_message": request.message,
+            "pantry_items": pantry_dicts,
+            # Initialize optional state fields with defaults
+            "intent": "",
+            "dietary_preferences": [],
+            "max_cook_time": None,
+            "retrieved_recipes": [],
+            "pantry_filtered_recipes": [],
+            "reply": "",
+            "retrieval_used": False,
+            "recipes_found": 0,
+        },
     )
-    return ChefChatResponse(reply=reply)
+
+    return ChefChatResponse(reply=result["reply"])
+
+
+@app.get("/rag-status")
+def rag_status() -> dict:
+    """Debug endpoint: shows RAG vector store health."""
+    return {
+        "status": "ok",
+        "vector_store": "chromadb",
+        "embedding_model": "gemini-text-embedding-004",
+        "indexed_recipes": vector_store.recipe_count,
+        "langgraph_nodes": ["parse_intent", "retrieve_recipes", "filter_by_pantry", "generate_response"],
+    }
 
 
 @app.post("/generate-plan", response_model=GeneratePlanResponse)

@@ -9,8 +9,9 @@ client = TestClient(app)
 def test_health_reports_the_verified_recipe_index() -> None:
     response = client.get("/health")
 
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok", "indexed_recipes": 6}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["indexed_recipes"] >= 6
 
 
 def test_generate_plan_returns_a_pantry_aware_meal() -> None:

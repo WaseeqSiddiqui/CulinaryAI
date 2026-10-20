@@ -12,6 +12,20 @@
 .swiftpm/
 migrate_working_dir/
 
+# RAG / ChromaDB vector store (auto-generated, do not commit)
+backend/.chroma_db/
+
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
 # IntelliJ related
 *.iml
 *.ipr
