@@ -1,4 +1,4 @@
-# CulinaryAI
+# AI Kitchen Assistant
 
 A Flutter cooking assistant with pantry tracking, receipt OCR, AI-assisted
 recipe discovery, guided cooking, household sharing, and smart restocking.
