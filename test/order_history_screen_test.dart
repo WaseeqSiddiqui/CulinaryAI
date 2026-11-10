@@ -67,7 +67,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Order history'));
+      await tester.tap(find.text('Order history'));
       await tester.pumpAndSettle();
       expect(find.text('Order history'), findsOneWidget);
       expect(find.text('Rs 675.00'), findsOneWidget);

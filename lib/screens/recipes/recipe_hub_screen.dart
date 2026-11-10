@@ -28,9 +28,10 @@ class RecipeHubScreen extends StatefulWidget {
 }
 
 class _RecipeHubScreenState extends State<RecipeHubScreen> {
+  int _requestGeneration = 0;
   final _query = TextEditingController();
   final _api = MealPlanningApiService(timeout: const Duration(seconds: 15));
-  late final RecipeSection _mode;
+  late RecipeSection _mode;
   List<BackendMealRecommendation> _generated = const [];
   bool _loading = false;
   String? _error;
@@ -49,6 +50,7 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
   }
 
   Future<void> _generate({required bool weekly}) async {
+    final generation = ++_requestGeneration;
     final pantry = context
         .read<PantryProvider>()
         .allItems
@@ -91,11 +93,17 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
         targetCaloriesPerPersonPerDay: profile.calorieTarget,
         pantryFirst: true,
       );
-      if (mounted) setState(() => _generated = plan.meals);
+      if (mounted && generation == _requestGeneration) {
+        setState(() => _generated = plan.meals);
+      }
     } on MealPlanningApiException catch (error) {
-      if (mounted) setState(() => _error = error.message);
+      if (mounted && generation == _requestGeneration) {
+        setState(() => _error = error.message);
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && generation == _requestGeneration) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -114,7 +122,7 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$added missing ingredient(s) added to Restock.'),
+          content: Text('$added missing ingredient(s) added to Shopping.'),
         ),
       );
     }
@@ -223,7 +231,7 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
                 OutlinedButton.icon(
                   onPressed: () => _addMissing(missing),
                   icon: const Icon(Icons.add_shopping_cart_rounded),
-                  label: Text('Add ${missing.length} missing to Restock'),
+                  label: Text('Add ${missing.length} missing to Shopping'),
                 ),
                 ExpansionTile(
                   tilePadding: EdgeInsets.zero,
@@ -295,45 +303,17 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(switch (_mode) {
-          RecipeSection.pantry => 'Pantry recipes',
-          RecipeSection.create => 'Recipe creator',
-          RecipeSection.macros => 'Nutrition goals',
-          RecipeSection.weekly => '7-day meal plan',
-          RecipeSection.saved => 'My cookbook',
-        }),
+        title: const Text('Recipes'),
         actions: [
           if (_mode == RecipeSection.macros)
-            IconButton(
-              tooltip: 'Scan meal nutrition',
+            TextButton.icon(
+              label: const Text('Scan meal'),
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const MealScannerScreen()),
               ),
               icon: const Icon(Icons.add_a_photo_outlined),
             ),
-          if (_mode == RecipeSection.pantry)
-            IconButton(
-              tooltip: 'My cookbook',
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      const RecipeHubScreen(section: RecipeSection.saved),
-                ),
-              ),
-              icon: const Icon(Icons.favorite_border_rounded),
-            ),
-          IconButton(
-            tooltip: 'Cooking preferences',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const CookingPreferencesScreen(),
-              ),
-            ),
-            icon: const Icon(Icons.tune_rounded),
-          ),
         ],
       ),
       body: AppPageBody(
@@ -349,6 +329,48 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
             children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final section in <(RecipeSection, String)>[
+                    (RecipeSection.pantry, 'Find recipes'),
+                    (RecipeSection.create, 'Create recipe'),
+                    (RecipeSection.weekly, 'Meal plan'),
+                    (RecipeSection.macros, 'Nutrition'),
+                    (RecipeSection.saved, 'Saved recipes'),
+                  ])
+                    ChoiceChip(
+                      label: Text(section.$2),
+                      selected: _mode == section.$1,
+                      onSelected: (_) {
+                        if (_mode == section.$1) return;
+                        setState(() {
+                          _requestGeneration++;
+                          _mode = section.$1;
+                          _generated = const [];
+                          _error = null;
+                          _loading = false;
+                          _query.clear();
+                        });
+                      },
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => const CookingPreferencesScreen(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.tune, size: 18),
+                  label: const Text('Portions and dietary preferences'),
+                ),
+              ),
+              const SizedBox(height: 12),
               PageIntro(
                 eyebrow: switch (_mode) {
                   RecipeSection.pantry => 'FROM YOUR PANTRY',
@@ -358,11 +380,11 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
                   RecipeSection.saved => 'YOUR PERSONAL COLLECTION',
                 },
                 title: switch (_mode) {
-                  RecipeSection.pantry => 'Cook with what you have.',
-                  RecipeSection.create => 'Make it your own.',
-                  RecipeSection.macros => 'Find your balance.',
-                  RecipeSection.weekly => 'Your week, made easier.',
-                  RecipeSection.saved => 'The ones worth keeping.',
+                  RecipeSection.pantry => 'Find a recipe to cook',
+                  RecipeSection.create => 'Create a recipe',
+                  RecipeSection.macros => 'Your daily nutrition',
+                  RecipeSection.weekly => 'Plan your meals',
+                  RecipeSection.saved => 'Your saved recipes',
                 },
                 subtitle: switch (_mode) {
                   RecipeSection.pantry => 'Fresh ideas, built around the ingredients already in your kitchen.',
@@ -387,11 +409,6 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
                   icon: Icons.kitchen_outlined,
                   message:
                       'Cooking for ${prefs.servings} people. Change portions or preferences to suit your table.',
-                ),
-                _SeparatedFeatureLinks(
-                  onCreate: () => _openSection(RecipeSection.create),
-                  onGoals: () => _openSection(RecipeSection.macros),
-                  onPlan: () => _openSection(RecipeSection.weekly),
                 ),
                 const SizedBox(height: 18),
               ],
@@ -559,13 +576,6 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
       ),
     );
   }
-
-  void _openSection(RecipeSection section) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => RecipeHubScreen(section: section)),
-    );
-  }
 }
 
 RecipeRecommendationModel _scaledRecipe(
@@ -581,7 +591,7 @@ String _suggestSwap(String ingredient) {
   if (value.contains('egg')) return 'flax egg';
   if (value.contains('rice')) return 'couscous or quinoa';
   if (value.contains('cheese')) return 'nutritional yeast';
-  return 'tap Restock to keep recipe exact';
+  return 'tap Shopping to keep recipe exact';
 }
 
 String _pairingFor(RecipeRecommendationModel recipe) {
@@ -596,39 +606,6 @@ String _pairingFor(RecipeRecommendationModel recipe) {
     return 'Green salad and sparkling citrus water';
   }
   return 'Seasonal salad and infused water';
-}
-
-class _SeparatedFeatureLinks extends StatelessWidget {
-  const _SeparatedFeatureLinks({
-    required this.onCreate,
-    required this.onGoals,
-    required this.onPlan,
-  });
-  final VoidCallback onCreate;
-  final VoidCallback onGoals;
-  final VoidCallback onPlan;
-  @override
-  Widget build(BuildContext context) => Wrap(
-    spacing: 8,
-    runSpacing: 8,
-    children: [
-      ActionChip(
-        avatar: const Icon(Icons.auto_awesome_outlined, size: 17),
-        label: const Text('Create a recipe'),
-        onPressed: onCreate,
-      ),
-      ActionChip(
-        avatar: const Icon(Icons.track_changes_outlined, size: 17),
-        label: const Text('Nutrition goals'),
-        onPressed: onGoals,
-      ),
-      ActionChip(
-        avatar: const Icon(Icons.calendar_month_outlined, size: 17),
-        label: const Text('Plan the week'),
-        onPressed: onPlan,
-      ),
-    ],
-  );
 }
 
 class _NutritionTodayCard extends StatelessWidget {

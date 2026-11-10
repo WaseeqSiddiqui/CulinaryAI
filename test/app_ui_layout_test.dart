@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:culinary_ai/main.dart';
 import 'package:culinary_ai/providers/theme_provider.dart';
+import 'package:culinary_ai/providers/pantry_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -92,10 +93,60 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await capture('home');
+      // The feature directory must lead to the real expiry editor, including
+      // when pantry search/zone filters would otherwise hide an ingredient.
+      await tester.tap(find.text('All features'));
+      await tester.pumpAndSettle();
+      await capture('features');
+      await tester.enterText(find.byType(TextField), 'not-a-feature');
+      await tester.pumpAndSettle();
+      expect(find.textContaining('No matching feature.'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'receipt');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Scan receipt'));
+      await tester.pumpAndSettle();
+      expect(find.text('Scan a receipt'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'expiry');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Check expiry'));
+      await tester.pumpAndSettle();
+      await capture('expiry');
+      final pantry = tester
+          .element(find.text('Check expiry'))
+          .read<PantryProvider>();
+      final quantities = {
+        for (final item in pantry.allItems) item.id: item.quantity,
+      };
+      final firstExpiryItem = find.byWidgetPredicate(
+        (widget) =>
+            widget is ListTile &&
+            widget.key is ValueKey<String> &&
+            (widget.key! as ValueKey<String>).value.startsWith('expiry-item-'),
+      );
+      await tester.tap(firstExpiryItem.first);
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Scan label').hitTestable(),
+        findsOneWidget,
+        reason:
+            'Expiry actions must be visible without hunting through the form',
+      );
+      await capture('expiry_editor');
+      Navigator.of(tester.element(find.text('Scan label'))).pop();
+      await tester.pumpAndSettle();
+      expect({
+        for (final item in pantry.allItems) item.id: item.quantity,
+      }, quantities);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       for (final tab in [
         ('My Pantry', 'pantry'),
-        ('Chef Chat', 'chat'),
-        ('Restock', 'shopping'),
+        ('Recipes', 'recipes'),
+        ('Shopping', 'shopping'),
         ('Profile', 'profile'),
       ]) {
         await tester.tap(find.text(tab.$1).last);
@@ -106,6 +157,19 @@ void main() {
           reason: '${config.$1}: ${tab.$2}',
         );
         await capture(tab.$2);
+        if (tab.$2 == 'recipes') {
+          await tester.tap(find.widgetWithText(ChoiceChip, 'Meal plan'));
+          await tester.pumpAndSettle();
+          expect(find.text('Plan your meals'), findsOneWidget);
+          await tester.tap(find.widgetWithText(ChoiceChip, 'Saved recipes'));
+          await tester.pumpAndSettle();
+          expect(find.text('Your saved recipes'), findsOneWidget);
+          await tester.tap(find.text('Home').last);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Find recipes'));
+          await tester.pumpAndSettle();
+          expect(find.text('Find a recipe to cook'), findsOneWidget);
+        }
       }
       expect(tester.takeException(), isNull);
     });

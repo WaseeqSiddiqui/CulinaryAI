@@ -121,8 +121,8 @@ class ShoppingListScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Shopping list'),
         actions: [
-          IconButton(
-            tooltip: 'Order history',
+          TextButton.icon(
+            label: const Text('Order history'),
             icon: const Icon(Icons.history),
             onPressed: () => Navigator.push(
               context,
@@ -150,8 +150,8 @@ class ShoppingListScreen extends StatelessWidget {
               children: [
                 PageIntro(
                   eyebrow: '${shopping.items.length} ITEMS ON YOUR LIST',
-                  title: 'A fresh little restock.',
-                  subtitle: 'The essentials for whatever comes next.',
+                  title: 'Groceries to buy',
+                  subtitle: 'Add items yourself or review ingredients running low in your pantry.',
                 ),
                 const SizedBox(height: 24),
                 SurfacePanel(

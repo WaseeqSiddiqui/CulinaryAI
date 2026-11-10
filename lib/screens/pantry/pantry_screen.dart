@@ -52,6 +52,17 @@ const Map<String, _ZoneMeta> _zoneMeta = {
 class PantryScreen extends StatefulWidget {
   const PantryScreen({super.key});
 
+  static Future<void> showItemEditor(
+    BuildContext context, {
+    PantryItemModel? item,
+    bool focusExpiry = false,
+  }) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (_) => _AddEditSheet(item: item, focusExpiry: focusExpiry),
+  );
+
   @override
   State<PantryScreen> createState() => _PantryScreenState();
 }
@@ -79,12 +90,7 @@ class _PantryScreenState extends State<PantryScreen>
   }
 
   void _showAddEditSheet({PantryItemModel? item}) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => _AddEditSheet(item: item),
-    );
+    PantryScreen.showItemEditor(context, item: item);
   }
 
   void _confirmDelete(BuildContext context, PantryItemModel item) {
@@ -173,7 +179,7 @@ class _PantryScreenState extends State<PantryScreen>
   ) {
     return SliverAppBar(
       pinned: true,
-      automaticallyImplyLeading: false,
+      automaticallyImplyLeading: true,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       title: const Text('My pantry'),
       actions: [
@@ -940,7 +946,8 @@ class _ZoneChip extends StatelessWidget {
 
 class _AddEditSheet extends StatefulWidget {
   final PantryItemModel? item;
-  const _AddEditSheet({this.item});
+  final bool focusExpiry;
+  const _AddEditSheet({this.item, this.focusExpiry = false});
 
   @override
   State<_AddEditSheet> createState() => _AddEditSheetState();
@@ -948,6 +955,7 @@ class _AddEditSheet extends StatefulWidget {
 
 class _AddEditSheetState extends State<_AddEditSheet> {
   final _formKey = GlobalKey<FormState>();
+  final _expirySectionKey = GlobalKey();
   late final TextEditingController _nameCtrl;
   late final TextEditingController _qtyCtrl;
   late final TextEditingController _thresholdCtrl;
@@ -971,6 +979,18 @@ class _AddEditSheetState extends State<_AddEditSheet> {
   @override
   void initState() {
     super.initState();
+    if (widget.focusExpiry) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final target = _expirySectionKey.currentContext;
+        if (mounted && target != null) {
+          Scrollable.ensureVisible(
+            target,
+            alignment: 0.05,
+            duration: const Duration(milliseconds: 250),
+          );
+        }
+      });
+    }
     final item = widget.item;
     _nameCtrl = TextEditingController(text: item?.name ?? '');
     _qtyCtrl = TextEditingController(
@@ -1563,6 +1583,7 @@ class _AddEditSheetState extends State<_AddEditSheet> {
               const SizedBox(height: 14),
 
               Container(
+                key: _expirySectionKey,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: isDark ? AppTheme.surfaceDark2 : AppTheme.bgLight,

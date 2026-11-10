@@ -51,6 +51,7 @@ Suggested demo flow:
 
 ## Project documentation
 
+- [App navigation and feature locations](docs/APP_NAVIGATION.md)
 - [Roman Urdu manual testing guide](docs/MANUAL_TESTING_GUIDE.md)
 - [Detailed progress and future roadmap](docs/CulinaryAI_Project_Progress_and_Roadmap.docx)
 - [PandaMart purchase flow and validation](docs/PURCHASE_AUTOMATION.md)

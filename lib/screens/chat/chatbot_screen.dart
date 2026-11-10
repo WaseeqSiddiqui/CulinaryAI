@@ -87,7 +87,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
     if (_isWeeklyPlanRequest(question)) {
       await Future<void>.delayed(const Duration(milliseconds: 180));
-      answer = 'Weekly planning has its own clean screen. Open the menu and choose 7-day meal plan; it will use your pantry, people count, and calorie target.';
+      answer = 'Open the Recipes tab and choose Meal plan to plan the next seven days using your pantry, people count, and calorie target.';
     } else if (ChefChatService.isMealPlanningQuestion(question)) {
       try {
         final plan = await _mealPlanningApi.discoverRecipes(

@@ -31,7 +31,7 @@ Test: Khali fields, ghalat email aur mismatch passwords try karein. Phir naya te
 Pass: Ghalat input par samajh aane wala error aaye; valid account se Home khule aur duplicate account na bane.
 
 ### A02 Login logout aur session
-Kahan: Login screen; Home > Kitchen Menu > Log out.
+Kahan: Login screen; Home > Account and appearance menu > Log out.
 Test: Ghalat password try karein, sahi account se login karein, app band karke kholein. Logout cancel aur confirm dono check karein.
 Pass: Error par app crash na ho; valid session restore ho; logout ke baad protected screens se purana account access na ho.
 
@@ -41,7 +41,7 @@ Test: Google account picker cancel karein, phir test account se login karein. De
 Pass: Cancel se loading khatam ho; login sahi user ka ho. Demo ko real cloud account ki successful testing na samjhein.
 
 ### A04 Profile edit aur appearance
-Kahan: Profile > Edit ya Edit Personal Details; Home ka Light Mode ya Dark Mode icon.
+Kahan: Profile > Edit ya Edit Personal Details; Home > Account and appearance menu > Appearance.
 Test: Naam, phone, city, date of birth aur food preference badal kar save karein. Dobara kholein. Theme badlein.
 Pass: Saved fields sahi rahen, email read-only ho to us ka behavior clear ho, dono themes mein text readable ho.
 
@@ -56,7 +56,7 @@ Test: Valid, invalid aur expired invite try karein. Owner se member management k
 Pass: Valid code hi join kare; ghalat code clear error de. Member ko owner privileges na milen. Invite access issue aaye to FAIL ya BLOCKED record karein.
 
 ### A07 Household data ki isolation
-Kahan: Do test accounts aur do households ki My Pantry aur Restock screens.
+Kahan: Do test accounts aur do households ki My Pantry aur Shopping screens.
 Test: Household A mein ek unique item banayein; account ya household B par switch karein; phir A par wapas aayein.
 Pass: B ko A ka private stock na dikhe; A par wapas aane se sahi stock aaye. Cloud sync ko do devices par alag verify karein.
 
@@ -64,7 +64,7 @@ Pass: B ko A ka private stock na dikhe; A par wapas aane se sahi stock aaye. Clo
 ## Pantry aur expiry
 
 ### P01 Ingredient add aur persistence
-Kahan: My Pantry > Add ingredient ya Add your first ingredient.
+Kahan: Home > Add food > Enter an ingredient; ya My Pantry > Add Item.
 Test: Milk 1 L add karein; quantity, unit, storage zone aur expiry set karein. Save karke screen aur app dobara kholein.
 Pass: Ek hi item bane; har field sahi rahe. Empty name, invalid quantity aur double Save se ghalat record na bane.
 
@@ -79,12 +79,12 @@ Test: Har zone mein ek item rakhein. Filter badlein, item details kholein aur it
 Pass: Sahi zone ke items hi dikhein; All par sab wapas aayen; moved item purane zone mein na rahe.
 
 ### P04 Expiry date manually set karna
-Kahan: My Pantry > item > Edit Details > expiry date.
+Kahan: Home > Check expiry > ingredient > Add expiry date.
 Test: Ek fresh date, kal ki date aur guzri hui date teen test items par set karein. Save karke reopen karein.
 Pass: Date sahi save ho, din shift na ho, expiry badges aur Use Soon grouping date ke mutabiq hon. Boundary results ki screenshot lein.
 
 ### P05 Expiry label scan aur correction
-Kahan: Item edit form > Scan label > Scan an expiry label.
+Kahan: Home > Check expiry > ingredient > Scan label.
 Test: Saaf EXP ya Best Before label scan karein. Detected date ko asal label se milayein; zaroorat par correct karke confirm karein.
 Pass: Confirmed date item form mein aaye aur Save ke baad retained ho. Manufacture date ko expiry samajhna FAIL hai; unclear scan ko manually correct kiya ja sake.
 
@@ -94,15 +94,15 @@ Test: Pehle printed expiry note karein. Estimated expiry aur opened state set ka
 Pass: Estimate ki nature clear rahe, opened state save ho, printed aur estimated dates confuse na hon. Estimate ko food safety ki guarantee na samjhein.
 
 ### P07 Remove undo aur low stock
-Kahan: My Pantry > item > Remove; Home > Low Stock; Restock.
+Kahan: My Pantry > item > Remove; Home > Low Stock; Shopping.
 Test: Test item remove karke Undo karein. Phir quantity low-stock level tak kam karein aur tabs refresh karein.
-Pass: Undo ek hi record restore kare; counts aur Restock sahi update hon; har refresh par duplicate shopping entries na banein.
+Pass: Undo ek hi record restore kare; counts aur Shopping sahi update hon; har refresh par duplicate shopping entries na banein.
 
 <!-- page -->
 ## Fridge receipt aur meal scanners
 
 ### S01 Camera gallery aur cancel
-Kahan: Home > Scan Fridge ya Scan Receipt; Kitchen Menu > Grocery management.
+Kahan: Home > Add food > Scan your fridge; Home > Scan receipt.
 Test: Camera aur gallery dono kholein; photo lene se pehle cancel karein. Phir permission deny karke dobara try karein.
 Pass: Cancel se stock na badle; deny par samajh aane wala message ho; permission dene ke baad retry kaam kare.
 
@@ -127,7 +127,7 @@ Test: Ek line edit karein, ek remove karein, ek missing item add karein. Save ka
 Pass: Final reviewed list hi add ho; removed line na aaye; double tap se stock do martaba add na ho. Retake se purana review commit na ho.
 
 ### S06 Meal nutrition aur daily log
-Kahan: Kitchen Menu > Nutrition goals > Scan meal nutrition icon.
+Kahan: Home > All features > Nutrition goals > Scan meal.
 Test: Meal photo dein; dish, calories aur macros review karein; Add to today ek baar dabayein; goals screen par wapas aayein.
 Pass: Ek log entry bane aur daily totals ek baar update hon. Nutrition estimates ko exact measurement na samjhein.
 
@@ -140,7 +140,7 @@ Pass: Non-food result meal log mein save na ho. Corrected APK mein OCR model loa
 ## Recipes preferences aur meal planning
 
 ### R01 Pantry recipes aur availability
-Kahan: Kitchen Menu > Pantry recipes; Home > Made for your pantry.
+Kahan: Recipes > Find recipes; ya Home > Find recipes.
 Test: Sample stock ke saath recipe list kholein. Ek required ingredient remove ya expire karke refresh karein.
 Pass: Available aur missing ingredients sahi reflect hon; expired ya zero stock ko usable stock na gina jaye. Server unavailable ho to us ki clear state aaye.
 
@@ -150,27 +150,27 @@ Test: Ingredients, instructions, time aur nutrition dekhein. Servings 1 se 2 kar
 Pass: Ingredient quantities servings ke mutabiq scale hon; units sahi rahen; per-serving aur total nutrition mix na ho. Instructions readable aur complete hon.
 
 ### R03 Recipe creator
-Kahan: Home > Create Recipe ya Kitchen Menu > Recipe creator.
+Kahan: Recipes > Create recipe.
 Test: Optional preference mein tomato pasta likhein; Find recipes dabayein. Empty query aur unavailable service bhi check karein.
 Pass: Pantry-aware result ya clear empty/error state aaye; loading finish ho. Hosted discover-recipes 404 rahe to online case BLOCKED hai.
 
 ### R04 Preferences aur avoidance
-Kahan: Recipe screen > Cooking preferences.
+Kahan: Recipes > Portions and dietary preferences.
 Test: People eating, Time to cook, Dietary needs, Allergens, Ingredients to avoid aur Favourite cuisines set karke Save preferences karein.
 Pass: Reopen par settings retained hon aur generated suggestions mein apply hon. Allergy compliance ko manually ingredients se verify karein; sirf badge par PASS na dein.
 
 ### R05 Cookbook aur missing ingredients
-Kahan: Pantry recipes > recipe > Save recipe; My cookbook icon; Add missing to Restock.
-Test: Recipe save karein, cookbook dobara kholein. Missing list Restock mein add karein aur action repeat karein.
+Kahan: Pantry recipes > recipe > Save recipe; Recipes > Saved recipes; Add missing to Shopping.
+Test: Recipe save karein, cookbook dobara kholein. Missing list Shopping mein add karein aur action repeat karein.
 Pass: Saved recipe sahi mile; present items ko missing na gina jaye; repeated add se bekaar duplicates na banein.
 
 ### R06 Nutrition goals
-Kahan: Kitchen Menu > Nutrition goals > Cooking preferences > Daily targets.
+Kahan: Recipes > Nutrition > Portions and dietary preferences > Daily targets.
 Test: Calories, Protein, Carbs, Fat aur Meals per day badlein. Ek meal log karke progress dekhein.
 Pass: Saved targets sahi rahen; daily aur per-meal values clear hon; meal se totals sahi badlein. Invalid input crash ya nonsensical negative progress na de.
 
 ### R07 Weekly meal plan
-Kahan: Home > Meal Planner ya Kitchen Menu > 7-day meal plan.
+Kahan: Recipes > Meal plan.
 Test: People aur goals set karke plan banayein; din aur meals dekhein. Preferences badal kar naya plan request karein.
 Pass: Sahi din, meal count aur servings hon; nayi preferences reflect hon. Failure par purane plan ko naya successful response keh kar na dikhaya jaye.
 
@@ -208,40 +208,40 @@ Test: Pehle cancel karein aur stock compare karein. Phir test recipe finish kare
 Pass: Cancel par stock na ghate; successful finish par ingredients sirf ek martaba ghatein; stock negative na ho aur unrelated items na badlein.
 
 ### C07 General Chef Chat
-Kahan: Main tabs > Chef Chat.
+Kahan: Home > Ask Chef.
 Test: What do I have in my pantry, What is low stock, aur How do I cook tomato pasta poochein. Weekly plan ka sawal aur rapid Send bhi check karein.
 Pass: Pantry facts sahi hon; general reply ya offline status clear ho; duplicate requests na chalain. Live recipe discovery ko normal text chat se alag result dein.
 
 <!-- page -->
-## Restock history aur screen behavior
+## Shopping history aur screen behavior
 
 ### L01 Shopping list manually add karna
-Kahan: Restock > Add an item.
+Kahan: Shopping > Add an item.
 Test: Rice 1 kg aur Eggs 6 pcs add karein; required input, unit aur repeat add check karein.
 Pass: Naam, quantity aur unit sahi hon; empty entry na bane; repeat add ka behavior consistent ho. Yeh case merchant automation use nahi karta.
 
 ### L02 Low stock aur missing ingredients
-Kahan: My Pantry > quantity controls; recipe > Add missing to Restock; phir Restock.
+Kahan: My Pantry > quantity controls; recipe > Add missing to Shopping; phir Shopping.
 Test: Low stock trigger karein aur recipe ke missing ingredients add karein. Tabs aur app reopen karein.
 Pass: Zaroori items list mein hon; zero ya expired stock availability ko ghalat na badhaye; unrelated items auto-add na hon.
 
 ### L03 Remove aur persistence
-Kahan: Restock > item ka Remove icon.
+Kahan: Shopping > item ka Remove icon.
 Test: Ek manual test item remove karein; screen aur app dobara kholein.
 Pass: Removed entry wapas na aaye jab tak low-stock rule use dobara legitimately add na kare. Baaqi list aur household association sahi rahe.
 
 ### L04 Pending order bina store ke
-Kahan: Restock > Place order without store.
+Kahan: Shopping > Place order without store.
 Test: Sirf test household mein pending order banayein. Order history aur pantry quantities compare karein.
 Pass: Pending order record bane, usay merchant ki successful purchase na samjha jaye, pantry stock is action se na badle. Is existing option ko remove nahi kiya gaya.
 
 ### L05 Local order history
-Kahan: Restock > Order history icon.
+Kahan: Shopping > Order history.
 Test: Empty history dekhein; pending test order ke baad history reopen karein. App restart ke baad same device par verify karein.
 Pass: Status, date aur lines sahi hon; ek action ka ek record ho. Local history ka pass cross-device cloud sync ka proof nahi.
 
 ### L06 Home counts aur navigation
-Kahan: Home > Current Stock, Use Soon, Low Stock; bottom tabs; Kitchen Menu.
+Kahan: Home > Current Stock, Expiry alerts, Low Stock; bottom tabs; Home > All features.
 Test: Pantry badal kar counts compare karein. Har tab aur menu entry kholein, Android Back use karein.
 Pass: Counts stock se match hon, har entry sahi screen khole aur Back expected jagah le jaye; screen stuck ya blank na ho.
 
@@ -254,12 +254,12 @@ Pass: Buttons reachable hon; text ya values clip na hon; keyboard ke peeche crit
 ## Offline recovery aur memory stability
 
 ### M01 Offline editing aur reconnect
-Kahan: My Pantry, Restock aur Profile.
+Kahan: My Pantry, Shopping aur Profile.
 Test: Test account ka data load karein; internet band karein; supported local edits try karein. Internet wapas karke reopen karein.
 Pass: Unsupported action clear error de; successful local edit silently lost na ho; reconnect par duplicates ya doosre household ka data na aaye. Cloud persistence alag verify karein.
 
 ### M02 Repeated navigation
-Kahan: Home > My Pantry > Chef Chat > Restock > Profile.
+Kahan: Home > My Pantry > Recipes > Shopping > Profile; phir Home > Ask Chef.
 Test: Yeh cycle 20 martaba karein, phir recipe details aur edit forms khol kar band karein.
 Pass: App crash, black screen, increasing lag ya repeated network requests ka visible flood na ho; entered data theek rahe.
 
@@ -300,7 +300,7 @@ Har test ID ke saamne apna actual result likhein. Sab rows shuru mein NOT RUN ha
 | Scanners | S01 to S07 | NOT RUN | |
 | Recipes aur goals | R01 to R07 | NOT RUN | |
 | Cooking aur Chef Chat | C01 to C07 | NOT RUN | |
-| Restock aur screens | L01 to L07 | NOT RUN | |
+| Shopping aur screens | L01 to L07 | NOT RUN | |
 | Offline aur memory | M01 to M07 | NOT RUN | |
 
 ## Bug record ka format

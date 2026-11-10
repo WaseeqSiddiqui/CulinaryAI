@@ -29,8 +29,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('Chef Alex'), findsOneWidget);
+    expect(find.text('Hi, Alex'), findsOneWidget);
     expect(find.text('My Pantry'), findsOneWidget);
-    expect(find.text('Chef Chat'), findsOneWidget);
+    expect(find.text('Recipes'), findsOneWidget);
   });
 }
