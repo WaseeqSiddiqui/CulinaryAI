@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:culinary_ai/models/pantry_item_model.dart';
 import 'package:culinary_ai/models/shopping_models.dart';
 import 'package:culinary_ai/providers/shopping_provider.dart';
@@ -8,6 +10,8 @@ class _FakeShoppingService extends ShoppingService {
   List<ShoppingListItem> storedItems = [];
   Set<String> suppressedIds = {};
   final List<ShoppingOrder> orders = [];
+  Completer<void>? createGate;
+  bool failCreate = false;
 
   @override
   Future<List<ShoppingListItem>> loadList(String householdId) async =>
@@ -34,7 +38,16 @@ class _FakeShoppingService extends ShoppingService {
   }
 
   @override
-  Future<void> createOrder(ShoppingOrder order) async => orders.add(order);
+  Future<void> createOrder(ShoppingOrder order) async {
+    if (createGate != null) await createGate!.future;
+    if (failCreate) throw StateError('disk full');
+    final index = orders.indexWhere((entry) => entry.id == order.id);
+    if (index < 0) {
+      orders.add(order);
+    } else {
+      orders[index] = order;
+    }
+  }
 }
 
 PantryItemModel _pantryItem({
@@ -112,4 +125,160 @@ void main() {
       expect(service.suppressedIds, isNot(contains('milk')));
     },
   );
+
+  test('partial store order retains skipped rows and suppresses only purchased low stock', () async {
+    final service = _FakeShoppingService();
+    final provider = ShoppingProvider(service: service);
+    final pantry = [
+      _pantryItem(id: 'milk', quantity: 0.5),
+      _pantryItem(id: 'eggs', quantity: 0),
+    ];
+    provider.bindHousehold('home', pantry);
+    await _settleProvider();
+    final snapshot = provider.items;
+    final order = await provider.recordStoreOrder(
+      storeName: 'PandaMart',
+      total: 675,
+      purchasedItemIds: {'milk'},
+      purchasedItems: snapshot,
+      orderId: 'same-order',
+      expectedHouseholdId: 'home',
+    );
+    expect(order?.items.single.id, 'milk');
+    expect(order?.total, 675);
+    expect(provider.items.single.id, 'eggs');
+    expect(service.suppressedIds, {'milk'});
+    provider.bindHousehold('home', pantry);
+    await _settleProvider();
+    expect(provider.items.single.id, 'eggs');
+    expect(pantry.first.quantity, 0.5);
+  });
+
+  test('repeated confirmation with one ID is idempotent even for retained shopping items', () async {
+    final service = _FakeShoppingService()
+      ..storedItems = const [
+        ShoppingListItem(
+          id: 'milk',
+          name: 'Milk',
+          quantity: 2,
+          unit: 'L',
+          keepAfterOrder: true,
+        ),
+      ];
+    final provider = ShoppingProvider(service: service)
+      ..bindHousehold('home', []);
+    await _settleProvider();
+    final first = provider.recordStoreOrder(
+      storeName: 'PandaMart',
+      total: 675,
+      purchasedItemIds: {'milk'},
+      orderId: 'same-order',
+    );
+    final second = provider.recordStoreOrder(
+      storeName: 'PandaMart',
+      total: 675,
+      purchasedItemIds: {'milk'},
+      orderId: 'same-order',
+    );
+    expect(identical(first, second), isTrue);
+    await Future.wait([first, second]);
+    expect(service.orders, hasLength(1));
+    expect(provider.items, hasLength(1));
+  });
+
+  test(
+    'a failed order save keeps the list and permits retry with the same ID',
+    () async {
+      final service = _FakeShoppingService()..failCreate = true;
+      final provider = ShoppingProvider(service: service)
+        ..bindHousehold('home', [_pantryItem(id: 'milk', quantity: 0)]);
+      await _settleProvider();
+      Future<ShoppingOrder?> record() => provider.recordStoreOrder(
+        storeName: 'PandaMart',
+        total: 675,
+        purchasedItemIds: {'milk'},
+        orderId: 'retry-order',
+      );
+      await expectLater(record(), throwsStateError);
+      expect(provider.items, hasLength(1));
+      service.failCreate = false;
+      expect((await record())?.id, 'retry-order');
+      expect(provider.items, isEmpty);
+      expect(service.orders, hasLength(1));
+    },
+  );
+
+  test(
+    'preserves edits made to a shopping row while checkout is open',
+    () async {
+      final service = _FakeShoppingService();
+      final provider = ShoppingProvider(service: service)
+        ..bindHousehold('home', [_pantryItem(id: 'milk', quantity: 0)]);
+      await _settleProvider();
+      final snapshot = provider.items;
+      await provider.setQuantity('milk', 5);
+      final order = await provider.recordStoreOrder(
+        storeName: 'PandaMart',
+        total: 675,
+        purchasedItemIds: {'milk'},
+        purchasedItems: snapshot,
+      );
+      expect(order?.items.single.quantity, 2);
+      expect(provider.items.single.quantity, 5);
+    },
+  );
+
+  test(
+    'rejects a checkout belonging to another household or an invalid total',
+    () async {
+      final service = _FakeShoppingService();
+      final provider = ShoppingProvider(service: service)
+        ..bindHousehold('home', [_pantryItem(id: 'milk', quantity: 0)]);
+      await _settleProvider();
+      expect(
+        await provider.recordStoreOrder(
+          storeName: 'PandaMart',
+          total: 675,
+          purchasedItemIds: {'milk'},
+          expectedHouseholdId: 'other',
+        ),
+        isNull,
+      );
+      for (final total in [0.0, -1.0, double.nan, double.infinity]) {
+        expect(
+          await provider.recordStoreOrder(
+            storeName: 'PandaMart',
+            total: total,
+            purchasedItemIds: {'milk'},
+          ),
+          isNull,
+        );
+      }
+      expect(service.orders, isEmpty);
+      expect(provider.items, hasLength(1));
+    },
+  );
+
+  test('household switch during order saving does not remove the new household list', () async {
+    final gate = Completer<void>();
+    final service = _FakeShoppingService()..createGate = gate;
+    final provider = ShoppingProvider(service: service)
+      ..bindHousehold('home', [_pantryItem(id: 'milk', quantity: 0)]);
+    await _settleProvider();
+    final write = provider.recordStoreOrder(
+      storeName: 'PandaMart',
+      total: 675,
+      purchasedItemIds: {'milk'},
+      expectedHouseholdId: 'home',
+    );
+    service.storedItems = const [
+      ShoppingListItem(id: 'other', name: 'Bread', quantity: 1, unit: 'pcs'),
+    ];
+    provider.bindHousehold('other-home', []);
+    await _settleProvider();
+    gate.complete();
+    await write;
+    expect(provider.items.single.id, 'other');
+    expect(service.orders.single.householdId, 'home');
+  });
 }

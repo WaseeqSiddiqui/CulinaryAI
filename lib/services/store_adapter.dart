@@ -16,5 +16,10 @@ abstract class StoreAdapter {
     int qty,
   );
   Future<List<CartLine>> readCart(InAppWebViewController controller);
-  Future<CheckoutResult> placeOrder(InAppWebViewController controller);
+  Future<CheckoutResult> placeOrder(
+    InAppWebViewController controller, {
+    required List<CartLine> expectedCart,
+    required CheckoutApproval approve,
+    Future<void> Function(CheckoutSummary summary)? beforeSubmit,
+  });
 }

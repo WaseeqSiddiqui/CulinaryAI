@@ -5,8 +5,8 @@ recipe discovery, guided cooking, household sharing, and smart restocking.
 
 ## Run the integrated app
 
-Week 2 connects Chef Chat to the FastAPI verified-recipe planner. Start both
-services from separate terminals:
+Start the current backend and app from separate terminals to use the complete
+local feature set, including cooking photo checks:
 
 ```powershell
 cd backend
@@ -15,6 +15,12 @@ cd backend
 
 ```powershell
 flutter run --dart-define=CULINARY_API_BASE_URL=http://10.0.2.2:8000
+```
+
+For Chrome on the same computer:
+
+```powershell
+flutter run -d chrome --dart-define=CULINARY_API_BASE_URL=http://127.0.0.1:8000
 ```
 
 `10.0.2.2` reaches the host machine from the Android emulator. For a physical
@@ -45,7 +51,12 @@ Suggested demo flow:
 
 ## Project documentation
 
+- [Roman Urdu manual testing guide](docs/MANUAL_TESTING_GUIDE.md)
 - [Detailed progress and future roadmap](docs/CulinaryAI_Project_Progress_and_Roadmap.docx)
+- [PandaMart purchase flow and validation](docs/PURCHASE_AUTOMATION.md)
+- [Interface design and visual verification](docs/UI_DESIGN.md)
+- [Release build and service readiness](docs/RELEASE_READINESS.md)
+- [Live pantry-based recipe discovery](docs/LIVE_RECIPE_DISCOVERY.md)
 
 ## Verification
 

@@ -40,6 +40,7 @@ class ShoppingOrder {
     required this.createdAt,
     this.storeName,
     this.total,
+    this.storeOrderReference,
   });
 
   final String id;
@@ -49,6 +50,7 @@ class ShoppingOrder {
   final DateTime createdAt;
   final String? storeName;
   final double? total;
+  final String? storeOrderReference;
 
   Map<String, dynamic> toMap() => {
     'id': id,
@@ -58,17 +60,22 @@ class ShoppingOrder {
     'createdAt': createdAt.toIso8601String(),
     'storeName': storeName,
     'total': total,
+    'storeOrderReference': storeOrderReference,
   };
 
   factory ShoppingOrder.fromMap(Map<String, dynamic> map) => ShoppingOrder(
     id: map['id'] as String,
     householdId: map['householdId'] as String,
     items: (map['items'] as List<dynamic>)
-        .map((item) => ShoppingListItem.fromMap(Map<String, dynamic>.from(item as Map)))
+        .map(
+          (item) =>
+              ShoppingListItem.fromMap(Map<String, dynamic>.from(item as Map)),
+        )
         .toList(),
     status: map['status'] as String,
     createdAt: DateTime.parse(map['createdAt'] as String),
     storeName: map['storeName'] as String?,
     total: (map['total'] as num?)?.toDouble(),
+    storeOrderReference: map['storeOrderReference'] as String?,
   );
 }

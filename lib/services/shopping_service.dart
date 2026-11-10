@@ -45,10 +45,11 @@ class ShoppingService {
     List<ShoppingListItem> items,
   ) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
+    final saved = await prefs.setString(
       _listKey(householdId),
       jsonEncode(items.map((item) => item.toMap()).toList()),
     );
+    if (!saved) throw StateError('The shopping list could not be saved.');
   }
 
   Future<Set<String>> loadSuppressedPantryIds(String householdId) async {
@@ -63,7 +64,12 @@ class ShoppingService {
   ) async {
     final prefs = await SharedPreferences.getInstance();
     final sortedIds = ids.toList()..sort();
-    await prefs.setStringList(_suppressedPantryKey(householdId), sortedIds);
+    if (!await prefs.setStringList(
+      _suppressedPantryKey(householdId),
+      sortedIds,
+    )) {
+      throw StateError('Pending restock items could not be saved.');
+    }
   }
 
   Future<void> createOrder(ShoppingOrder order) async {
@@ -73,8 +79,18 @@ class ShoppingService {
     final orders = existing == null
         ? <dynamic>[]
         : jsonDecode(existing) as List<dynamic>;
-    orders.add(order.toMap());
-    await prefs.setString(key, jsonEncode(orders));
+    final index = orders.indexWhere(
+      (entry) => entry is Map && entry['id'] == order.id,
+    );
+    if (index < 0) {
+      orders.add(order.toMap());
+    }
+    final savedOrder = index < 0
+        ? order.toMap()
+        : Map<String, dynamic>.from(orders[index] as Map);
+    if (!await prefs.setString(key, jsonEncode(orders))) {
+      throw StateError('The order could not be saved on this device.');
+    }
 
     if (_firestore != null) {
       try {
@@ -83,12 +99,26 @@ class ShoppingService {
             .doc(order.householdId)
             .collection('orders')
             .doc(order.id)
-            .set(order.toMap());
+            .set(savedOrder);
       } on FirebaseException catch (error) {
         if (kDebugMode) {
           debugPrint('Order retained locally: ${error.code}');
         }
       }
     }
+  }
+
+  Future<List<ShoppingOrder>> loadOrders(String householdId) async {
+    final encoded = (await SharedPreferences.getInstance()).getString(
+      _ordersKey(householdId),
+    );
+    if (encoded == null) return [];
+    return (jsonDecode(encoded) as List<dynamic>)
+        .map(
+          (entry) =>
+              ShoppingOrder.fromMap(Map<String, dynamic>.from(entry as Map)),
+        )
+        .toList()
+      ..sort((left, right) => right.createdAt.compareTo(left.createdAt));
   }
 }

@@ -5,48 +5,61 @@ CartComparison compareCart(
   List<CartLine> actual, {
   List<CartLine> baseline = const [],
 }) {
-  final usedActual = <int>{};
-  final baselineActual = <int>{};
   final matched = <CartLine>[];
   final missing = <String>[];
   final quantityMismatches = <CartQuantityMismatch>[];
-
-  for (final baselineLine in baseline) {
-    final index = _bestLineIndex(
-      baselineLine,
-      actual,
-      excluded: baselineActual,
-    );
-    if (index >= 0) baselineActual.add(index);
+  final expected = <CartLine>[];
+  final labels = <String>[];
+  void accumulate(CartLine line, String label) {
+    final index = _bestLineIndex(line, expected);
+    if (index < 0) {
+      expected.add(line);
+      labels.add(label);
+    } else {
+      final previous = expected[index];
+      expected[index] = CartLine(
+        name: previous.name,
+        quantity: previous.quantity + line.quantity,
+        price: line.price,
+        storeId: previous.storeId ?? line.storeId,
+      );
+    }
   }
 
+  for (final line in baseline) {
+    accumulate(line, line.name);
+  }
   for (final item in intended.where((item) => item.status == AddStatus.added)) {
-    final wantedLine = CartLine(
-      name: item.productName ?? item.wantedName,
-      quantity: item.unitsAdded ?? 1,
-      price: item.unitPrice ?? 0,
+    accumulate(
+      CartLine(
+        name: item.productName ?? item.wantedName,
+        quantity: item.unitsAdded ?? 1,
+        price: item.unitPrice ?? 0,
+        storeId: item.productId,
+      ),
+      item.wantedName,
     );
+  }
+  final usedActual = <int>{};
+  for (var index = 0; index < expected.length; index++) {
+    final wantedLine = expected[index];
     final actualIndex = _bestLineIndex(
       wantedLine,
       actual,
       excluded: usedActual,
     );
     if (actualIndex < 0) {
-      missing.add(item.wantedName);
+      missing.add(labels[index]);
       continue;
     }
 
     usedActual.add(actualIndex);
     final line = actual[actualIndex];
-    final baselineIndex = _bestLineIndex(wantedLine, baseline);
-    final baselineQuantity = baselineIndex < 0
-        ? 0
-        : baseline[baselineIndex].quantity;
-    final expectedQuantity = baselineQuantity + (item.unitsAdded ?? 1);
+    final expectedQuantity = wantedLine.quantity;
     if (line.quantity != expectedQuantity) {
       quantityMismatches.add(
         CartQuantityMismatch(
-          name: item.wantedName,
+          name: labels[index],
           expected: expectedQuantity,
           actual: line.quantity,
         ),
@@ -58,8 +71,7 @@ CartComparison compareCart(
 
   final unexpected = <CartLine>[
     for (var index = 0; index < actual.length; index++)
-      if (!usedActual.contains(index) && !baselineActual.contains(index))
-        actual[index],
+      if (!usedActual.contains(index)) actual[index],
   ];
 
   return CartComparison(
@@ -84,33 +96,14 @@ int _bestLineIndex(
     if (byId != null) return byId;
   }
 
-  var bestIndex = -1;
-  var bestScore = 0.0;
   for (var index = 0; index < candidates.length; index++) {
     if (excluded.contains(index)) continue;
-    final score = _nameScore(wanted.name, candidates[index].name);
-    if (score > bestScore) {
-      bestScore = score;
-      bestIndex = index;
+    if (_normalizedName(wanted.name) == _normalizedName(candidates[index].name)) {
+      return index;
     }
   }
-  return bestScore >= 0.72 ? bestIndex : -1;
+  return -1;
 }
 
-double _nameScore(String left, String right) {
-  final leftTokens = _tokens(left);
-  final rightTokens = _tokens(right);
-  if (leftTokens.isEmpty || rightTokens.isEmpty) return 0;
-  if (leftTokens.join(' ') == rightTokens.join(' ')) return 1;
-  final common = leftTokens.intersection(rightTokens).length;
-  if (common == 0) return 0;
-  if (leftTokens.length == 1 || rightTokens.length == 1) return 0;
-  return (2 * common) / (leftTokens.length + rightTokens.length);
-}
-
-Set<String> _tokens(String value) =>
-    RegExp(r'[a-z0-9]+')
-        .allMatches(value.toLowerCase())
-        .map((match) => match.group(0)!)
-        .where((token) => token.isNotEmpty)
-        .toSet();
+String _normalizedName(String value) =>
+    value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');

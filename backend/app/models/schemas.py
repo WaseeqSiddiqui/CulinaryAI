@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -12,13 +14,17 @@ from pydantic import (
 
 class PantryItemInput(BaseModel):
     name: str = Field(min_length=1, max_length=120)
-    quantity: float = Field(default=1, ge=0)
+    quantity: float = Field(default=1, ge=0, allow_inf_nan=False)
     unit: str = Field(default="pcs", min_length=1, max_length=24)
+    expiry_date: date | None = None
 
     @field_validator("name", "unit")
     @classmethod
     def clean_text(cls, value: str) -> str:
-        return value.strip()
+        value = value.strip()
+        if not value:
+            raise ValueError("must not be blank")
+        return value
 
 
 class Ingredient(BaseModel):
@@ -31,6 +37,7 @@ class CookingStep(BaseModel):
     step_number: int = Field(ge=1)
     instruction: str
     timer_seconds: int = Field(default=0, ge=0)
+    ingredients_required: list[Ingredient] = Field(default_factory=list)
 
 
 class GeneratePlanRequest(BaseModel):
@@ -188,4 +195,3 @@ class ChefChatRequest(BaseModel):
 
 class ChefChatResponse(BaseModel):
     reply: str
-

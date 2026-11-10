@@ -11,8 +11,8 @@ def test_plan_prioritizes_recipes_that_match_the_pantry() -> None:
     request = GeneratePlanRequest(
         pantry_items=[
             PantryItemInput(name="chicken breast", quantity=500, unit="g"),
-            PantryItemInput(name="basmati rice", quantity=250, unit="g"),
-            PantryItemInput(name="garlic cloves", quantity=3, unit="pcs"),
+            PantryItemInput(name="basmati rice", quantity=300, unit="g"),
+            PantryItemInput(name="garlic cloves", quantity=4, unit="pcs"),
             PantryItemInput(name="olive oil", quantity=2, unit="tbsp"),
         ],
         meal_count=1,
@@ -64,6 +64,28 @@ def test_instruction_generator_scales_ingredients() -> None:
     assert chicken.quantity == 1000
     assert response.steps[0].step_number == 1
     assert any(step.timer_seconds > 0 for step in response.steps)
+    assert any(step.ingredients_required for step in response.steps)
+    assert sum(
+        len(step.ingredients_required) for step in response.steps
+    ) == len(response.ingredients_required)
+
+
+def test_pantry_match_requires_enough_compatible_quantity() -> None:
+    request = GeneratePlanRequest(
+        pantry_items=[
+            PantryItemInput(name="chicken breast", quantity=100, unit="g"),
+            PantryItemInput(name="basmati rice", quantity=0.3, unit="kg"),
+        ],
+        servings=4,
+        meal_count=1,
+        question="chicken rice",
+    )
+
+    meal = build_planner().generate_plan(request).meals[0]
+
+    assert "Chicken Breast" in meal.missing_ingredients
+    assert "Basmati Rice" in meal.available_ingredients
+    assert meal.pantry_match_percent < 100
 
 
 def test_allergens_and_disliked_ingredients_are_excluded() -> None:

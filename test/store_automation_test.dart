@@ -111,6 +111,51 @@ void main() {
       expect(result.unexpected.single.name, 'Potato Chips');
       expect(result.isVerified, isFalse);
     });
+
+    test('does not confuse products with different pack sizes', () {
+      final result = compareCart(
+        const [intendedMilk],
+        const [CartLine(name: 'Fresh Milk 2L', quantity: 2, price: 500)],
+      );
+      expect(result.isVerified, isFalse);
+      expect(result.missing, ['Milk']);
+    });
+
+    test(
+      'adds quantities when two shopping rows resolve to the same product',
+      () {
+        final result = compareCart(
+          const [intendedMilk, intendedMilk],
+          const [CartLine(name: 'Fresh Milk 1L', quantity: 5, price: 300)],
+          baseline: const [
+            CartLine(name: 'Fresh Milk 1L', quantity: 1, price: 300),
+          ],
+        );
+        expect(result.isVerified, isTrue);
+        expect(result.matched.single.quantity, 5);
+      },
+    );
+
+    test('rejects changed or removed pre-existing cart items', () {
+      const baseline = [CartLine(name: 'Bananas 1kg', quantity: 1, price: 250)];
+      final changed = compareCart(
+        const [intendedMilk],
+        const [
+          CartLine(name: 'Fresh Milk 1L', quantity: 2, price: 300),
+          CartLine(name: 'Bananas 1kg', quantity: 2, price: 250),
+        ],
+        baseline: baseline,
+      );
+      expect(changed.isVerified, isFalse);
+      expect(changed.quantityMismatches.single.name, 'Bananas 1kg');
+      final removed = compareCart(
+        const [intendedMilk],
+        const [CartLine(name: 'Fresh Milk 1L', quantity: 2, price: 300)],
+        baseline: baseline,
+      );
+      expect(removed.isVerified, isFalse);
+      expect(removed.missing, contains('Bananas 1kg'));
+    });
   });
 
   group('automation failure guard', () {

@@ -10,6 +10,7 @@ from app.models.schemas import (
     Ingredient,
     InstructionResponse,
     MealPlanRecipe,
+    PantryItemInput,
 )
 
 from .recipe_repository import RecipeRetriever, RetrievedRecipe
@@ -36,20 +37,20 @@ class MealPlannerService:
                 candidate
                 for candidate in candidates
                 if any(
-                    self._has_ingredient(
-                        ingredient["name"], pantry_names
+                    self._ingredient_available(ingredient, request.pantry_items)
+                    for ingredient in self._scaled_ingredient_dicts(
+                        candidate.recipe, request.servings
                     )
-                    for ingredient in candidate.recipe["ingredients_required"]
                 )
             ]
         candidates.sort(
             key=lambda candidate: self._combined_score(
-                candidate, pantry_names, request
+                candidate, request.pantry_items, request
             ),
             reverse=True,
         )
         meals = [
-            self._to_plan_recipe(candidate, pantry_names, request.servings)
+            self._to_plan_recipe(candidate, request.pantry_items, request.servings)
             for candidate in candidates[: request.meal_count]
         ]
         return GeneratePlanResponse(
@@ -70,23 +71,22 @@ class MealPlannerService:
             recipe_name=recipe["name"],
             servings=servings,
             ingredients_required=self._scaled_ingredients(recipe, servings),
-            steps=[CookingStep(**step) for step in recipe["steps"]],
+            steps=self._steps_with_ingredients(recipe, servings),
         )
 
     def _to_plan_recipe(
         self,
         candidate: RetrievedRecipe,
-        pantry_names: list[str],
+        pantry_items: list[PantryItemInput],
         servings: int,
     ) -> MealPlanRecipe:
         recipe = candidate.recipe
-        ingredient_names = [
-            ingredient["name"] for ingredient in recipe["ingredients_required"]
-        ]
+        scaled = self._scaled_ingredient_dicts(recipe, servings)
+        ingredient_names = [ingredient["name"] for ingredient in scaled]
         available = [
-            ingredient
-            for ingredient in ingredient_names
-            if self._has_ingredient(ingredient, pantry_names)
+            ingredient["name"]
+            for ingredient in scaled
+            if self._ingredient_available(ingredient, pantry_items)
         ]
         missing = [
             ingredient for ingredient in ingredient_names if ingredient not in available
@@ -103,7 +103,7 @@ class MealPlannerService:
             ingredients_required=self._scaled_ingredients(recipe, servings),
             available_ingredients=available,
             missing_ingredients=missing,
-            steps=[CookingStep(**step) for step in recipe["steps"]],
+            steps=self._steps_with_ingredients(recipe, servings),
             source=recipe["source"],
             calories_per_serving=int(recipe.get("calories_per_serving", 0)),
         )
@@ -111,14 +111,17 @@ class MealPlannerService:
     def _combined_score(
         self,
         candidate: RetrievedRecipe,
-        pantry_names: list[str],
+        pantry_items: list[PantryItemInput],
         request: GeneratePlanRequest,
     ) -> float:
         ingredients = candidate.recipe["ingredients_required"]
+        scaled = self._scaled_ingredient_dicts(
+            candidate.recipe, request.servings
+        )
         pantry_match = sum(
-            self._has_ingredient(ingredient["name"], pantry_names)
-            for ingredient in ingredients
-        ) / len(ingredients)
+            self._ingredient_available(ingredient, pantry_items)
+            for ingredient in scaled
+        ) / len(scaled)
         normalized_retrieval = max(0.0, candidate.score)
         target = self._calorie_target(request)
         recipe_calories = int(candidate.recipe.get("calories_per_serving", 0))
@@ -166,6 +169,104 @@ class MealPlannerService:
         required_tokens = cls._normalize(required)
         return any(required_tokens & cls._normalize(name) for name in pantry_names)
 
+    _UNIT_INFO = {
+        "g": ("mass", 1.0),
+        "kg": ("mass", 1000.0),
+        "ml": ("volume", 1.0),
+        "l": ("volume", 1000.0),
+        "tsp": ("volume", 5.0),
+        "tbsp": ("volume", 15.0),
+        "cup": ("volume", 240.0),
+        "pcs": ("count", 1.0),
+        "dozen": ("count", 12.0),
+    }
+    _DENSITIES = {
+        "milk": 1.03,
+        "olive oil": 0.91,
+        "cooking oil": 0.92,
+        "oil": 0.92,
+        "mustard sauce": 1.02,
+        "soy sauce": 1.16,
+        "vinegar": 1.01,
+        "heavy cream": 0.99,
+    }
+
+    @staticmethod
+    def _unit(value: str) -> str:
+        normalized = value.strip().lower()
+        aliases = {
+            "gram": "g", "grams": "g", "kilogram": "kg", "kilograms": "kg",
+            "milliliter": "ml", "milliliters": "ml", "millilitre": "ml",
+            "millilitres": "ml", "liter": "l", "liters": "l",
+            "litre": "l", "litres": "l", "teaspoon": "tsp",
+            "teaspoons": "tsp", "tablespoon": "tbsp", "tablespoons": "tbsp",
+            "cups": "cup", "pc": "pcs", "piece": "pcs", "pieces": "pcs",
+            "clove": "pcs", "cloves": "pcs",
+        }
+        return aliases.get(normalized, normalized)
+
+    @classmethod
+    def _density(cls, ingredient_name: str) -> float | None:
+        normalized = ingredient_name.strip().lower()
+        return next(
+            (
+                density
+                for name, density in cls._DENSITIES.items()
+                if name in normalized or normalized in name
+            ),
+            None,
+        )
+
+    @classmethod
+    def _convert(
+        cls, quantity: float, from_unit: str, to_unit: str, ingredient_name: str
+    ) -> float | None:
+        source = cls._UNIT_INFO.get(cls._unit(from_unit))
+        target = cls._UNIT_INFO.get(cls._unit(to_unit))
+        if source is None or target is None:
+            return None
+        source_dimension, source_factor = source
+        target_dimension, target_factor = target
+        base = quantity * source_factor
+        if source_dimension == target_dimension:
+            return base / target_factor
+        if {source_dimension, target_dimension} == {"mass", "volume"}:
+            density = cls._density(ingredient_name)
+            if density is None:
+                return None
+            converted = base / density if source_dimension == "mass" else base * density
+            return converted / target_factor
+        return None
+
+    @classmethod
+    def _ingredient_available(
+        cls, required: dict[str, Any], pantry_items: list[PantryItemInput]
+    ) -> bool:
+        available = 0.0
+        for item in pantry_items:
+            if not cls._has_ingredient(required["name"], [item.name]):
+                continue
+            converted = cls._convert(
+                item.quantity, item.unit, required["unit"], required["name"]
+            )
+            if converted is not None:
+                available += converted
+        return available + 1e-6 >= float(required["quantity"])
+
+    @staticmethod
+    def _scaled_ingredient_dicts(
+        recipe: dict[str, Any], servings: int
+    ) -> list[dict[str, Any]]:
+        factor = servings / recipe["servings"]
+        return [
+            {
+                "name": ingredient["name"],
+                "quantity": round(ingredient["quantity"] * factor, 2),
+                "unit": ingredient["unit"],
+            }
+            for ingredient in recipe["ingredients_required"]
+        ]
+
     @staticmethod
     def _scaled_ingredients(
         recipe: dict[str, Any], servings: int
@@ -178,4 +279,30 @@ class MealPlannerService:
                 unit=ingredient["unit"],
             )
             for ingredient in recipe["ingredients_required"]
+        ]
+
+    @classmethod
+    def _steps_with_ingredients(
+        cls, recipe: dict[str, Any], servings: int
+    ) -> list[CookingStep]:
+        raw_steps = recipe["steps"]
+        if not raw_steps:
+            return []
+        allocations: list[list[dict[str, Any]]] = [[] for _ in raw_steps]
+        for ingredient in cls._scaled_ingredient_dicts(recipe, servings):
+            required_tokens = cls._normalize(ingredient["name"])
+            target = 0
+            for index, step in enumerate(raw_steps):
+                if required_tokens & cls._normalize(step["instruction"]):
+                    target = index
+                    break
+            allocations[target].append(ingredient)
+        return [
+            CookingStep(
+                **step,
+                ingredients_required=[
+                    Ingredient(**ingredient) for ingredient in allocations[index]
+                ],
+            )
+            for index, step in enumerate(raw_steps)
         ]

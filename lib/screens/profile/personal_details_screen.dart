@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../widgets/app_ui.dart';
 import '../../core/utils/auth_validators.dart';
 import '../../providers/auth_provider.dart';
 
@@ -95,140 +96,154 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.currentUser!;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.bgDark : AppTheme.bgLight,
-      appBar: AppBar(title: const Text('Personal Details')),
-      body: Form(
-        key: _formKey,
-        autovalidateMode: AutovalidateMode.onUserInteraction,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 36),
-          children: [
-            Text(
-              'Keep your profile up to date',
-              style: Theme.of(context).textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'These details personalize your CulinaryAI experience and appear on your profile.',
-              style: TextStyle(
-                color: isDark
-                    ? AppTheme.textDarkSecondary
-                    : AppTheme.textLightSecondary,
-                height: 1.45,
+      appBar: AppBar(title: const Text('Personal details')),
+      body: AppPageBody(
+        maxWidth: 760,
+        child: Form(
+          key: _formKey,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            children: [
+              const PageIntro(
+                eyebrow: 'A LITTLE ABOUT YOU',
+                title: 'Your kitchen, your story.',
+                subtitle: 'Keep your details up to date and make CulinaryAI feel more like you.',
               ),
-            ),
-            const SizedBox(height: 22),
-            TextFormField(
-              controller: _nameController,
-              textCapitalization: TextCapitalization.words,
-              textInputAction: TextInputAction.next,
-              autofillHints: const [AutofillHints.name],
-              decoration: const InputDecoration(
-                labelText: 'Full name',
-                prefixIcon: Icon(Icons.person_outline),
+              const SizedBox(height: 26),
+              FormSection(
+                title: 'The essentials',
+                children: [
+                  TextFormField(
+                    controller: _nameController,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.name],
+                    validator: AuthValidators.name,
+                    decoration: const InputDecoration(
+                      labelText: 'Full name',
+                      prefixIcon: Icon(Icons.person_outline_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    initialValue: user.email,
+                    readOnly: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Email address',
+                      prefixIcon: Icon(Icons.mail_outline_rounded),
+                      helperText: 'Your sign-in email stays the same.',
+                    ),
+                  ),
+                ],
               ),
-              validator: AuthValidators.name,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              initialValue: user.email,
-              readOnly: true,
-              decoration: const InputDecoration(
-                labelText: 'Email address',
-                prefixIcon: Icon(Icons.email_outlined),
-                helperText: 'Your sign-in email cannot be changed here.',
+              const SizedBox(height: 18),
+              FormSection(
+                title: 'Stay connected',
+                description: 'These details are optional.',
+                children: [
+                  TextFormField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.telephoneNumber],
+                    validator: AuthValidators.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Phone number',
+                      hintText: '+92 300 1234567',
+                      prefixIcon: Icon(Icons.phone_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _locationController,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.addressCity],
+                    maxLength: 80,
+                    decoration: const InputDecoration(
+                      labelText: 'City or location',
+                      prefixIcon: Icon(Icons.location_on_outlined),
+                      counterText: '',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: _pickDate,
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Date of birth',
+                        prefixIcon: Icon(Icons.cake_outlined),
+                        suffixIcon: Icon(Icons.calendar_month_outlined),
+                      ),
+                      child: Text(
+                        _dateOfBirth == null
+                            ? 'Select a date'
+                            : DateFormat('d MMMM yyyy').format(_dateOfBirth!),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              textInputAction: TextInputAction.next,
-              autofillHints: const [AutofillHints.telephoneNumber],
-              decoration: const InputDecoration(
-                labelText: 'Phone number (optional)',
-                prefixIcon: Icon(Icons.phone_outlined),
-                hintText: '+92 300 1234567',
+              const SizedBox(height: 18),
+              FormSection(
+                title: 'At home in the kitchen',
+                description: 'Tell us what you enjoy.',
+                children: [
+                  TextFormField(
+                    controller: _dietController,
+                    textCapitalization: TextCapitalization.sentences,
+                    textInputAction: TextInputAction.next,
+                    maxLength: 80,
+                    decoration: const InputDecoration(
+                      labelText: 'Food preference',
+                      hintText: 'e.g. Halal, vegetarian, high-protein',
+                      prefixIcon: Icon(Icons.restaurant_outlined),
+                      counterText: '',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _bioController,
+                    textCapitalization: TextCapitalization.sentences,
+                    minLines: 3,
+                    maxLines: 5,
+                    maxLength: 240,
+                    decoration: const InputDecoration(
+                      labelText: 'About you',
+                      alignLabelWithHint: true,
+                      hintText: 'A little about your cooking style…',
+                      prefixIcon: Icon(Icons.notes_rounded),
+                    ),
+                  ),
+                ],
               ),
-              validator: AuthValidators.phone,
-            ),
-            const SizedBox(height: 14),
-            InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: _pickDate,
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Date of birth (optional)',
-                  prefixIcon: Icon(Icons.cake_outlined),
-                  suffixIcon: Icon(Icons.calendar_month_outlined),
-                ),
-                child: Text(
-                  _dateOfBirth == null
-                      ? 'Select date'
-                      : DateFormat('d MMMM yyyy').format(_dateOfBirth!),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _locationController,
-              textCapitalization: TextCapitalization.words,
-              textInputAction: TextInputAction.next,
-              autofillHints: const [AutofillHints.addressCity],
-              maxLength: 80,
-              decoration: const InputDecoration(
-                labelText: 'City or location (optional)',
-                prefixIcon: Icon(Icons.location_on_outlined),
-                counterText: '',
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _dietController,
-              textCapitalization: TextCapitalization.sentences,
-              textInputAction: TextInputAction.next,
-              maxLength: 80,
-              decoration: const InputDecoration(
-                labelText: 'Food preference (optional)',
-                prefixIcon: Icon(Icons.restaurant_outlined),
-                hintText: 'e.g. Halal, vegetarian, high-protein',
-                counterText: '',
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _bioController,
-              textCapitalization: TextCapitalization.sentences,
-              minLines: 3,
-              maxLines: 5,
-              maxLength: 240,
-              decoration: const InputDecoration(
-                labelText: 'About you (optional)',
-                alignLabelWithHint: true,
-                prefixIcon: Icon(Icons.notes_rounded),
-                hintText: 'Tell us a little about your cooking style.',
-              ),
-            ),
-            const SizedBox(height: 22),
-            ElevatedButton.icon(
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: AppPageBody(
+          maxWidth: 760,
+          shrinkWrap: true,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+            child: FilledButton.icon(
               onPressed: auth.isProfileSaving ? null : _save,
               icon: auth.isProfileSaving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
+                  ? SizedBox.square(
+                      dimension: 18,
                       child: CircularProgressIndicator(
-                        strokeWidth: 2.3,
-                        color: Colors.white,
+                        strokeWidth: 2,
+                        color: Theme.of(context).colorScheme.onPrimary,
                       ),
                     )
-                  : const Icon(Icons.save_outlined),
-              label: Text(auth.isProfileSaving ? 'Saving...' : 'Save Details'),
+                  : const Icon(Icons.check_rounded),
+              label: Text(auth.isProfileSaving ? 'Saving…' : 'Save details'),
             ),
-          ],
+          ),
         ),
       ),
     );

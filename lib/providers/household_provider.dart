@@ -15,6 +15,15 @@ class HouseholdProvider extends ChangeNotifier {
   HouseholdModel? get household => _household;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  String? get userId => _userId;
+  bool get isOwner => _household?.ownerId == _userId;
+  String get currentRole {
+    final userId = _userId;
+    if (userId == null) return 'member';
+    return _household?.memberRoles[userId] ??
+        (_household?.ownerId == userId ? 'owner' : 'member');
+  }
+
   String? get pantryScopeId =>
       _userId == null ? null : (_household?.id ?? 'personal_$_userId');
 
@@ -56,6 +65,51 @@ class HouseholdProvider extends ChangeNotifier {
     final userId = _userId;
     if (userId == null) return false;
     return _run(() => _service.join(inviteCode: inviteCode, userId: userId));
+  }
+
+  Future<bool> rename(String name) async {
+    final household = _household;
+    final userId = _userId;
+    if (household == null || userId == null) return false;
+    return _run(
+      () => _service.rename(household: household, actorId: userId, name: name),
+    );
+  }
+
+  Future<bool> regenerateInvite() async {
+    final household = _household;
+    final userId = _userId;
+    if (household == null || userId == null) return false;
+    return _run(
+      () => _service.regenerateInvite(household: household, actorId: userId),
+    );
+  }
+
+  Future<bool> setMemberRole(String memberId, String role) async {
+    final household = _household;
+    final userId = _userId;
+    if (household == null || userId == null) return false;
+    return _run(
+      () => _service.setMemberRole(
+        household: household,
+        actorId: userId,
+        memberId: memberId,
+        role: role,
+      ),
+    );
+  }
+
+  Future<bool> removeMember(String memberId) async {
+    final household = _household;
+    final userId = _userId;
+    if (household == null || userId == null) return false;
+    return _run(
+      () => _service.removeMember(
+        household: household,
+        actorId: userId,
+        memberId: memberId,
+      ),
+    );
   }
 
   Future<bool> _run(Future<HouseholdModel> Function() action) async {

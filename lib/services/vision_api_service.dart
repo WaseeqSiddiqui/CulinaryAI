@@ -49,11 +49,15 @@ class VisionApiService {
     Uint8List inputBytes, {
     int maxDimension = 1600,
   }) async {
+    ui.ImmutableBuffer? buffer;
+    ui.ImageDescriptor? descriptor;
+    ui.Codec? codec;
+    ui.Image? image;
     try {
-      final codec = await ui.instantiateImageCodec(inputBytes);
-      final frame = await codec.getNextFrame();
-      final width = frame.image.width;
-      final height = frame.image.height;
+      buffer = await ui.ImmutableBuffer.fromUint8List(inputBytes);
+      descriptor = await ui.ImageDescriptor.encoded(buffer);
+      final width = descriptor.width;
+      final height = descriptor.height;
 
       // If already within dimensions, return original
       if (width <= maxDimension && height <= maxDimension) {
@@ -70,15 +74,13 @@ class VisionApiService {
         targetWidth = (width * (maxDimension / height)).round();
       }
 
-      final scaledCodec = await ui.instantiateImageCodec(
-        inputBytes,
+      codec = await descriptor.instantiateCodec(
         targetWidth: targetWidth,
         targetHeight: targetHeight,
       );
-      final scaledFrame = await scaledCodec.getNextFrame();
-      final byteData = await scaledFrame.image.toByteData(
-        format: ui.ImageByteFormat.png,
-      );
+      final frame = await codec.getNextFrame();
+      image = frame.image;
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return inputBytes;
       return byteData.buffer.asUint8List();
     } catch (e) {
@@ -86,8 +88,18 @@ class VisionApiService {
         debugPrint('Downscale failed, falling back to original bytes: $e');
       }
       return inputBytes;
+    } finally {
+      image?.dispose();
+      codec?.dispose();
+      descriptor?.dispose();
+      buffer?.dispose();
     }
   }
+
+  Future<http.Response> _sendImage(http.MultipartRequest request) => (() async {
+    final streamed = await _client.send(request);
+    return http.Response.fromStream(streamed);
+  })().timeout(timeout);
 
   /// Computes SHA-256 hash of image bytes for duplicate receipt detection
   static String hashBytes(Uint8List bytes) {
@@ -158,8 +170,7 @@ class VisionApiService {
     );
 
     try {
-      final streamedResponse = await _client.send(request).timeout(timeout);
-      final response = await http.Response.fromStream(streamedResponse);
+      final response = await _sendImage(request);
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
@@ -253,8 +264,7 @@ class VisionApiService {
     );
 
     try {
-      final streamedResponse = await _client.send(request).timeout(timeout);
-      final response = await http.Response.fromStream(streamedResponse);
+      final response = await _sendImage(request);
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);

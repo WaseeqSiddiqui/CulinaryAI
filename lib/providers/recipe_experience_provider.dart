@@ -194,13 +194,32 @@ class RecipeExperienceProvider extends ChangeNotifier {
 
   bool isFavorite(String recipeId) => _favoriteIds.contains(recipeId);
 
-  Future<void> recordCooked(RecipeRecommendationModel recipe) async {
+  Future<void> _historyWrite = Future<void>.value();
+
+  Future<void> _recordMeal(CookedMealEntry entry) {
+    final operation = _historyWrite.then((_) async {
+      final updated = [entry, ..._history].take(100).toList();
+      final prefs = await SharedPreferences.getInstance();
+      final saved = await prefs.setString(
+        _historyKey,
+        jsonEncode(updated.map((item) => item.toJson()).toList()),
+      );
+      if (!saved) throw StateError('Meal history could not be saved.');
+      _history
+        ..clear()
+        ..addAll(updated);
+      notifyListeners();
+    });
+    _historyWrite = operation.catchError((Object _) {});
+    return operation;
+  }
+
+  Future<void> recordCooked(RecipeRecommendationModel recipe) {
     final calculated = NutritionCalculatorService.calculate(
       ingredients: recipe.ingredientDetails,
       servings: recipe.servings,
     );
-    _history.insert(
-      0,
+    return _recordMeal(
       CookedMealEntry(
         recipeId: recipe.id,
         title: recipe.title,
@@ -208,33 +227,19 @@ class RecipeExperienceProvider extends ChangeNotifier {
         nutrition: calculated.perServing,
       ),
     );
-    if (_history.length > 100) _history.removeRange(100, _history.length);
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _historyKey,
-      jsonEncode(_history.map((entry) => entry.toJson()).toList()),
-    );
   }
 
   Future<void> recordNutrition({
     required String title,
     required NutritionFacts nutrition,
-  }) async {
-    _history.insert(
-      0,
+  }) {
+    return _recordMeal(
       CookedMealEntry(
         recipeId: 'meal_${DateTime.now().millisecondsSinceEpoch}',
         title: title,
         cookedAt: DateTime.now(),
         nutrition: nutrition,
       ),
-    );
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _historyKey,
-      jsonEncode(_history.map((entry) => entry.toJson()).toList()),
     );
   }
 
@@ -268,6 +273,19 @@ Map<String, dynamic> _recipeToJson(RecipeRecommendationModel recipe) => {
       )
       .toList(),
   'instructions': recipe.instructions,
+  'stepIngredients': recipe.explicitStepIngredients
+      .map(
+        (step) => step
+            .map(
+              (item) => {
+                'name': item.name,
+                'quantity': item.quantity,
+                'unit': item.unit,
+              },
+            )
+            .toList(),
+      )
+      .toList(),
 };
 
 RecipeRecommendationModel _recipeFromJson(Map<String, dynamic> json) =>
@@ -292,6 +310,19 @@ RecipeRecommendationModel _recipeFromJson(Map<String, dynamic> json) =>
             }).toList()
           : const [],
       instructions: _strings(json['instructions']),
+      explicitStepIngredients: json['stepIngredients'] is List
+          ? (json['stepIngredients'] as List).map((rawStep) {
+              if (rawStep is! List) return <RecipeIngredient>[];
+              return rawStep.whereType<Map>().map((item) {
+                final value = Map<String, dynamic>.from(item);
+                return RecipeIngredient(
+                  name: value['name']?.toString() ?? '',
+                  quantity: _double(value['quantity']),
+                  unit: value['unit']?.toString() ?? 'pcs',
+                );
+              }).toList();
+            }).toList()
+          : const [],
     );
 
 List<String> _strings(Object? value) => value is List

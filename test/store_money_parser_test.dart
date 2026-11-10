@@ -12,4 +12,17 @@ void main() {
     expect(parseStoreMoney('Unavailable'), isNull);
     expect(parseStoreMoney(null), isNull);
   });
+
+  test('rejects ambiguous, negative and malformed amounts', () {
+    for (final text in [
+      'Rs -500',
+      'Rs 100 Rs 200',
+      'Rs 1,23',
+      'Rs 500.999',
+      '20% off Rs 300',
+    ]) {
+      expect(parseStoreMoney(text), isNull, reason: text);
+    }
+    expect(parseStoreMoney('Rs.\u00a01,200.50'), 1200.50);
+  });
 }

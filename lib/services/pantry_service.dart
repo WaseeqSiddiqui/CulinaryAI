@@ -7,10 +7,31 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pantry_item_model.dart';
 import 'firebase_service.dart';
 
+class PantryStockDeduction {
+  final String itemId;
+  final double amount;
+  final String unit;
+
+  const PantryStockDeduction({
+    required this.itemId,
+    required this.amount,
+    required this.unit,
+  });
+}
+
+class PantryConcurrencyException implements Exception {
+  final String message;
+  const PantryConcurrencyException(this.message);
+  @override
+  String toString() => message;
+}
+
 class PantryService {
   final FirebaseFirestore? _firestore = FirebaseService.isInitialized
       ? FirebaseFirestore.instance
       : null;
+
+  bool get supportsCloudSync => _firestore != null;
 
   String _cacheKey(String householdId) => 'culinary_pantry_$householdId';
 
@@ -84,22 +105,25 @@ class PantryService {
 
   Future<void> recordLedgerEvent(
     String householdId,
-    Map<String, dynamic> event,
-  ) async {
+    Map<String, dynamic> event, {
+    bool syncRemote = true,
+  }) async {
     // 1. Save to local preferences
     final prefs = await SharedPreferences.getInstance();
     final cacheKey = 'culinary_ledger_$householdId';
     final existingJson = prefs.getString(cacheKey);
     final list = existingJson != null
-        ? (jsonDecode(existingJson) as List<dynamic>).cast<Map<String, dynamic>>()
+        ? (jsonDecode(existingJson) as List<dynamic>)
+              .cast<Map<String, dynamic>>()
         : <Map<String, dynamic>>[];
     list.add(event);
     await prefs.setString(cacheKey, jsonEncode(list));
 
     // 2. Save to Firestore if available
-    if (_firestore != null) {
+    if (_firestore != null && syncRemote) {
       try {
-        final eventId = event['id'] as String? ??
+        final eventId =
+            event['id'] as String? ??
             DateTime.now().millisecondsSinceEpoch.toString();
         await _firestore
             .collection('households')
@@ -112,6 +136,98 @@ class PantryService {
           debugPrint('Ledger event queued locally: ${error.code}');
         }
       }
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> loadLocalLedger(String householdId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = prefs.getString('culinary_ledger_$householdId');
+    if (encoded == null) return [];
+    try {
+      return (jsonDecode(encoded) as List<dynamic>)
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Applies all shared-pantry deductions in one Firestore transaction. The
+  /// transaction rereads current stock and rejects stale or negative updates.
+  Future<void> consumeAtomically({
+    required String householdId,
+    required List<PantryStockDeduction> deductions,
+    required Map<String, dynamic> ledgerEvent,
+  }) async {
+    if (deductions.isEmpty) return;
+    final firestore = _firestore;
+    if (firestore == null) return;
+    try {
+      await firestore.runTransaction((transaction) async {
+        final references = [
+          for (final deduction in deductions)
+            firestore
+                .collection('households')
+                .doc(householdId)
+                .collection('pantry')
+                .doc(deduction.itemId),
+        ];
+        final snapshots = <DocumentSnapshot<Map<String, dynamic>>>[];
+        for (final reference in references) {
+          snapshots.add(await transaction.get(reference));
+        }
+        final nextQuantities = <double>[];
+        final openedDates = <Object?>[];
+        for (var index = 0; index < deductions.length; index++) {
+          final deduction = deductions[index];
+          final snapshot = snapshots[index];
+          final data = snapshot.data();
+          if (!snapshot.exists || data == null) {
+            throw const PantryConcurrencyException(
+              'A pantry item was removed by another household member.',
+            );
+          }
+          final current = (data['quantity'] as num?)?.toDouble() ?? 0;
+          final currentUnit = data['unit']?.toString() ?? '';
+          if (currentUnit.toLowerCase() != deduction.unit.toLowerCase()) {
+            throw const PantryConcurrencyException(
+              'A pantry unit changed. Review the latest inventory and retry.',
+            );
+          }
+          if (deduction.amount < 0 || current + 0.000001 < deduction.amount) {
+            throw const PantryConcurrencyException(
+              'Stock changed while cooking. Review the available quantity.',
+            );
+          }
+          nextQuantities.add(current - deduction.amount);
+          openedDates.add(
+            data['opened_date'] ?? DateTime.now().toIso8601String(),
+          );
+        }
+        for (var index = 0; index < references.length; index++) {
+          transaction.update(references[index], {
+            'quantity': nextQuantities[index],
+            'remaining_quantity': nextQuantities[index],
+            'opened_date': openedDates[index],
+            'package_status': 'opened',
+            'updated_at': DateTime.now().toIso8601String(),
+          });
+        }
+        final eventId = ledgerEvent['id'] as String;
+        final ledgerReference = firestore
+            .collection('households')
+            .doc(householdId)
+            .collection('ledger')
+            .doc(eventId);
+        transaction.set(ledgerReference, ledgerEvent);
+      });
+    } on PantryConcurrencyException {
+      rethrow;
+    } on FirebaseException catch (error) {
+      throw PantryConcurrencyException(
+        'Could not safely update the shared pantry (${error.code}). Try again online.',
+      );
     }
   }
 }

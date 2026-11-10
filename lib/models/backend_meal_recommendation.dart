@@ -52,6 +52,19 @@ class BackendMealRecommendation {
             .map((step) => _string(step['instruction']))
             .where((instruction) => instruction.isNotEmpty)
             .toList(),
+        explicitStepIngredients: stepRecords
+            .map(
+              (step) => _mapList(step['ingredients_required'])
+                  .map(
+                    (ingredient) => RecipeIngredient(
+                      name: _string(ingredient['name']),
+                      quantity: _number(ingredient['quantity']),
+                      unit: _string(ingredient['unit'], fallback: 'pcs'),
+                    ),
+                  )
+                  .toList(),
+            )
+            .toList(),
       ),
       pantryMatchPercent: _integer(json['pantry_match_percent']),
       retrievalScore: _number(json['retrieval_score']),

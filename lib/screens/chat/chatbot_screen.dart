@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../widgets/app_ui.dart';
 import '../../core/utils/chef_name_formatter.dart';
-import '../../models/backend_meal_recommendation.dart';
-import '../../models/pantry_item_model.dart';
-import '../../models/recipe_recommendation_model.dart';
+import '../../models/recipe_discovery.dart';
+import '../../widgets/live_recipe_card.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/pantry_provider.dart';
 import '../../providers/recipe_experience_provider.dart';
 import '../../services/chef_chat_service.dart';
 import '../../services/meal_planning_api_service.dart';
-import '../cooking/guided_cooking_screen.dart';
 
 class ChatbotScreen extends StatefulWidget {
   final String? initialQuestion;
@@ -63,10 +63,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     final pantryItems = context
         .read<PantryProvider>()
         .allItems
-        .where(
-          (item) =>
-              item.quantity > 0 && item.expiryStatus != ExpiryStatus.expired,
-        )
+        .where((item) => item.quantity > 0)
         .toList();
     final preferences = context.read<RecipeExperienceProvider>().preferences;
     final dietaryPreference = context
@@ -84,40 +81,44 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
     var answer = '';
     String? serviceNotice;
-    var recommendations = const <BackendMealRecommendation>[];
+    var recommendations = const <DiscoveredRecipe>[];
+    String? quantitiesNote;
+    var serviceError = false;
 
     if (_isWeeklyPlanRequest(question)) {
       await Future<void>.delayed(const Duration(milliseconds: 180));
       answer = 'Weekly planning has its own clean screen. Open the menu and choose 7-day meal plan; it will use your pantry, people count, and calorie target.';
     } else if (ChefChatService.isMealPlanningQuestion(question)) {
       try {
-        final plan = await _mealPlanningApi.generatePlan(
+        final plan = await _mealPlanningApi.discoverRecipes(
           question: question,
           pantryItems: pantryItems,
-          servings: preferences.servings,
-          mealCount: 1,
-          dietaryPreferences:
-              dietaryPreference == null || dietaryPreference.isEmpty
-              ? preferences.dietaryNeeds
-              : [...preferences.dietaryNeeds, dietaryPreference],
-          maxCookTimeMinutes: preferences.maxCookMinutes,
+          resultCount: 5,
+          dietaryPreferences: [
+            ...preferences.dietaryNeeds,
+            if (dietaryPreference != null && dietaryPreference.isNotEmpty)
+              dietaryPreference,
+          ],
           avoidIngredients: [
             ...preferences.allergens,
             ...preferences.dislikedIngredients,
           ],
-          mealsPerDay: preferences.mealsPerDay,
-          targetCaloriesPerPersonPerDay: preferences.calorieTarget,
-          pantryFirst: true,
         );
-        recommendations = plan.meals;
-        answer = recommendations.isEmpty
-            ? 'The verified recipe service did not find a suitable meal. Try changing your dietary preference or adding more pantry items.'
-            : 'I checked your pantry first and found this recipe for ${preferences.servings} people. It targets about ${(preferences.calorieTarget / preferences.mealsPerDay).round()} kcal per person for this meal.';
-        serviceNotice =
-            'Live backend • ${plan.retrievalMethod} • ${plan.pantryItemCount} pantry items';
+        recommendations = plan.recipes;
+        answer =
+            '${DateFormat('EEEE, d MMM').format(plan.planningDate)}\n${plan.message}';
+        if (plan.excludedExpiredItems.isNotEmpty) {
+          answer +=
+              '\nExcluded for this date: ${plan.excludedExpiredItems.join(', ')}.';
+        }
+        quantitiesNote = recommendations.isEmpty ? null : plan.quantitiesNote;
+        serviceNotice = plan.pantryItemCount == 0
+            ? 'Inventory checked'
+            : 'Live recipe search ? ${plan.pantryItemCount} pantry items ? ${plan.checkedRecipeCount} recipes checked';
       } on MealPlanningApiException catch (error) {
-        answer = ChefChatService.answer(question, pantryItems);
-        serviceNotice = error.message;
+        answer = error.message;
+        serviceNotice = 'Live recipe search unavailable ? Try again';
+        serviceError = true;
       }
     } else {
       final result = await ChefChatService.askChefApi(question, pantryItems);
@@ -136,6 +137,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           isUser: false,
           serviceNotice: serviceNotice,
           recommendations: recommendations,
+          quantitiesNote: quantitiesNote,
+          serviceError: serviceError,
         ),
       );
       _isReplying = false;
@@ -149,13 +152,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         normalized.contains('7-day') ||
         normalized.contains('weekly plan') ||
         normalized.contains('week plan');
-  }
-
-  void _startCooking(RecipeRecommendationModel recipe) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => GuidedCookingScreen(recipe: recipe)),
-    );
   }
 
   void _scrollToBottom() {
@@ -209,10 +205,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                         if (index == _messages.length) {
                           return const _TypingBubble();
                         }
-                        return _MessageBubble(
-                          message: _messages[index],
-                          onCook: _startCooking,
-                        );
+                        return _MessageBubble(message: _messages[index]);
                       },
                     ),
             ),
@@ -249,10 +242,11 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                     child: TextField(
                       key: const Key('chefChatInput'),
                       controller: _controller,
+                      onChanged: (_) => setState(() {}),
                       maxLines: 1,
                       textInputAction: TextInputAction.send,
                       onSubmitted: _isReplying ? null : _send,
-                      style: const TextStyle(fontSize: 13),
+                      style: const TextStyle(fontSize: 14),
                       decoration: InputDecoration(
                         hintText: 'Ask about recipes or your pantry…',
                         hintStyle: TextStyle(color: muted),
@@ -275,7 +269,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                   IconButton.filled(
                     key: const Key('chefChatSend'),
                     tooltip: 'Send',
-                    onPressed: _isReplying ? null : _send,
+                    onPressed: _isReplying || _controller.text.trim().isEmpty
+                        ? null
+                        : _send,
+                    style: IconButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    ),
                     constraints: const BoxConstraints.tightFor(
                       width: 40,
                       height: 40,
@@ -306,63 +305,98 @@ class _EmptyChat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final secondary = isDark
-        ? AppTheme.textDarkSecondary
-        : AppTheme.textLightSecondary;
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
-      children: [
-        Align(
-          child: Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: AppTheme.primaryFlame.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Icon(
-              Icons.soup_kitchen_outlined,
-              size: 32,
-              color: AppTheme.primaryFlame,
+    final colors = Theme.of(context).colorScheme;
+    const icons = [
+      Icons.restaurant_outlined,
+      Icons.shopping_basket_outlined,
+      Icons.kitchen_outlined,
+      Icons.menu_book_outlined,
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const BrandMark(showName: false),
+                const SizedBox(height: 26),
+                Text(
+                  'A little inspiration,\nChef $chefName?',
+                  style: Theme.of(context).textTheme.headlineLarge,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Good ideas start with your ingredients. Ask for a recipe, a plan, or a helping hand.',
+                  style: Theme.of(context).textTheme.bodyLarge
+                      ?.copyWith(color: colors.onSurfaceVariant),
+                ),
+                const SizedBox(height: 30),
+                Text(
+                  'LET’S MAKE SOMETHING GOOD',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    letterSpacing: 1.1,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                for (var index = 0; index < suggestions.length; index++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Material(
+                      color: colors.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        side: BorderSide(color: colors.outlineVariant),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () => onSuggestion(suggestions[index]),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 18,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                icons[index % icons.length],
+                                size: 20,
+                                color: colors.primary,
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Text(
+                                  suggestions[index],
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ),
+                              Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 17,
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
-        const SizedBox(height: 18),
-        Text(
-          'What can I help you cook, Chef $chefName?',
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Ask about your pantry, meal ideas, missing ingredients, cooking time, or step-by-step instructions.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, height: 1.5, color: secondary),
-        ),
-        const SizedBox(height: 28),
-        for (final suggestion in suggestions)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: OutlinedButton(
-              onPressed: () => onSuggestion(suggestion),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(suggestion),
-              ),
-            ),
-          ),
-      ],
+      ),
     );
   }
 }
 
 class _MessageBubble extends StatelessWidget {
   final _ChatMessage message;
-  final ValueChanged<RecipeRecommendationModel> onCook;
 
-  const _MessageBubble({required this.message, required this.onCook});
+  const _MessageBubble({required this.message});
 
   @override
   Widget build(BuildContext context) {
@@ -409,11 +443,11 @@ class _MessageBubble extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      message.recommendations.isEmpty
+                      message.serviceError
                           ? Icons.cloud_off_outlined
                           : Icons.cloud_done_outlined,
                       size: 13,
-                      color: message.recommendations.isEmpty
+                      color: message.serviceError
                           ? AppTheme.warmAmber
                           : AppTheme.freshHerb,
                     ),
@@ -433,104 +467,18 @@ class _MessageBubble extends StatelessWidget {
                 ),
               ),
             for (final recommendation in message.recommendations)
-              _BackendRecipeCard(
-                recommendation: recommendation,
-                isDark: isDark,
-                onCook: () => onCook(recommendation.recipe),
+              LiveRecipeCard(recipe: recommendation),
+            if (message.quantitiesNote != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+                child: Text(
+                  message.quantitiesNote!,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ),
             const SizedBox(height: 4),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _BackendRecipeCard extends StatelessWidget {
-  final BackendMealRecommendation recommendation;
-  final bool isDark;
-  final VoidCallback onCook;
-
-  const _BackendRecipeCard({
-    required this.recommendation,
-    required this.isDark,
-    required this.onCook,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final recipe = recommendation.recipe;
-    return Container(
-      width: 350,
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.surfaceDark : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.primaryFlame.withValues(alpha: 0.24),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  recipe.title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppTheme.freshHerb.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '${recommendation.pantryMatchPercent}% match',
-                  style: const TextStyle(
-                    color: AppTheme.freshHerb,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '${recipe.mealType} • ${recipe.cookTimeMinutes} min • ${recipe.servings} servings',
-            style: TextStyle(
-              fontSize: 11,
-              color: isDark
-                  ? AppTheme.textDarkSecondary
-                  : AppTheme.textLightSecondary,
-            ),
-          ),
-          if (recommendation.missingIngredients.isNotEmpty) ...[
-            const SizedBox(height: 7),
-            Text(
-              'Missing: ${recommendation.missingIngredients.join(', ')}',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11, color: AppTheme.warmAmber),
-            ),
-          ],
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: recipe.instructions.isEmpty ? null : onCook,
-              icon: const Icon(Icons.soup_kitchen_rounded, size: 17),
-              label: const Text('Cook this recipe'),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -557,12 +505,16 @@ class _ChatMessage {
   final String text;
   final bool isUser;
   final String? serviceNotice;
-  final List<BackendMealRecommendation> recommendations;
+  final List<DiscoveredRecipe> recommendations;
+  final String? quantitiesNote;
+  final bool serviceError;
 
   const _ChatMessage({
     required this.text,
     required this.isUser,
     this.serviceNotice,
     this.recommendations = const [],
+    this.quantitiesNote,
+    this.serviceError = false,
   });
 }

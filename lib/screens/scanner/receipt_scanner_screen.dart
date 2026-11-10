@@ -1,15 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../widgets/app_ui.dart';
+import '../../widgets/scan_ui.dart';
 import '../../models/receipt_vision_models.dart';
 import '../../providers/pantry_provider.dart';
-import '../../services/food_image_service.dart';
 import '../../services/household_alias_service.dart';
 import '../../services/vision_api_service.dart';
-
 
 class ReceiptScannerScreen extends StatefulWidget {
   const ReceiptScannerScreen({super.key});
@@ -31,6 +34,7 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
   bool _isDuplicateReceipt = false;
   String? _receiptKey;
   String? _scanError;
+  bool _pickingImage = false;
 
   late AnimationController _scanLineController;
   late AnimationController _pulseController;
@@ -43,11 +47,11 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
     _scanLineController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
+    );
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
+    );
 
     _scanLineAnim = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _scanLineController, curve: Curves.easeInOut),
@@ -66,14 +70,18 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
   }
 
   Future<void> _startScan(ImageSource source) async {
-    XFile? image;
+    if (_pickingImage) return;
+    _pickingImage = true;
+    late Uint8List bytes;
     try {
-      image = await _imagePicker.pickImage(
+      final image = await _imagePicker.pickImage(
         source: source,
         maxWidth: 1600,
         maxHeight: 1600,
         imageQuality: 85,
       );
+      if (image == null || !mounted) return;
+      bytes = await image.readAsBytes();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -82,9 +90,12 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
         ),
       );
       return;
+    } finally {
+      _pickingImage = false;
     }
-    if (image == null || !mounted) return;
-    final bytes = await image.readAsBytes();
+    if (!mounted) return;
+    _scanLineController.repeat(reverse: true);
+    _pulseController.repeat(reverse: true);
     setState(() {
       _scanState = _ScanState.scanning;
       _receiptImage = bytes;
@@ -93,6 +104,8 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
 
     await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted) return;
+    _scanLineController.stop();
+    _pulseController.stop();
     setState(() => _scanState = _ScanState.processing);
 
     try {
@@ -110,9 +123,13 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
       );
 
       // 3. Duplicate check using SHA-256 hash or metadata
-      final receiptKey = validatedResponse.imageHash ??
+      final receiptKey =
+          validatedResponse.imageHash ??
           '${validatedResponse.storeName ?? "store"}_${validatedResponse.date ?? "nodate"}_${validatedResponse.receiptTotal ?? 0}';
-      final isDuplicate = await VisionApiService.isDuplicate(householdId, receiptKey);
+      final isDuplicate = await VisionApiService.isDuplicate(
+        householdId,
+        receiptKey,
+      );
 
       if (!mounted) return;
 
@@ -143,7 +160,7 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _scanError = 'Failed to analyze receipt. Check your backend server and connection.';
+        _scanError = 'We could not read this receipt. Check your connection and try another photo.';
         _scanState = _ScanState.error;
       });
     }
@@ -165,12 +182,15 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
     final resp = _validatedResponse;
     if (resp == null) return;
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: const BoxConstraints(maxWidth: 760),
+      useSafeArea: true,
+      showDragHandle: false,
       isDismissible: false,
-      builder: (_) => _ReviewSheet(
+      builder: (_) => ReceiptReviewSheet(
         response: resp,
         items: _scannedItems,
         isDuplicate: _isDuplicateReceipt,
@@ -186,7 +206,9 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
           _resetScan();
         },
       ),
-    );
+    ).whenComplete(() {
+      if (mounted && _scanState == _ScanState.review) _resetScan();
+    });
   }
 
   Future<void> _confirmItems(List<ValidatedReceiptItem> confirmed) async {
@@ -320,75 +342,46 @@ class _ReceiptScannerScreenState extends State<ReceiptScannerScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      // Receipt scanner is intentionally a dark camera-first experience;
-      // dark mode uses the warm truffle obsidian, light mode uses a warm camera-dark.
-      backgroundColor: isDark ? AppTheme.bgDark : const Color(0xFF2A2420),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
-          'Receipt Scanner',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-        ),
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.white70,
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Scan a receipt'),
+      actions: [
+        if (_scanState == _ScanState.done)
+          TextButton.icon(
+            onPressed: _resetScan,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('New scan'),
           ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          if (_scanState == _ScanState.done)
-            TextButton.icon(
-              onPressed: _resetScan,
-              icon: const Icon(
-                Icons.refresh_rounded,
-                color: AppTheme.primaryEmerald,
-                size: 18,
-              ),
-              label: const Text(
-                'New Scan',
-                style: TextStyle(
-                  color: AppTheme.primaryEmerald,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-        ],
-      ),
-      body: _buildBody(),
-    );
-  }
+        const SizedBox(width: 12),
+      ],
+    ),
+    body: SafeArea(child: AppPageBody(child: _buildBody())),
+  );
 
   Widget _buildBody() {
     return switch (_scanState) {
       _ScanState.idle => _IdleView(
-          onCamera: () => _startScan(ImageSource.camera),
-          onGallery: () => _startScan(ImageSource.gallery),
-        ),
+        onCamera: () => _startScan(ImageSource.camera),
+        onGallery: () => _startScan(ImageSource.gallery),
+      ),
       _ScanState.scanning => _ScanningView(
-          scanLineAnim: _scanLineAnim,
-          pulseAnim: _pulseAnim,
-          imageBytes: _receiptImage,
-        ),
+        scanLineAnim: _scanLineAnim,
+        pulseAnim: _pulseAnim,
+        imageBytes: _receiptImage,
+      ),
       _ScanState.processing => const _ProcessingView(),
       _ScanState.review => const _ProcessingView(),
       _ScanState.error => _ScanErrorView(
-          message: _scanError ?? 'The receipt could not be read.',
-          onRetry: _resetScan,
-          onUseDemo: _loadDemoReceipt,
-        ),
+        message: _scanError ?? 'The receipt could not be read.',
+        onRetry: _resetScan,
+        onUseDemo: _loadDemoReceipt,
+      ),
       _ScanState.done => _DoneView(
-          itemCount: _scannedItems.where((i) => i.isSelected).length,
-          onNewScan: _resetScan,
-        ),
+        itemCount: _scannedItems.where((i) => i.isSelected).length,
+        onNewScan: _resetScan,
+      ),
     };
   }
-
 }
 
 enum _ScanState { idle, scanning, processing, review, error, done }
@@ -401,241 +394,16 @@ class _IdleView extends StatelessWidget {
   const _IdleView({required this.onCamera, required this.onGallery});
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Viewfinder container
-                Container(
-                  width: 290,
-                  height: 220,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: AppTheme.primaryEmerald,
-                      width: 2,
-                    ),
-                    color: Colors.white.withValues(alpha: 0.03),
-                  ),
-                  child: Stack(
-                    children: [
-                      ..._buildCorners(),
-                      Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.document_scanner_rounded,
-                              size: 48,
-                              color: Colors.white.withValues(alpha: 0.25),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Point camera at grocery receipt',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.6),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'AI-powered receipt scanning',
-                              style: TextStyle(
-                                color: AppTheme.primaryEmerald.withValues(alpha: 0.8),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 32),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.center,
-                  children: const [
-                    _InfoChip(
-                      icon: Icons.check_circle_outline_rounded,
-                      label: 'Auto Crop & Deskew',
-                    ),
-                    _InfoChip(
-                      icon: Icons.reviews_outlined,
-                      label: 'Mandatory Review',
-                    ),
-                    _InfoChip(
-                      icon: Icons.history_edu_rounded,
-                      label: 'Ledger Audit',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        // Bottom action buttons
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: SafeArea(
-            top: false,
-            minimum: const EdgeInsets.only(bottom: 24),
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onGallery,
-                  icon: const Icon(Icons.photo_library_rounded, size: 20),
-                  label: const Text('Gallery'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton.icon(
-                  onPressed: onCamera,
-                  icon: const Icon(Icons.camera_alt_rounded, size: 22),
-                  label: const Text(
-                    'Snap Receipt',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryEmerald,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 4,
-                  ),
-                ),
-              ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => ScanLanding(
+    title: 'A fresh start, one receipt at a time.',
+    description: 'Turn your grocery receipt into a tidy pantry. Review the items and quantities before saving.',
+    icon: Icons.receipt_long_outlined,
 
-  List<Widget> _buildCorners() {
-    const size = 18.0;
-    const thickness = 3.0;
-    const color = AppTheme.primaryEmerald;
-
-    return [
-      Positioned(
-        top: 10,
-        left: 10,
-        child: Container(
-          width: size,
-          height: size,
-          decoration: const BoxDecoration(
-            border: Border(
-              top: BorderSide(color: color, width: thickness),
-              left: BorderSide(color: color, width: thickness),
-            ),
-          ),
-        ),
-      ),
-      Positioned(
-        top: 10,
-        right: 10,
-        child: Container(
-          width: size,
-          height: size,
-          decoration: const BoxDecoration(
-            border: Border(
-              top: BorderSide(color: color, width: thickness),
-              right: BorderSide(color: color, width: thickness),
-            ),
-          ),
-        ),
-      ),
-      Positioned(
-        bottom: 10,
-        left: 10,
-        child: Container(
-          width: size,
-          height: size,
-          decoration: const BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: color, width: thickness),
-              left: BorderSide(color: color, width: thickness),
-            ),
-          ),
-        ),
-      ),
-      Positioned(
-        bottom: 10,
-        right: 10,
-        child: Container(
-          width: size,
-          height: size,
-          decoration: const BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: color, width: thickness),
-              right: BorderSide(color: color, width: thickness),
-            ),
-          ),
-        ),
-      ),
-    ];
-  }
+    onCamera: onCamera,
+    onGallery: onGallery,
+    tip: 'Lay the receipt flat in good light. Keep the shop name, item lines and total in the frame.',
+  );
 }
-
-class _InfoChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _InfoChip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: AppTheme.primaryEmerald),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Scanning View ────────────────────────────────────────────────────────────
 
 class _ScanningView extends StatelessWidget {
   final Animation<double> scanLineAnim;
@@ -653,18 +421,16 @@ class _ScanningView extends StatelessWidget {
     return Stack(
       children: [
         if (imageBytes != null)
-          Positioned.fill(
-            child: Image.memory(
-              imageBytes!,
-              fit: BoxFit.cover,
-            ),
-          ),
+          Positioned.fill(child: Image.memory(imageBytes!, fit: BoxFit.cover)),
         Container(color: Colors.black.withValues(alpha: 0.45)),
         Center(
           child: ScaleTransition(
             scale: pulseAnim,
             child: Container(
-              width: 290,
+              width: (MediaQuery.sizeOf(context).width - 48).clamp(
+                180.0,
+                320.0,
+              ),
               height: 420,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
@@ -683,7 +449,9 @@ class _ScanningView extends StatelessWidget {
                           color: AppTheme.primaryEmerald,
                           boxShadow: [
                             BoxShadow(
-                              color: AppTheme.primaryEmerald.withValues(alpha: 0.8),
+                              color: AppTheme.primaryEmerald.withValues(
+                                alpha: 0.8,
+                              ),
                               blurRadius: 12,
                               spreadRadius: 2,
                             ),
@@ -708,49 +476,12 @@ class _ProcessingView extends StatelessWidget {
   const _ProcessingView();
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppTheme.primaryEmerald.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: const Center(
-              child: CircularProgressIndicator(
-                color: AppTheme.primaryEmerald,
-                strokeWidth: 3,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Analyzing receipt...',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Reading line items & prices',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
-              fontSize: 13,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const ScanStatusView(
+    busy: true,
+    title: 'Reading your receipt.',
+    message: 'Finding the groceries, quantities and prices. You can check everything before adding it to your pantry.',
+  );
 }
-
-// ── Error View ───────────────────────────────────────────────────────────────
 
 class _ScanErrorView extends StatelessWidget {
   final String message;
@@ -764,87 +495,23 @@ class _ScanErrorView extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(
-                Icons.error_outline_rounded,
-                color: Colors.redAccent,
-                size: 38,
-              ),
-            ),
-            const SizedBox(height: 18),
-            const Text(
-              'Scan Failed',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.65),
-                fontSize: 12.5,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 22),
-            ElevatedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Try Again'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryEmerald,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 13,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-            TextButton.icon(
-              onPressed: onUseDemo,
-              icon: const Icon(
-                Icons.receipt_long_rounded,
-                size: 18,
-                color: AppTheme.warmSaffron,
-              ),
-              label: const Text(
-                'Test with Sample Demo Receipt',
-                style: TextStyle(
-                  color: AppTheme.warmSaffron,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
+  Widget build(BuildContext context) => ScanStatusView(
+    icon: Icons.document_scanner_outlined,
+    title: 'Let us try that again.',
+    message: message,
+    actions: [
+      FilledButton.icon(
+        onPressed: onRetry,
+        icon: const Icon(Icons.refresh_rounded),
+        label: const Text('Try another photo'),
       ),
-    );
-  }
+      TextButton(
+        onPressed: onUseDemo,
+        child: const Text('Explore a sample receipt'),
+      ),
+    ],
+  );
 }
-
-// ── Done View ────────────────────────────────────────────────────────────────
 
 class _DoneView extends StatelessWidget {
   final int itemCount;
@@ -853,105 +520,36 @@ class _DoneView extends StatelessWidget {
   const _DoneView({required this.itemCount, required this.onNewScan});
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryEmerald.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: const Icon(
-                Icons.check_circle_rounded,
-                color: AppTheme.primaryEmerald,
-                size: 44,
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Stock Ingested Successfully',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '$itemCount items added to pantry inventory & purchase ledger',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 28),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 12,
-              runSpacing: 10,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                  label: const Text('Back to Home'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white70,
-                    side: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.2),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: onNewScan,
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('Scan Another'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryEmerald,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 22,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+  Widget build(BuildContext context) => ScanStatusView(
+    icon: Icons.check_rounded,
+    title: 'Your pantry is up to date.',
+    message:
+        "$itemCount reviewed items were added to your pantry and purchase history.",
+    actions: [
+      FilledButton.icon(
+        onPressed: onNewScan,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Scan another receipt'),
       ),
-    );
-  }
+      OutlinedButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Back to your kitchen'),
+      ),
+    ],
+  );
 }
 
-// ── Review Sheet (Mandatory Review) ──────────────────────────────────────────
-
-class _ReviewSheet extends StatefulWidget {
+class ReceiptReviewSheet extends StatefulWidget {
   final ValidatedReceiptResponse response;
   final List<ValidatedReceiptItem> items;
   final bool isDuplicate;
   final Uint8List? receiptImage;
   final void Function(String rawText, String newName) onAliasCorrection;
-  final void Function(List<ValidatedReceiptItem>) onConfirm;
+  final FutureOr<void> Function(List<ValidatedReceiptItem>) onConfirm;
   final VoidCallback onRescan;
 
-  const _ReviewSheet({
+  const ReceiptReviewSheet({
+    super.key,
     required this.response,
     required this.items,
     required this.isDuplicate,
@@ -962,11 +560,13 @@ class _ReviewSheet extends StatefulWidget {
   });
 
   @override
-  State<_ReviewSheet> createState() => _ReviewSheetState();
+  State<ReceiptReviewSheet> createState() => _ReceiptReviewSheetState();
 }
 
-class _ReviewSheetState extends State<_ReviewSheet> {
+class _ReceiptReviewSheetState extends State<ReceiptReviewSheet> {
   late List<ValidatedReceiptItem> _items;
+  bool _saving = false;
+  bool _saved = false;
   final _zones = PantryProvider.zones;
   final _zoneIcons = {
     'Fridge': Icons.kitchen_rounded,
@@ -987,11 +587,34 @@ class _ReviewSheetState extends State<_ReviewSheet> {
       .where((i) => i.isSelected && i.linePrice != null)
       .fold(0.0, (sum, i) => sum + i.linePrice!);
 
+  Future<void> _save() async {
+    if (_saving || _saved || _selectedCount == 0) return;
+    setState(() => _saving = true);
+    try {
+      await widget.onConfirm(_items);
+      if (mounted) setState(() => _saved = true);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Changes could not be saved. Please try again.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Future<bool> _editItem(int index) async {
     final item = _items[index];
     final originalRaw = item.rawText;
     final formKey = GlobalKey<FormState>();
-    final nameController = TextEditingController(text: item.matchedIngredient.isNotEmpty ? item.matchedIngredient : item.name);
+    final nameController = TextEditingController(
+      text: item.matchedIngredient.isNotEmpty
+          ? item.matchedIngredient
+          : item.name,
+    );
     final quantityController = TextEditingController(
       text: item.totalQty.toStringAsFixed(
         item.totalQty.truncateToDouble() == item.totalQty ? 0 : 2,
@@ -1032,8 +655,9 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                       labelText: 'Ingredient Name',
                       prefixIcon: Icon(Icons.restaurant_rounded),
                     ),
-                    validator: (value) =>
-                        value == null || value.trim().isEmpty ? 'Enter ingredient name' : null,
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Enter ingredient name'
+                        : null,
                   ),
                   const SizedBox(height: 14),
                   Row(
@@ -1041,11 +665,17 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                       Expanded(
                         child: TextFormField(
                           controller: quantityController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          decoration: const InputDecoration(labelText: 'Quantity'),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Quantity',
+                          ),
                           validator: (value) {
                             final q = double.tryParse(value ?? '');
-                            return q == null || q <= 0 ? 'Invalid quantity' : null;
+                            return q == null || q <= 0
+                                ? 'Invalid quantity'
+                                : null;
                           },
                         ),
                       ),
@@ -1055,9 +685,14 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                           initialValue: selectedUnit,
                           decoration: const InputDecoration(labelText: 'Unit'),
                           items: PantryProvider.units
-                              .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                              .map(
+                                (u) =>
+                                    DropdownMenuItem(value: u, child: Text(u)),
+                              )
                               .toList(),
-                          onChanged: (val) => setDialogState(() => selectedUnit = val ?? selectedUnit),
+                          onChanged: (val) => setDialogState(
+                            () => selectedUnit = val ?? selectedUnit,
+                          ),
                         ),
                       ),
                     ],
@@ -1068,7 +703,9 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                       Expanded(
                         child: TextFormField(
                           controller: priceController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           decoration: const InputDecoration(
                             labelText: 'Line Price',
                             prefixText: 'PKR ',
@@ -1081,9 +718,14 @@ class _ReviewSheetState extends State<_ReviewSheet> {
                           initialValue: selectedZone,
                           decoration: const InputDecoration(labelText: 'Zone'),
                           items: _zones
-                              .map((z) => DropdownMenuItem(value: z, child: Text(z)))
+                              .map(
+                                (z) =>
+                                    DropdownMenuItem(value: z, child: Text(z)),
+                              )
                               .toList(),
-                          onChanged: (val) => setDialogState(() => selectedZone = val ?? selectedZone),
+                          onChanged: (val) => setDialogState(
+                            () => selectedZone = val ?? selectedZone,
+                          ),
                         ),
                       ),
                     ],
@@ -1164,208 +806,260 @@ class _ReviewSheetState extends State<_ReviewSheet> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final resp = widget.response;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.88,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (_, controller) => Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppTheme.surfaceDark : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 30,
-              offset: const Offset(0, -6),
+    return PopScope(
+      canPop: !_saving,
+      child: AbsorbPointer(
+        absorbing: _saving || _saved,
+        child: DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.88,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (_, controller) => Material(
+            color: Theme.of(context).colorScheme.surface,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
-          ],
-        ),
-        child: Column(
-          children: [
-            // Drag handle
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(top: 10, bottom: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(2),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                // Drag handle
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 8),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                 ),
-              ),
-            ),
 
-            // Sheet header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          resp.storeName ?? 'Receipt Review',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                // Sheet header
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              resp.storeName ?? 'Review your groceries',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '${resp.date ?? "Date not detected"} • ${resp.currency ?? "PKR"} ${resp.receiptTotal?.toStringAsFixed(0) ?? _totalPrice.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          '${resp.date ?? "Detected Date: Today"} • ${resp.currency ?? "PKR"} ${resp.receiptTotal?.toStringAsFixed(0) ?? _totalPrice.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.textSecondary,
-                            fontWeight: FontWeight.w500,
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _addMissingItem,
+                        icon: const Icon(Icons.add_rounded, size: 16),
+                        label: const Text('Add Item'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Warning Banners
+                if (widget.isDuplicate)
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.warmAmber.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppTheme.warmAmber.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Icons.copy_rounded,
+                          color: AppTheme.warmAmber,
+                          size: 20,
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'This receipt may already be in your pantry. Check the items before adding it again.',
+                            style: TextStyle(
+                              color: AppTheme.warmAmber,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  OutlinedButton.icon(
-                    onPressed: _addMissingItem,
-                    icon: const Icon(Icons.add_rounded, size: 16),
-                    label: const Text('Add Item'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    ),
-                  ),
-                ],
-              ),
-            ),
 
-            // Warning Banners
-            if (widget.isDuplicate)
-              Container(
-                margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppTheme.warmAmber.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.warmAmber.withValues(alpha: 0.4)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.copy_rounded, color: AppTheme.warmAmber, size: 20),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Duplicate Receipt Warning: This receipt appears to have been scanned previously. Please verify items before confirming.',
-                        style: TextStyle(
-                          color: AppTheme.warmAmber,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
+                if (resp.totalMismatchWarning)
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.orange.withValues(alpha: 0.4),
                       ),
                     ),
-                  ],
-                ),
-              ),
-
-            if (resp.totalMismatchWarning)
-              Container(
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.price_change_rounded, color: Colors.orange, size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Total mismatch: Item sum (${resp.calculatedItemsTotal.toStringAsFixed(0)}) differs from printed total (${resp.receiptTotal?.toStringAsFixed(0)}) by ${resp.totalDifferencePercent.toStringAsFixed(1)}%. Review highlighted items below.',
-                        style: const TextStyle(
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.price_change_rounded,
                           color: Colors.orange,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          size: 20,
                         ),
-                      ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Total mismatch: Item sum (${resp.calculatedItemsTotal.toStringAsFixed(0)}) differs from printed total (${resp.receiptTotal?.toStringAsFixed(0)}) by ${resp.totalDifferencePercent.toStringAsFixed(1)}%. Review highlighted items below.',
+                            style: const TextStyle(
+                              color: Colors.orange,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
 
-            // Items List
-            Expanded(
-              child: ListView.separated(
-                controller: controller,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                itemCount: _items.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 6),
-                itemBuilder: (_, i) => _ReviewItemTile(
-                  item: _items[i],
-                  zones: _zones,
-                  zoneIcons: _zoneIcons,
-                  isDark: isDark,
-                  onToggle: (val) => setState(() => _items[i].isSelected = val),
-                  onZoneChange: (zone) => setState(() => _items[i].storageZone = zone),
-                  onEdit: () => _editItem(i),
-                  onDelete: () => _removeItem(i),
+                // Items List
+                Expanded(
+                  child: ListView.separated(
+                    controller: controller,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
+                    itemCount: _items.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 6),
+                    itemBuilder: (_, i) => _ReviewItemTile(
+                      item: _items[i],
+                      zones: _zones,
+                      zoneIcons: _zoneIcons,
+                      isDark: isDark,
+                      onToggle: (val) =>
+                          setState(() => _items[i].isSelected = val),
+                      onZoneChange: (zone) =>
+                          setState(() => _items[i].storageZone = zone),
+                      onEdit: () => _editItem(i),
+                      onDelete: () => _removeItem(i),
+                    ),
+                  ),
                 ),
-              ),
-            ),
 
-            // Confirm Bottom Bar
-            Container(
-              decoration: BoxDecoration(
-                color: isDark ? AppTheme.surfaceDark : Colors.white,
-                border: Border(
-                  top: BorderSide(
-                    color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
-                  ),
-                ),
-              ),
-              child: SafeArea(
-                top: false,
-                minimum: const EdgeInsets.only(bottom: 16),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                  child: Row(
-                    children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: widget.onRescan,
-                      icon: const Icon(Icons.refresh_rounded, size: 16),
-                      label: const Text('Re-scan'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
+                // Confirm Bottom Bar
+                Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.surfaceDark : Colors.white,
+                    border: Border(
+                      top: BorderSide(
+                        color: isDark
+                            ? AppTheme.borderDark
+                            : AppTheme.borderLight,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton.icon(
-                      onPressed: _selectedCount == 0 ? null : () => widget.onConfirm(_items),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryEmerald,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      icon: const Icon(Icons.check_circle_rounded, size: 18),
-                      label: Text(
-                        'Confirm $_selectedCount Items',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                  child: SafeArea(
+                    top: false,
+                    minimum: const EdgeInsets.only(bottom: 16),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _saving ? null : widget.onRescan,
+                              icon: const Icon(Icons.refresh_rounded, size: 16),
+                              label: const Text('Retake'),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton.icon(
+                              onPressed:
+                                  _selectedCount == 0 || _saving || _saved
+                                  ? null
+                                  : _save,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryEmerald,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              icon: const Icon(
+                                Icons.check_circle_rounded,
+                                size: 18,
+                              ),
+                              label: Text(
+                                _saving
+                                    ? 'Saving…'
+                                    : _saved
+                                    ? 'Saved'
+                                    : _selectedCount == 1
+                                    ? 'Add 1 item'
+                                    : 'Add $_selectedCount items',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                    ],
-                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -1395,7 +1089,7 @@ class _ReviewItemTile extends StatelessWidget {
 
   bool get _hasWarning =>
       item.needsReview ||
-      (item.count == null && item.packSize == null) ||
+      (!item.totalQty.isFinite || item.totalQty <= 0) ||
       item.confidence < 0.65;
 
   Color get _zoneColor {
@@ -1413,183 +1107,129 @@ class _ReviewItemTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _zoneColor;
-    final isSelected = item.isSelected;
+    final colors = Theme.of(context).colorScheme;
     final warning = _hasWarning;
-
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 200),
-      opacity: isSelected ? 1.0 : 0.45,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: isDark
-              ? (warning
-                  ? AppTheme.warmAmber.withValues(alpha: 0.12)
-                  : isSelected
-                      ? color.withValues(alpha: 0.07)
-                      : AppTheme.surfaceDark)
-              : (warning
-                  ? AppTheme.warmAmber.withValues(alpha: 0.08)
-                  : isSelected
-                      ? color.withValues(alpha: 0.04)
-                      : Colors.grey.shade50),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: warning
-                ? AppTheme.warmAmber
-                : isSelected
-                    ? color.withValues(alpha: 0.3)
-                    : Colors.transparent,
-            width: warning ? 1.5 : 1.0,
-          ),
+    return Material(
+      color: warning
+          ? AppTheme.warmAmber.withValues(alpha: .05)
+          : colors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: warning
+              ? AppTheme.warmAmber.withValues(alpha: .4)
+              : colors.outlineVariant,
         ),
-        child: Row(
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Checkbox(
-              value: isSelected,
-              onChanged: (v) => onToggle(v ?? false),
-              activeColor: AppTheme.primaryEmerald,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-            ),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                FoodImageService.resolveImageUrl(
-                  item.matchedIngredient.isNotEmpty ? item.matchedIngredient : item.name,
+            Row(
+              children: [
+                Checkbox(
+                  value: item.isSelected,
+                  onChanged: (value) => onToggle(value ?? false),
                 ),
-                width: 38,
-                height: 38,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
+                Expanded(
+                  child: Text(
+                    item.matchedIngredient.isNotEmpty
+                        ? item.matchedIngredient
+                        : item.name,
+                    style: Theme.of(context).textTheme.titleSmall,
                   ),
-                  child: Icon(zoneIcons[item.storageZone] ?? Icons.shelves, color: color, size: 18),
                 ),
-              ),
+                PopupMenuButton<String>(
+                  tooltip: 'Review item options',
+                  icon: const Icon(Icons.more_horiz_rounded),
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      onEdit();
+                    } else {
+                      onDelete();
+                    }
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'edit', child: Text('Correct item')),
+                    PopupMenuItem(value: 'remove', child: Text('Remove item')),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
-            Expanded(
+            Padding(
+              padding: const EdgeInsets.only(left: 48),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          item.matchedIngredient.isNotEmpty ? item.matchedIngredient : item.name,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? AppTheme.textDarkPrimary : AppTheme.textLightPrimary,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Correct item',
-                        onPressed: onEdit,
-                        visualDensity: VisualDensity.compact,
-                        constraints: const BoxConstraints.tightFor(width: 30, height: 28),
-                        icon: const Icon(Icons.edit_outlined, size: 16),
-                      ),
-                      IconButton(
-                        tooltip: 'Remove',
-                        onPressed: onDelete,
-                        visualDensity: VisualDensity.compact,
-                        constraints: const BoxConstraints.tightFor(width: 30, height: 28),
-                        icon: const Icon(Icons.close_rounded, size: 17),
-                      ),
-                    ],
+                  Text(
+                    '${NumberFormat('0.###').format(item.totalQty)} ${item.unit}${item.linePrice == null ? '' : ' · PKR ${item.linePrice!.toStringAsFixed(2)}'}',
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
-                  if (warning) ...[
-                    const SizedBox(height: 2),
+                  if (warning || !item.isFood) ...[
+                    const SizedBox(height: 8),
                     Wrap(
-                      spacing: 4,
+                      spacing: 6,
+                      runSpacing: 6,
                       children: [
-                        if (item.count == null && item.packSize == null)
-                          _badge('Null Qty (Tap to fix)', AppTheme.warmAmber),
-                        if (item.confidence < 0.65)
-                          _badge('Low Conf ${(item.confidence * 100).toInt()}%', Colors.orange),
-                        if (item.needsReview && (item.count != null || item.packSize != null))
-                          _badge('Needs Review', AppTheme.warmAmber),
+                        if (!item.totalQty.isFinite || item.totalQty <= 0)
+                          _badge('Check the quantity', AppTheme.warmAmber),
+                        if (item.confidence < .65)
+                          _badge('Check the match', AppTheme.warmAmber),
+                        if (item.needsReview)
+                          _badge('Review this item', AppTheme.warmAmber),
+                        if (!item.isFood)
+                          _badge('Non-food item', colors.onSurfaceVariant),
                       ],
                     ),
                   ],
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Text(
-                        '${item.totalQty.toStringAsFixed(item.totalQty.truncateToDouble() == item.totalQty ? 0 : 1)} ${item.unit}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textSecondary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (item.linePrice != null) ...[
-                        const Text(' • ', style: TextStyle(color: AppTheme.textSecondary)),
-                        Text(
-                          'PKR ${item.linePrice!.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.textSecondary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                      if (!item.isFood) ...[
-                        const SizedBox(width: 6),
-                        _badge('Non-food', Colors.grey),
-                      ],
-                    ],
-                  ),
                 ],
               ),
             ),
-            // Storage Zone Dropdown
+            const SizedBox(height: 10),
             PopupMenuButton<String>(
+              tooltip: 'Choose storage zone',
               onSelected: onZoneChange,
               itemBuilder: (_) => zones
                   .map(
-                    (z) => PopupMenuItem(
-                      value: z,
+                    (zone) => PopupMenuItem(
+                      value: zone,
                       child: Row(
                         children: [
                           Icon(
-                            zoneIcons[z] ?? Icons.shelves,
-                            size: 16,
-                            color: z == item.storageZone ? AppTheme.primaryEmerald : AppTheme.textSecondary,
+                            zoneIcons[zone] ?? Icons.shelves,
+                            size: 18,
+                            color: colors.primary,
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            z,
-                            style: TextStyle(
-                              fontWeight: z == item.storageZone ? FontWeight.w700 : FontWeight.normal,
-                            ),
-                          ),
+                          const SizedBox(width: 12),
+                          Text(zone),
                         ],
                       ),
                     ),
                   )
                   .toList(),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 4, 4),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(zoneIcons[item.storageZone] ?? Icons.shelves, color: color, size: 14),
-                    const SizedBox(width: 4),
-                    Icon(Icons.expand_more_rounded, color: color, size: 14),
+                    Icon(
+                      zoneIcons[item.storageZone] ?? Icons.shelves,
+                      size: 18,
+                      color: _zoneColor,
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        'Store in ${item.storageZone}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    Icon(
+                      Icons.expand_more_rounded,
+                      color: colors.onSurfaceVariant,
+                      size: 20,
+                    ),
                   ],
                 ),
               ),
@@ -1610,7 +1250,7 @@ class _ReviewItemTile extends StatelessWidget {
       child: Text(
         text,
         style: TextStyle(
-          color: color,
+          color: isDark ? AppTheme.textDarkPrimary : color,
           fontSize: 10,
           fontWeight: FontWeight.w700,
         ),

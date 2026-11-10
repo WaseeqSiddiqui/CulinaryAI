@@ -6,10 +6,10 @@ import '../../core/theme/app_theme.dart';
 import '../../models/pantry_item_model.dart';
 import '../../providers/pantry_provider.dart';
 import '../../services/food_image_service.dart';
+import '../../widgets/app_ui.dart';
 import '../../services/expiry_estimation_service.dart';
 import '../scanner/expiry_label_scanner_screen.dart';
 import '../scanner/fridge_scanner_screen.dart';
-import '../scanner/receipt_scanner_screen.dart';
 
 // ── Zone Metadata ─────────────────────────────────────────────────────────────
 
@@ -59,7 +59,6 @@ class PantryScreen extends StatefulWidget {
 class _PantryScreenState extends State<PantryScreen>
     with SingleTickerProviderStateMixin {
   final _searchController = TextEditingController();
-  bool _isSearching = false;
   late AnimationController _fabAnim;
 
   @override
@@ -77,16 +76,6 @@ class _PantryScreenState extends State<PantryScreen>
     _searchController.dispose();
     _fabAnim.dispose();
     super.dispose();
-  }
-
-  void _toggleSearch() {
-    setState(() {
-      _isSearching = !_isSearching;
-      if (!_isSearching) {
-        _searchController.clear();
-        context.read<PantryProvider>().setSearch('');
-      }
-    });
   }
 
   void _showAddEditSheet({PantryItemModel? item}) {
@@ -184,95 +173,9 @@ class _PantryScreenState extends State<PantryScreen>
   ) {
     return SliverAppBar(
       pinned: true,
-      floating: false,
-      elevation: innerBoxIsScrolled ? 1 : 0,
-      backgroundColor: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
-      title: _isSearching
-          ? TextField(
-              controller: _searchController,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'Search pantry...',
-                hintStyle: TextStyle(
-                  color: isDark
-                      ? AppTheme.textDarkSecondary
-                      : AppTheme.textLightSecondary,
-                  fontSize: 15,
-                ),
-                border: InputBorder.none,
-                filled: false,
-                contentPadding: EdgeInsets.zero,
-              ),
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: isDark
-                    ? AppTheme.textDarkPrimary
-                    : AppTheme.textLightPrimary,
-              ),
-              onChanged: pantry.setSearch,
-            )
-          : Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Pantry Inventory',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.3,
-                              color: isDark
-                                  ? AppTheme.textDarkPrimary
-                                  : AppTheme.textLightPrimary,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.freshHerb.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '${pantry.totalCount}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.freshHerb,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        pantry.lowStockCount > 0
-                            ? '${pantry.lowStockCount} items need restock'
-                            : 'All items well-stocked',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: pantry.lowStockCount > 0
-                              ? AppTheme.warmAmber
-                              : (isDark
-                                    ? AppTheme.textDarkSecondary
-                                    : AppTheme.textLightSecondary),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+      automaticallyImplyLeading: false,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      title: const Text('My pantry'),
       actions: [
         IconButton(
           icon: const Icon(Icons.document_scanner_outlined),
@@ -283,21 +186,39 @@ class _PantryScreenState extends State<PantryScreen>
           ),
         ),
         IconButton(
-          icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded),
-          tooltip: _isSearching ? 'Close Search' : 'Search',
-          onPressed: _toggleSearch,
-        ),
-        IconButton(
-          icon: const Icon(Icons.filter_list_rounded),
+          icon: const Icon(Icons.tune_rounded),
           tooltip: 'Filter by Zone',
           onPressed: () => _showZoneFilterSheet(context, pantry),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 12),
       ],
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(96),
+        preferredSize: const Size.fromHeight(184),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+              child: Text(
+                '${pantry.totalCount} ingredients, a world of possibilities.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: TextField(
+                controller: _searchController,
+                onChanged: pantry.setSearch,
+                decoration: const InputDecoration(
+                  hintText: 'Find an ingredient',
+                  prefixIcon: Icon(Icons.search_rounded, size: 21),
+                  isDense: true,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
             _buildZoneChips(pantry, isDark),
             _buildExpiryChips(pantry),
           ],
@@ -417,7 +338,7 @@ class _PantryScreenState extends State<PantryScreen>
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 100),
       itemCount:
           grouped.keys.length +
           (pantry.useSoonCount + pantry.expiredCount > 0 ? 1 : 0),
@@ -449,69 +370,16 @@ class _PantryScreenState extends State<PantryScreen>
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: Image.network(
-                'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&q=80',
-                width: 140,
-                height: 140,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Image.asset(
-                  'assets/images/pantry_basket.jpg',
-                  width: 140,
-                  height: 140,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Your Pantry is Empty',
-              style: Theme.of(context).textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Add an item, scan your fridge, or import a grocery receipt.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: isDark
-                    ? AppTheme.textDarkSecondary
-                    : AppTheme.textLightSecondary,
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 18),
-            FilledButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const FridgeScannerScreen()),
-              ),
-              icon: const Icon(Icons.kitchen_rounded),
-              label: const Text('Scan fridge'),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ReceiptScannerScreen()),
-              ),
-              icon: const Icon(Icons.receipt_long_rounded),
-              label: const Text('Scan receipt'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _buildEmptyState(BuildContext context) => KitchenEmptyState(
+    icon: Icons.kitchen_outlined,
+    title: 'A fresh start for your pantry.',
+    message: 'Add your ingredients or scan a receipt. We will help you make the most of what is here.',
+    action: FilledButton.icon(
+      onPressed: () => _showAddEditSheet(),
+      icon: const Icon(Icons.add_rounded),
+      label: const Text('Add your first ingredient'),
+    ),
+  );
 
   void _showZoneFilterSheet(BuildContext context, PantryProvider pantry) {
     showModalBottomSheet(
@@ -738,251 +606,145 @@ class _PantryItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaceColor = isDark ? AppTheme.surfaceDark : Colors.white;
-    final borderColor = item.isLowStock
-        ? AppTheme.warmAmber.withValues(alpha: 0.5)
-        : (isDark ? AppTheme.borderDark : AppTheme.borderLight);
-
+    final colors = Theme.of(context).colorScheme;
+    final expired = item.expiryStatus == ExpiryStatus.expired;
+    final soon = item.expiryStatus == ExpiryStatus.useSoon;
     return Dismissible(
       key: Key(item.id),
       direction: DismissDirection.endToStart,
       background: _swipeBackground(),
-      confirmDismiss: (_) async => false, // Handled by onDelete
-      onDismissed: (_) => onDelete(),
-      child: GestureDetector(
-        onTap: () => _showItemDetailSheet(context, item, zoneColor, isDark),
-        onLongPress: onEdit,
-        child: Container(
-          decoration: BoxDecoration(
-            color: surfaceColor,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: borderColor, width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: Row(
+      confirmDismiss: (_) async {
+        onDelete();
+        return false;
+      },
+      child: Material(
+        color: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(color: colors.outlineVariant),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _showItemDetailSheet(context, item, zoneColor, isDark),
+          onLongPress: onEdit,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 8, 14),
+            child: Column(
               children: [
-                // Zone color vertical accent pill
-                Container(width: 4, height: 64, color: zoneColor),
-                const SizedBox(width: 10),
-                // Food Photo Thumbnail
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    item.displayImageUrl,
-                    width: 48,
-                    height: 48,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: zoneColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.restaurant, color: zoneColor, size: 20),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Item info
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                item.name,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: isDark
-                                      ? AppTheme.textDarkPrimary
-                                      : AppTheme.textLightPrimary,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (item.isLowStock)
-                              Container(
-                                margin: const EdgeInsets.only(
-                                  left: 6,
-                                  right: 4,
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.warmAmber.withValues(
-                                    alpha: 0.15,
-                                  ),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: AppTheme.warmAmber.withValues(
-                                      alpha: 0.4,
-                                    ),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: const [
-                                    Icon(
-                                      Icons.warning_amber_rounded,
-                                      size: 11,
-                                      color: AppTheme.warmAmber,
-                                    ),
-                                    SizedBox(width: 3),
-                                    Text(
-                                      'Low',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppTheme.warmAmber,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Text(
-                              '${_formatQty(item.quantity)} ${item.unit}',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: item.isLowStock
-                                    ? AppTheme.warmAmber
-                                    : (isDark
-                                          ? AppTheme.textDarkSecondary
-                                          : AppTheme.textLightSecondary),
-                                fontWeight: item.isLowStock
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '• ${item.location}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isDark
-                                    ? AppTheme.textDarkMuted
-                                    : AppTheme.textLightMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (item.expiryDate != null) ...[
-                          const SizedBox(height: 5),
-                          Row(
-                            children: [
-                              Icon(
-                                item.expiryStatus == ExpiryStatus.expired
-                                    ? Icons.error_outline_rounded
-                                    : Icons.schedule_rounded,
-                                size: 13,
-                                color: item.expiryStatus == ExpiryStatus.expired
-                                    ? AppTheme.errorRed
-                                    : item.expiryStatus == ExpiryStatus.useSoon
-                                    ? AppTheme.warmAmber
-                                    : AppTheme.freshHerb,
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  item.expiryStatus == ExpiryStatus.expired
-                                      ? 'Expired ${DateFormat('d MMM').format(item.expiryDate!)}'
-                                      : 'Use by ${DateFormat('d MMM').format(item.expiryDate!)}${item.hasEstimatedExpiry ? ' · estimated' : ''}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color:
-                                        item.expiryStatus ==
-                                            ExpiryStatus.expired
-                                        ? AppTheme.errorRed
-                                        : item.expiryStatus ==
-                                              ExpiryStatus.useSoon
-                                        ? AppTheme.warmAmber
-                                        : AppTheme.freshHerb,
-                                  ),
-                                ),
-                              ),
-                            ],
+                Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        item.displayImageUrl,
+                        width: 52,
+                        height: 52,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Container(
+                          width: 52,
+                          height: 52,
+                          color: colors.primaryContainer,
+                          child: Icon(
+                            Icons.eco_outlined,
+                            color: colors.primary,
+                            size: 24,
                           ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-                // Quantity controls
-                _QuantityControls(
-                  onDecrement: onDecrement,
-                  onIncrement: onIncrement,
-                  isDark: isDark,
-                ),
-                // Actions menu
-                PopupMenuButton<String>(
-                  icon: Icon(
-                    Icons.more_vert_rounded,
-                    size: 20,
-                    color: isDark
-                        ? AppTheme.textDarkMuted
-                        : AppTheme.textLightSecondary,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  onSelected: (val) {
-                    if (val == 'edit') onEdit();
-                    if (val == 'delete') onDelete();
-                  },
-                  itemBuilder: (_) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit_outlined, size: 18),
-                          SizedBox(width: 10),
-                          Text('Edit'),
-                        ],
+                        ),
                       ),
                     ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.delete_outline_rounded,
-                            size: 18,
-                            color: AppTheme.errorRed,
-                          ),
-                          const SizedBox(width: 10),
                           Text(
-                            'Remove',
-                            style: TextStyle(color: AppTheme.errorRed),
+                            item.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontSize: 15),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            '${_formatQty(item.quantity)} ${item.unit}',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: colors.onSurfaceVariant),
                           ),
                         ],
                       ),
+                    ),
+                    if (item.isLowStock)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.warmAmber.withValues(alpha: .1),
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: const Text(
+                          'Low stock',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppTheme.warmAmber,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    PopupMenuButton<String>(
+                      tooltip: 'Item options',
+                      icon: const Icon(Icons.more_horiz_rounded, size: 22),
+                      onSelected: (value) {
+                        if (value == 'edit') {
+                          onEdit();
+                        } else {
+                          onDelete();
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Text('Edit ingredient'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Remove ingredient'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.expiryDate == null
+                            ? (item.hasKnownPackageCapacity
+                                  ? '${_formatQty(item.packageCount!)} ${item.packageType}${item.packageCount == 1 ? '' : 's'} · ${_formatQty(item.quantityPerPackage!)} ${item.unit} each'
+                                  : 'No expiry date added')
+                            : '${expired ? 'Expired' : 'Use by'} ${DateFormat('d MMM').format(item.expiryDate!)}${item.hasEstimatedExpiry ? ' · estimated' : ''}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: expired
+                              ? colors.error
+                              : soon
+                              ? AppTheme.warmAmber
+                              : colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _QuantityControls(
+                      onDecrement: onDecrement,
+                      onIncrement: onIncrement,
+                      isDark: isDark,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ),
               ],
             ),
           ),
@@ -1018,8 +780,7 @@ class _PantryItemCard extends StatelessWidget {
   }
 
   String _formatQty(double qty) {
-    if (qty == qty.truncateToDouble()) return qty.toInt().toString();
-    return qty.toStringAsFixed(1);
+    return NumberFormat('0.###').format(qty);
   }
 
   void _showItemDetailSheet(
@@ -1084,26 +845,22 @@ class _QtyBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 30,
-        height: 30,
-        decoration: BoxDecoration(
-          color: isDark ? AppTheme.surfaceDark2 : AppTheme.bgLight,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
+    return IconButton(
+      onPressed: onTap,
+      tooltip: icon == Icons.remove_rounded
+          ? 'Decrease quantity'
+          : 'Increase quantity',
+      style: IconButton.styleFrom(
+        minimumSize: const Size(44, 44),
+        backgroundColor: isDark ? AppTheme.surfaceDark2 : AppTheme.bgLight,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(
             color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
           ),
         ),
-        child: Icon(
-          icon,
-          size: 16,
-          color: isDark
-              ? AppTheme.textDarkSecondary
-              : AppTheme.textLightSecondary,
-        ),
       ),
+      icon: Icon(icon, size: 17),
     );
   }
 }
@@ -1195,6 +952,9 @@ class _AddEditSheetState extends State<_AddEditSheet> {
   late final TextEditingController _qtyCtrl;
   late final TextEditingController _thresholdCtrl;
   late final TextEditingController _customImageCtrl;
+  late final TextEditingController _packageTypeCtrl;
+  late final TextEditingController _packageCountCtrl;
+  late final TextEditingController _capacityCtrl;
 
   late String _selectedUnit;
   late String _selectedLocation;
@@ -1220,6 +980,15 @@ class _AddEditSheetState extends State<_AddEditSheet> {
       text: item != null ? _fmt(item.lowStockThreshold) : '1',
     );
     _customImageCtrl = TextEditingController(text: item?.customImageUrl ?? '');
+    _packageTypeCtrl = TextEditingController(text: item?.packageType ?? '');
+    _packageCountCtrl = TextEditingController(
+      text: item?.packageCount == null ? '' : _fmt(item!.packageCount!),
+    );
+    _capacityCtrl = TextEditingController(
+      text: item?.quantityPerPackage == null
+          ? ''
+          : _fmt(item!.quantityPerPackage!),
+    );
     _showCustomImageField =
         item?.customImageUrl != null && item!.customImageUrl!.isNotEmpty;
 
@@ -1248,6 +1017,9 @@ class _AddEditSheetState extends State<_AddEditSheet> {
     _qtyCtrl.dispose();
     _thresholdCtrl.dispose();
     _customImageCtrl.dispose();
+    _packageTypeCtrl.dispose();
+    _packageCountCtrl.dispose();
+    _capacityCtrl.dispose();
     super.dispose();
   }
 
@@ -1281,6 +1053,11 @@ class _AddEditSheetState extends State<_AddEditSheet> {
           name: _nameCtrl.text.trim(),
           quantity: qty,
           unit: _selectedUnit,
+          packageType: _packageTypeCtrl.text.trim().isEmpty
+              ? null
+              : _packageTypeCtrl.text.trim(),
+          packageCount: double.tryParse(_packageCountCtrl.text),
+          quantityPerPackage: double.tryParse(_capacityCtrl.text),
           location: _selectedLocation,
           lowStockThreshold: threshold,
           customImageUrl: customUrl,
@@ -1298,6 +1075,11 @@ class _AddEditSheetState extends State<_AddEditSheet> {
         name: _nameCtrl.text.trim(),
         quantity: qty,
         unit: _selectedUnit,
+        packageType: _packageTypeCtrl.text.trim().isEmpty
+            ? null
+            : _packageTypeCtrl.text.trim(),
+        packageCount: double.tryParse(_packageCountCtrl.text),
+        quantityPerPackage: double.tryParse(_capacityCtrl.text),
         location: _selectedLocation,
         lowStockThreshold: threshold,
         customImageUrl: customUrl,
@@ -1664,7 +1446,7 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                     child: TextFormField(
                       controller: _qtyCtrl,
                       decoration: const InputDecoration(
-                        labelText: 'Quantity',
+                        labelText: 'Available quantity',
                         prefixIcon: Icon(Icons.numbers_rounded),
                       ),
                       keyboardType: const TextInputType.numberWithOptions(
@@ -1694,6 +1476,67 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                 ],
               ),
               const SizedBox(height: 14),
+
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 12),
+                leading: const Icon(Icons.inventory_2_outlined),
+                title: const Text('Package details'),
+                subtitle: Text(
+                  widget.item?.needsPackageDetails == true
+                      ? 'Capacity unknown — add it before recipe deductions'
+                      : 'Optional for bottles, jars, cartons, and packs',
+                  style: widget.item?.needsPackageDetails == true
+                      ? const TextStyle(color: AppTheme.warmAmber)
+                      : null,
+                ),
+                children: [
+                  TextFormField(
+                    controller: _packageTypeCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      labelText: 'Package type',
+                      hintText: 'Bottle, jar, carton, pack',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _packageCountCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Package count',
+                            hintText: '1',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _capacityCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: 'Per package ($_selectedUnit)',
+                            hintText: '1000',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Available quantity is the usable amount remaining. Package fields describe the original containers and are never inferred for older “piece” records.',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
 
               // Storage zone
               DropdownButtonFormField<String>(

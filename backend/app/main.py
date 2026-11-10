@@ -29,6 +29,11 @@ from app.models.vision_schemas import (
     FridgeScanResponse,
     ValidatedReceiptResponse,
     MealNutritionEstimate,
+    CookingStepValidationResponse,
+    StepExplanationRequest,
+    StepExplanationResponse,
+    CookingStepChatRequest,
+    CookingStepChatResponse,
 )
 from app.services.fridge_reconciler import FridgeReconciler
 from app.services.gemini_service import GeminiVisionService
@@ -36,6 +41,8 @@ from app.services.ingredient_catalog import IngredientCatalogService
 from app.services.meal_planner import MealPlannerService
 from app.services.product_matcher import ProductMatcher
 from app.services.recipe_repository import VerifiedRecipeRepository
+from app.models.recipe_discovery import RecipeDiscoveryRequest, RecipeDiscoveryResponse
+from app.services.live_recipe_discovery import LiveRecipeDiscoveryService, RecipeProviderUnavailable
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +53,7 @@ catalog_service = IngredientCatalogService()
 vision_service = GeminiVisionService(catalog_service=catalog_service)
 fridge_reconciler = FridgeReconciler(catalog=catalog_service)
 product_matcher = ProductMatcher()
+recipe_discovery = LiveRecipeDiscoveryService()
 
 app = FastAPI(
     title="CulinaryAI API",
@@ -118,6 +126,16 @@ async def chef_chat(request: ChefChatRequest) -> ChefChatResponse:
 @app.post("/generate-plan", response_model=GeneratePlanResponse)
 def generate_plan(request: GeneratePlanRequest) -> GeneratePlanResponse:
     return planner.generate_plan(request)
+
+
+@app.post("/discover-recipes", response_model=RecipeDiscoveryResponse)
+def discover_recipes(request: RecipeDiscoveryRequest) -> RecipeDiscoveryResponse:
+    try:
+        return recipe_discovery.discover(request)
+    except RecipeProviderUnavailable as error:
+        raise HTTPException(status_code=503, detail=str(error)) from None
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from None
 
 
 @app.post("/generate-instructions", response_model=InstructionResponse)
@@ -207,3 +225,57 @@ async def analyze_meal(
         mime_type=file.content_type or "image/jpeg",
         user_id=effective_user,
     )
+
+
+@app.post("/validate-cooking-step", response_model=CookingStepValidationResponse)
+async def validate_cooking_step(
+    file: UploadFile = File(..., description="Photo of cooking progress in pan/pot"),
+    recipe_title: str = Form(..., description="Title of the recipe being cooked"),
+    step_number: int = Form(..., description="Current step index or number"),
+    step_instruction: str = Form(..., description="Instruction text of the current step"),
+    user_question: str | None = Form(default=None, description="Optional question/check from the cook"),
+    user_id: str | None = Header(default=None, alias="X-User-Id"),
+    user_id_form: str | None = Form(default=None, alias="user_id"),
+) -> CookingStepValidationResponse:
+    effective_user = user_id or user_id_form or "default_user"
+    image_bytes = await file.read()
+    mime = file.content_type or "image/jpeg"
+    return await asyncio.to_thread(
+        vision_service.validate_cooking_step,
+        image_bytes=image_bytes,
+        mime_type=mime,
+        recipe_title=recipe_title,
+        step_number=step_number,
+        step_instruction=step_instruction,
+        user_question=user_question,
+        user_id=effective_user,
+    )
+
+
+@app.post("/step-explanation", response_model=StepExplanationResponse)
+async def get_step_explanation(
+    request: StepExplanationRequest,
+) -> StepExplanationResponse:
+    return await asyncio.to_thread(
+        vision_service.get_step_explanation,
+        recipe_title=request.recipe_title,
+        step_number=request.step_number,
+        step_instruction=request.step_instruction,
+    )
+
+
+@app.post("/cooking-step-chat", response_model=CookingStepChatResponse)
+async def cooking_step_chat(
+    request: CookingStepChatRequest,
+) -> CookingStepChatResponse:
+    reply = await asyncio.to_thread(
+        vision_service.chat_cooking_step,
+        recipe_title=request.recipe_title,
+        step_number=request.step_number,
+        step_instruction=request.step_instruction,
+        message=request.message,
+        conversation_history=[turn.model_dump() for turn in request.conversation_history],
+        adjustments=request.adjustments,
+        dietary_restrictions=request.dietary_restrictions,
+    )
+    return CookingStepChatResponse(reply=reply)

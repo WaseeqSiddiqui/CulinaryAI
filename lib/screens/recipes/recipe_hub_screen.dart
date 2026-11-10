@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../widgets/app_ui.dart';
 import '../../models/backend_meal_recommendation.dart';
 import '../../models/pantry_item_model.dart';
 import '../../models/recipe_recommendation_model.dart';
@@ -11,7 +13,6 @@ import '../../providers/recipe_experience_provider.dart';
 import '../../providers/shopping_provider.dart';
 import '../../services/meal_planning_api_service.dart';
 import '../../services/recipe_recommendation_service.dart';
-import '../../services/nutrition_calculator_service.dart';
 import '../cooking/guided_cooking_screen.dart';
 import '../scanner/meal_scanner_screen.dart';
 
@@ -129,6 +130,7 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      constraints: const BoxConstraints(maxWidth: 760),
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) => DraggableScrollableSheet(
           expand: false,
@@ -145,7 +147,7 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
                     child: Text(
                       recipe.title,
                       style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w800),
+                          ?.copyWith(fontWeight: FontWeight.w600),
                     ),
                   ),
                   IconButton(
@@ -211,7 +213,9 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
                     size: 19,
                   ),
                   title: Text(ingredient.name),
-                  trailing: Text('${ingredient.quantity} ${ingredient.unit}'),
+                  trailing: Text(
+                    '${NumberFormat('0.###').format(ingredient.quantity)} ${ingredient.unit}',
+                  ),
                 ),
               ),
               if (missing.isNotEmpty) ...[
@@ -230,7 +234,7 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
                         (name) => ListTile(
                           dense: true,
                           title: Text(name),
-                          trailing: Text(_suggestSwap(name)),
+                          subtitle: Text(_suggestSwap(name)),
                         ),
                       )
                       .toList(),
@@ -332,184 +336,225 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          if (_mode == RecipeSection.create || _mode == RecipeSection.macros) {
-            await _generate(weekly: false);
-          } else if (_mode == RecipeSection.weekly) {
-            await _generate(weekly: true);
-          }
-        },
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-          children: [
-            if (_mode == RecipeSection.macros) ...[
-              _NutritionTodayCard(
-                calories: today.calories,
-                target: prefs.calorieTarget,
-                protein: today.proteinGrams,
-                proteinTarget: prefs.proteinTarget,
-              ),
-              const SizedBox(height: 18),
-            ],
-            if (_mode == RecipeSection.pantry) ...[
-              _MessageCard(
-                icon: Icons.kitchen_outlined,
-                message:
-                    'Every suggestion checks your usable pantry first. Recipes are sized for ${prefs.servings} people.',
-              ),
-              _SeparatedFeatureLinks(
-                onCreate: () => _openSection(RecipeSection.create),
-                onGoals: () => _openSection(RecipeSection.macros),
-                onPlan: () => _openSection(RecipeSection.weekly),
-              ),
-              const SizedBox(height: 18),
-            ],
+      body: AppPageBody(
+        child: RefreshIndicator(
+          onRefresh: () async {
             if (_mode == RecipeSection.create ||
-                _mode == RecipeSection.macros ||
-                _mode == RecipeSection.weekly) ...[
-              TextField(
-                controller: _query,
-                textInputAction: TextInputAction.done,
-                decoration: InputDecoration(
-                  hintText: _mode == RecipeSection.create
-                      ? 'e.g. spicy pasta, quick Pakistani dinner'
-                      : _mode == RecipeSection.macros
-                      ? 'Optional: high protein breakfast'
-                      : 'Optional: budget, cuisine or family needs',
-                  prefixIcon: const Icon(Icons.search_rounded),
+                _mode == RecipeSection.macros) {
+              await _generate(weekly: false);
+            } else if (_mode == RecipeSection.weekly) {
+              await _generate(weekly: true);
+            }
+          },
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+            children: [
+              PageIntro(
+                eyebrow: switch (_mode) {
+                  RecipeSection.pantry => 'FROM YOUR PANTRY',
+                  RecipeSection.create => 'YOUR OWN INSPIRATION',
+                  RecipeSection.macros => 'NUTRITION, IN PERSPECTIVE',
+                  RecipeSection.weekly => 'A LITTLE PLANNING',
+                  RecipeSection.saved => 'YOUR PERSONAL COLLECTION',
+                },
+                title: switch (_mode) {
+                  RecipeSection.pantry => 'Cook with what you have.',
+                  RecipeSection.create => 'Make it your own.',
+                  RecipeSection.macros => 'Find your balance.',
+                  RecipeSection.weekly => 'Your week, made easier.',
+                  RecipeSection.saved => 'The ones worth keeping.',
+                },
+                subtitle: switch (_mode) {
+                  RecipeSection.pantry => 'Fresh ideas, built around the ingredients already in your kitchen.',
+                  RecipeSection.create => 'A craving, a cuisine, a little inspiration. Tell us what sounds good.',
+                  RecipeSection.macros => 'Keep your daily targets and the meals you enjoy in one place.',
+                  RecipeSection.weekly => 'Plan good meals around your pantry, your people and your preferences.',
+                  RecipeSection.saved => 'Your saved recipes, ready for the next time you need a good idea.',
+                },
+              ),
+              const SizedBox(height: 26),
+              if (_mode == RecipeSection.macros) ...[
+                _NutritionTodayCard(
+                  calories: today.calories,
+                  target: prefs.calorieTarget,
+                  protein: today.proteinGrams,
+                  proteinTarget: prefs.proteinTarget,
                 ),
-                onSubmitted: (_) =>
-                    _generate(weekly: _mode == RecipeSection.weekly),
+                const SizedBox(height: 18),
+              ],
+              if (_mode == RecipeSection.pantry) ...[
+                _MessageCard(
+                  icon: Icons.kitchen_outlined,
+                  message:
+                      'Cooking for ${prefs.servings} people. Change portions or preferences to suit your table.',
+                ),
+                _SeparatedFeatureLinks(
+                  onCreate: () => _openSection(RecipeSection.create),
+                  onGoals: () => _openSection(RecipeSection.macros),
+                  onPlan: () => _openSection(RecipeSection.weekly),
+                ),
+                const SizedBox(height: 18),
+              ],
+              if (_mode == RecipeSection.create ||
+                  _mode == RecipeSection.macros ||
+                  _mode == RecipeSection.weekly) ...[
+                TextField(
+                  controller: _query,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    hintText: _mode == RecipeSection.create
+                        ? 'e.g. spicy pasta, quick Pakistani dinner'
+                        : _mode == RecipeSection.macros
+                        ? 'Optional: high protein breakfast'
+                        : 'Optional: budget, cuisine or family needs',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                  ),
+                  onSubmitted: (_) =>
+                      _generate(weekly: _mode == RecipeSection.weekly),
+                ),
+                const SizedBox(height: 10),
+                FilledButton.icon(
+                  onPressed: _loading
+                      ? null
+                      : () => _generate(weekly: _mode == RecipeSection.weekly),
+                  icon: _loading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.auto_awesome_rounded),
+                  label: Text(
+                    _loading
+                        ? 'Building...'
+                        : _mode == RecipeSection.weekly
+                        ? 'Build my week'
+                        : 'Find recipes',
+                  ),
+                ),
+                const SizedBox(height: 18),
+              ],
+              if (_error != null)
+                _MessageCard(
+                  icon: Icons.cloud_off_outlined,
+                  message: '$_error Showing reliable offline recommendations.',
+                ),
+              if (_mode == RecipeSection.pantry && pantry.useSoonCount > 0)
+                _MessageCard(
+                  icon: Icons.eco_outlined,
+                  message:
+                      '${pantry.useSoonCount} ingredient(s) need using soon, so recipes using them appear first.',
+                ),
+              Text(
+                _mode == RecipeSection.weekly
+                    ? 'Your week'
+                    : _mode == RecipeSection.saved
+                    ? 'Your cookbook'
+                    : 'Made for your kitchen',
+                style: Theme.of(context).textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 10),
-              FilledButton.icon(
-                onPressed: _loading
-                    ? null
-                    : () => _generate(weekly: _mode == RecipeSection.weekly),
-                icon: _loading
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+              if (_generated.isNotEmpty &&
+                  {
+                    RecipeSection.create,
+                    RecipeSection.macros,
+                    RecipeSection.weekly,
+                  }.contains(_mode))
+                _RecipeGrid(
+                  children: _generated
+                      .asMap()
+                      .entries
+                      .map(
+                        (entry) => _GeneratedRecipeCard(
+                          recommendation: entry.value,
+                          dayNumber: _mode == RecipeSection.weekly
+                              ? entry.key + 1
+                              : null,
+                          favorite: experience.isFavorite(
+                            entry.value.recipe.id,
+                          ),
+                          onTap: () => _openRecipe(
+                            entry.value.recipe,
+                            missing: entry.value.missingIngredients,
+                          ),
+                          onFavorite: () => experience.toggleFavorite(
+                            entry.value.recipe.id,
+                            recipe: entry.value.recipe,
+                          ),
+                        ),
                       )
-                    : const Icon(Icons.auto_awesome_rounded),
-                label: Text(
-                  _loading
-                      ? 'Building...'
-                      : _mode == RecipeSection.weekly
-                      ? 'Build my week'
-                      : 'Find recipes',
+                      .toList(),
+                )
+              else if (_mode == RecipeSection.saved && visibleLocal.isEmpty)
+                const _MessageCard(
+                  icon: Icons.favorite_border_rounded,
+                  message: 'No saved recipes yet. Tap the heart on any recipe to build your cookbook.',
+                )
+              else if (_mode == RecipeSection.pantry && visibleLocal.isEmpty)
+                const _MessageCard(
+                  icon: Icons.inventory_2_outlined,
+                  message: 'No usable pantry item matches a recipe yet. Add an ingredient or restock an expired item first.',
+                )
+              else if ({
+                RecipeSection.create,
+                RecipeSection.macros,
+                RecipeSection.weekly,
+              }.contains(_mode))
+                _MessageCard(
+                  icon: Icons.kitchen_outlined,
+                  message: _mode == RecipeSection.weekly
+                      ? 'Build your plan when ready. Pantry availability, people count, and calories per person will be applied.'
+                      : 'Enter an optional preference, then find recipes. Your pantry is always checked before a suggestion is shown.',
+                )
+              else
+                _RecipeGrid(
+                  children: visibleLocal
+                      .map(
+                        (recipe) => _LocalRecipeCard(
+                          recipe: recipe,
+                          pantry: pantry.allItems,
+                          favorite: experience.isFavorite(recipe.id),
+                          onTap: () => _openRecipe(
+                            recipe,
+                            missing: recipe.missingIngredients(pantry.allItems),
+                          ),
+                          onFavorite: () => experience.toggleFavorite(
+                            recipe.id,
+                            recipe: recipe,
+                          ),
+                        ),
+                      )
+                      .toList(),
                 ),
-              ),
-              const SizedBox(height: 18),
-            ],
-            if (_error != null)
-              _MessageCard(
-                icon: Icons.cloud_off_outlined,
-                message: '$_error Showing reliable offline recommendations.',
-              ),
-            if (_mode == RecipeSection.pantry && pantry.useSoonCount > 0)
-              _MessageCard(
-                icon: Icons.eco_outlined,
-                message:
-                    '${pantry.useSoonCount} ingredient(s) need using soon, so recipes using them appear first.',
-              ),
-            Text(
-              _mode == RecipeSection.weekly
-                  ? 'Your week'
-                  : _mode == RecipeSection.saved
-                  ? 'Your cookbook'
-                  : 'Recommended for you',
-              style: Theme.of(context).textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 10),
-            if (_generated.isNotEmpty &&
-                {
-                  RecipeSection.create,
-                  RecipeSection.macros,
-                  RecipeSection.weekly,
-                }.contains(_mode))
-              ..._generated.asMap().entries.map(
-                (entry) => _GeneratedRecipeCard(
-                  recommendation: entry.value,
-                  dayNumber: _mode == RecipeSection.weekly
-                      ? entry.key + 1
-                      : null,
-                  favorite: experience.isFavorite(entry.value.recipe.id),
-                  onTap: () => _openRecipe(
-                    entry.value.recipe,
-                    missing: entry.value.missingIngredients,
-                  ),
-                  onFavorite: () => experience.toggleFavorite(
-                    entry.value.recipe.id,
-                    recipe: entry.value.recipe,
-                  ),
+              if (_mode == RecipeSection.saved &&
+                  experience.history.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                Text(
+                  'Recently cooked',
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
-              )
-            else if (_mode == RecipeSection.saved && visibleLocal.isEmpty)
-              const _MessageCard(
-                icon: Icons.favorite_border_rounded,
-                message: 'No saved recipes yet. Tap the heart on any recipe to build your cookbook.',
-              )
-            else if (_mode == RecipeSection.pantry && visibleLocal.isEmpty)
-              const _MessageCard(
-                icon: Icons.inventory_2_outlined,
-                message: 'No usable pantry item matches a recipe yet. Add an ingredient or restock an expired item first.',
-              )
-            else if ({
-              RecipeSection.create,
-              RecipeSection.macros,
-              RecipeSection.weekly,
-            }.contains(_mode))
-              _MessageCard(
-                icon: Icons.kitchen_outlined,
-                message: _mode == RecipeSection.weekly
-                    ? 'Build your plan when ready. Pantry availability, people count, and calories per person will be applied.'
-                    : 'Enter an optional preference, then find recipes. Your pantry is always checked before a suggestion is shown.',
-              )
-            else
-              ...visibleLocal.map(
-                (recipe) => _LocalRecipeCard(
-                  recipe: recipe,
-                  pantry: pantry.allItems,
-                  favorite: experience.isFavorite(recipe.id),
-                  onTap: () => _openRecipe(
-                    recipe,
-                    missing: recipe.missingIngredients(pantry.allItems),
-                  ),
-                  onFavorite: () =>
-                      experience.toggleFavorite(recipe.id, recipe: recipe),
-                ),
-              ),
-            if (_mode == RecipeSection.saved &&
-                experience.history.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              Text(
-                'Recently cooked',
-                style: Theme.of(context).textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              ...experience.history
-                  .take(5)
-                  .map(
-                    (entry) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const CircleAvatar(
-                        child: Icon(Icons.check_rounded),
-                      ),
-                      title: Text(entry.title),
-                      subtitle: Text(
-                        '${entry.cookedAt.day}/${entry.cookedAt.month}/${entry.cookedAt.year}',
-                      ),
-                      trailing: Text(
-                        '${entry.nutrition.calories.round()} kcal',
+                ...experience.history
+                    .take(5)
+                    .map(
+                      (entry) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const CircleAvatar(
+                          child: Icon(Icons.check_rounded),
+                        ),
+                        title: Text(entry.title),
+                        subtitle: Text(
+                          '${entry.cookedAt.day}/${entry.cookedAt.month}/${entry.cookedAt.year}',
+                        ),
+                        trailing: Text(
+                          '${entry.nutrition.calories.round()} kcal',
+                        ),
                       ),
                     ),
-                  ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -526,26 +571,7 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
 RecipeRecommendationModel _scaledRecipe(
   RecipeRecommendationModel recipe,
   int servings,
-) {
-  if (servings == recipe.servings) return recipe;
-  return RecipeRecommendationModel(
-    id: recipe.id,
-    title: recipe.title,
-    subtitle: recipe.subtitle,
-    imageUrl: recipe.imageUrl,
-    cookTimeMinutes: recipe.cookTimeMinutes,
-    calories: recipe.calories,
-    difficulty: recipe.difficulty,
-    mealType: recipe.mealType,
-    servings: servings,
-    ingredientDetails: NutritionCalculatorService.scaleIngredients(
-      ingredients: recipe.ingredientDetails,
-      baseServings: recipe.servings,
-      targetServings: servings,
-    ),
-    instructions: recipe.instructions,
-  );
-}
+) => recipe.scaledTo(servings);
 
 String _suggestSwap(String ingredient) {
   final value = ingredient.toLowerCase();
@@ -573,69 +599,35 @@ String _pairingFor(RecipeRecommendationModel recipe) {
 }
 
 class _SeparatedFeatureLinks extends StatelessWidget {
-  final VoidCallback onCreate;
-  final VoidCallback onGoals;
-  final VoidCallback onPlan;
-
   const _SeparatedFeatureLinks({
     required this.onCreate,
     required this.onGoals,
     required this.onPlan,
   });
-
+  final VoidCallback onCreate;
+  final VoidCallback onGoals;
+  final VoidCallback onPlan;
   @override
-  Widget build(BuildContext context) => Card(
-    margin: EdgeInsets.zero,
-    child: Column(
-      children: [
-        _FeatureLink(
-          icon: Icons.auto_awesome_rounded,
-          title: 'Create a recipe',
-          subtitle: 'One focused pantry-aware result',
-          onTap: onCreate,
-        ),
-        const Divider(height: 1, indent: 58),
-        _FeatureLink(
-          icon: Icons.track_changes_rounded,
-          title: 'Nutrition goals',
-          subtitle: 'Calories and macros per person',
-          onTap: onGoals,
-        ),
-        const Divider(height: 1, indent: 58),
-        _FeatureLink(
-          icon: Icons.calendar_view_week_rounded,
-          title: '7-day meal plan',
-          subtitle: 'A separate weekly planning workspace',
-          onTap: onPlan,
-        ),
-      ],
-    ),
-  );
-}
-
-class _FeatureLink extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  const _FeatureLink({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => ListTile(
-    onTap: onTap,
-    leading: CircleAvatar(
-      backgroundColor: AppTheme.primaryFlame.withValues(alpha: .12),
-      child: Icon(icon, color: AppTheme.primaryFlame),
-    ),
-    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-    subtitle: Text(subtitle),
-    trailing: const Icon(Icons.chevron_right_rounded),
+  Widget build(BuildContext context) => Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    children: [
+      ActionChip(
+        avatar: const Icon(Icons.auto_awesome_outlined, size: 17),
+        label: const Text('Create a recipe'),
+        onPressed: onCreate,
+      ),
+      ActionChip(
+        avatar: const Icon(Icons.track_changes_outlined, size: 17),
+        label: const Text('Nutrition goals'),
+        onPressed: onGoals,
+      ),
+      ActionChip(
+        avatar: const Icon(Icons.calendar_month_outlined, size: 17),
+        label: const Text('Plan the week'),
+        onPressed: onPlan,
+      ),
+    ],
   );
 }
 
@@ -650,63 +642,44 @@ class _NutritionTodayCard extends StatelessWidget {
     required this.protein,
     required this.proteinTarget,
   });
+
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [Color(0xFF163B33), Color(0xFF28624F)],
-      ),
-      borderRadius: BorderRadius.circular(22),
-    ),
-    child: Row(
+  Widget build(BuildContext context) => SurfacePanel(
+    color: Theme.of(context).colorScheme.primaryContainer,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 58,
-          height: 58,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              CircularProgressIndicator(
-                value: target <= 0 ? 0 : (calories / target).clamp(0, 1),
-                backgroundColor: Colors.white24,
-                color: AppTheme.warmSaffron,
-                strokeWidth: 6,
-              ),
-              Text(
-                '${calories.round()}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
+        Text('Today, so far', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 20),
+        Wrap(
+          spacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              '${calories.round()}',
+              style: Theme.of(context).textTheme.headlineLarge,
+            ),
+            Text(
+              '/ $target kcal',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Today’s nutrition',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                ),
-              ),
-              Text(
-                '${calories.round()} / $target kcal · ${protein.round()} / ${proteinTarget}g protein',
-                style: const TextStyle(color: Colors.white70, fontSize: 12),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Completed recipes are logged automatically',
-                style: TextStyle(color: Colors.white54, fontSize: 10),
-              ),
-            ],
-          ),
+        const SizedBox(height: 14),
+        LinearProgressIndicator(
+          value: target <= 0 ? 0 : (calories / target).clamp(0, 1),
+          minHeight: 7,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          '${protein.round()} / $proteinTarget g protein',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Completed recipes and meal scans are logged here.',
+          style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
     ),
@@ -717,21 +690,11 @@ class _MessageCard extends StatelessWidget {
   final IconData icon;
   final String message;
   const _MessageCard({required this.icon, required this.message});
+
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 14),
-    padding: const EdgeInsets.all(13),
-    decoration: BoxDecoration(
-      color: AppTheme.warmSaffron.withValues(alpha: .10),
-      borderRadius: BorderRadius.circular(14),
-    ),
-    child: Row(
-      children: [
-        Icon(icon, color: AppTheme.warmSaffron),
-        const SizedBox(width: 10),
-        Expanded(child: Text(message, style: const TextStyle(fontSize: 12))),
-      ],
-    ),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: StatusNotice(message: message, icon: icon),
   );
 }
 
@@ -748,61 +711,15 @@ class _LocalRecipeCard extends StatelessWidget {
     required this.onTap,
     required this.onFavorite,
   });
+
   @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(bottom: 12),
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onTap: onTap,
-      child: Row(
-        children: [
-          Image.network(
-            recipe.imageUrl,
-            width: 96,
-            height: 106,
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => const SizedBox(
-              width: 96,
-              height: 106,
-              child: Icon(Icons.restaurant_rounded),
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    recipe.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${recipe.matchPercentage(pantry)}% pantry match · ${recipe.cookTimeMinutes} min',
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    '${recipe.missingIngredients(pantry).length} missing · ${recipe.calories} kcal',
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          IconButton(
-            onPressed: onFavorite,
-            icon: Icon(
-              favorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-              color: AppTheme.primaryFlame,
-            ),
-          ),
-        ],
-      ),
-    ),
+  Widget build(BuildContext context) => _RecipeOverviewCard(
+    recipe: recipe,
+    matchPercent: recipe.matchPercentage(pantry),
+    missingCount: recipe.missingIngredients(pantry).length,
+    favorite: favorite,
+    onTap: onTap,
+    onFavorite: onFavorite,
   );
 }
 
@@ -819,54 +736,155 @@ class _GeneratedRecipeCard extends StatelessWidget {
     required this.onTap,
     required this.onFavorite,
   });
+
+  @override
+  Widget build(BuildContext context) => _RecipeOverviewCard(
+    recipe: recommendation.recipe,
+    matchPercent: recommendation.pantryMatchPercent,
+    missingCount: recommendation.missingIngredients.length,
+    dayNumber: dayNumber,
+    favorite: favorite,
+    onTap: onTap,
+    onFavorite: onFavorite,
+  );
+}
+
+class _RecipeGrid extends StatelessWidget {
+  const _RecipeGrid({required this.children});
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final columns = constraints.maxWidth >= 760 ? 2 : 1;
+      final width = (constraints.maxWidth - (columns - 1) * 16) / columns;
+      return Wrap(
+        spacing: 16,
+        children: [
+          for (final child in children) SizedBox(width: width, child: child),
+        ],
+      );
+    },
+  );
+}
+
+class _RecipeOverviewCard extends StatelessWidget {
+  const _RecipeOverviewCard({
+    required this.recipe,
+    required this.matchPercent,
+    required this.missingCount,
+    required this.favorite,
+    required this.onTap,
+    required this.onFavorite,
+    this.dayNumber,
+  });
+  final RecipeRecommendationModel recipe;
+  final num matchPercent;
+  final int missingCount;
+  final int? dayNumber;
+  final bool favorite;
+  final VoidCallback onTap;
+  final VoidCallback onFavorite;
+
   @override
   Widget build(BuildContext context) {
-    final recipe = recommendation.recipe;
+    final colors = Theme.of(context).colorScheme;
+    final placeholder = Container(
+      color: colors.primaryContainer,
+      child: Icon(Icons.restaurant_outlined, color: colors.primary, size: 30),
+    );
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 14),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                backgroundColor: AppTheme.primaryFlame.withValues(alpha: .12),
-                child: Text(
-                  dayNumber == null
-                      ? '${recommendation.pantryMatchPercent}%'
-                      : 'D$dayNumber',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.primaryFlame,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: SizedBox(
+                  width: 84,
+                  height: 104,
+                  child: Image.network(
+                    recipe.imageUrl,
+                    fit: BoxFit.cover,
+                    frameBuilder: (_, child, frame, _) =>
+                        frame == null ? placeholder : child,
+                    errorBuilder: (_, _, _) => placeholder,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      recipe.title,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            dayNumber == null
+                                ? '$matchPercent% pantry match'
+                                : 'DAY $dayNumber',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: colors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: favorite
+                              ? 'Remove saved recipe'
+                              : 'Save recipe',
+                          onPressed: onFavorite,
+                          constraints: const BoxConstraints(
+                            minWidth: 32,
+                            minHeight: 32,
+                          ),
+                          padding: EdgeInsets.zero,
+                          icon: Icon(
+                            favorite
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_border_rounded,
+                            size: 20,
+                            color: colors.primary,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${recommendation.pantryMatchPercent}% pantry match · ${recipe.cookTimeMinutes} min · ${recommendation.missingIngredients.length} missing',
-                      style: const TextStyle(fontSize: 11),
+                      recipe.title,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium
+                          ?.copyWith(fontSize: 15),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          '${recipe.cookTimeMinutes} min',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        Text(
+                          '${recipe.calories} kcal',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        Text(
+                          missingCount == 0
+                              ? 'Ready to cook'
+                              : '$missingCount to pick up',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
                     ),
                   ],
-                ),
-              ),
-              IconButton(
-                onPressed: onFavorite,
-                icon: Icon(
-                  favorite
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_border_rounded,
-                  color: AppTheme.primaryFlame,
                 ),
               ),
             ],
@@ -964,119 +982,139 @@ class _CookingPreferencesScreenState extends State<CookingPreferencesScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Cooking preferences')),
-    body: ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        const Text(
-          'Personalize recipes and plans',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'Separate multiple entries with commas. Allergens and dislikes are treated as avoid rules.',
-        ),
-        const SizedBox(height: 18),
-        DropdownButtonFormField<String>(
-          initialValue: _goal,
-          decoration: const InputDecoration(labelText: 'Goal'),
-          items:
-              const [
-                    'Balanced eating',
-                    'Lose weight',
-                    'Build muscle',
-                    'Save time',
-                    'Reduce food waste',
-                  ]
-                  .map(
-                    (value) =>
-                        DropdownMenuItem(value: value, child: Text(value)),
-                  )
-                  .toList(),
-          onChanged: (value) => setState(() => _goal = value!),
-        ),
-        const SizedBox(height: 12),
-        _field(_diet, 'Dietary needs', 'halal, vegetarian, gluten-free'),
-        _field(_allergens, 'Allergens', 'peanuts, shellfish'),
-        _field(_dislikes, 'Ingredients to avoid', 'mushrooms, olives'),
-        _field(_cuisines, 'Favourite cuisines', 'Pakistani, Italian'),
-        Row(
-          children: [
-            Expanded(
-              child: DropdownButtonFormField<int>(
-                initialValue: _servings,
-                decoration: const InputDecoration(labelText: 'People eating'),
-                items: [1, 2, 3, 4, 5, 6, 8, 10, 12]
-                    .map(
-                      (value) =>
-                          DropdownMenuItem(value: value, child: Text('$value')),
-                    )
-                    .toList(),
-                onChanged: (value) => setState(() => _servings = value!),
+    body: AppPageBody(
+      maxWidth: 760,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        children: [
+          const PageIntro(
+            eyebrow: 'MAKE IT PERSONAL',
+            title: 'Good food, your way.',
+            subtitle: 'Shape your recipes around the people, tastes and goals that matter to you.',
+          ),
+          const SizedBox(height: 26),
+          FormSection(
+            title: 'At your table',
+            description:
+                'Set a goal, your usual portions and the time you have.',
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: _goal,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Your goal'),
+                items:
+                    const [
+                          'Balanced eating',
+                          'Lose weight',
+                          'Build muscle',
+                          'Save time',
+                          'Reduce food waste',
+                        ]
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
+                onChanged: (value) => setState(() => _goal = value!),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: DropdownButtonFormField<int>(
-                initialValue: _maxTime,
-                decoration: const InputDecoration(labelText: 'Max cook time'),
-                items: [15, 20, 30, 45, 60, 90]
+              const SizedBox(height: 16),
+              FormFieldPair(
+                first: DropdownButtonFormField<int>(
+                  initialValue: _servings,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'People eating'),
+                  items: [1, 2, 3, 4, 5, 6, 8, 10, 12]
+                      .map(
+                        (value) => DropdownMenuItem(
+                          value: value,
+                          child: Text('$value'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() => _servings = value!),
+                ),
+                second: DropdownButtonFormField<int>(
+                  initialValue: _maxTime,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Time to cook'),
+                  items: [15, 20, 30, 45, 60, 90]
+                      .map(
+                        (value) => DropdownMenuItem(
+                          value: value,
+                          child: Text('$value min'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() => _maxTime = value!),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          FormSection(
+            title: 'Tastes & dietary needs',
+            description: 'Separate entries with commas. Allergens and avoided ingredients are applied to suggestions.',
+            children: [
+              _field(_diet, 'Dietary needs', 'halal, vegetarian, gluten-free'),
+              _field(_allergens, 'Allergens', 'peanuts, shellfish'),
+              _field(_dislikes, 'Ingredients to avoid', 'mushrooms, olives'),
+              _field(_cuisines, 'Favourite cuisines', 'Pakistani, Italian'),
+            ],
+          ),
+          const SizedBox(height: 18),
+          FormSection(
+            title: 'Daily targets',
+            description: 'Your targets are applied per person.',
+            children: [
+              DropdownButtonFormField<int>(
+                initialValue: _mealsPerDay,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Meals per day'),
+                items: [1, 2, 3, 4, 5, 6]
                     .map(
                       (value) => DropdownMenuItem(
                         value: value,
-                        child: Text('$value min'),
+                        child: Text('$value meals'),
                       ),
                     )
                     .toList(),
-                onChanged: (value) => setState(() => _maxTime = value!),
+                onChanged: (value) => setState(() => _mealsPerDay = value!),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              FormFieldPair(
+                first: _number(_calories, 'Daily calories'),
+                second: _number(_protein, 'Protein (g)'),
+              ),
+              const SizedBox(height: 16),
+              FormFieldPair(
+                first: _number(_carbs, 'Carbs (g)'),
+                second: _number(_fat, 'Fat (g)'),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'About ${((int.tryParse(_calories.text) ?? 2000) / _mealsPerDay).round()} kcal per meal, per person',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+    bottomNavigationBar: SafeArea(
+      child: AppPageBody(
+        maxWidth: 760,
+        shrinkWrap: true,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+          child: FilledButton.icon(
+            onPressed: _save,
+            icon: const Icon(Icons.check_rounded),
+            label: const Text('Save preferences'),
+          ),
         ),
-        const SizedBox(height: 18),
-        const Text(
-          'Daily targets per person',
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 10),
-        DropdownButtonFormField<int>(
-          initialValue: _mealsPerDay,
-          decoration: const InputDecoration(labelText: 'Meals per day'),
-          items: [1, 2, 3, 4, 5, 6]
-              .map(
-                (value) =>
-                    DropdownMenuItem(value: value, child: Text('$value meals')),
-              )
-              .toList(),
-          onChanged: (value) => setState(() => _mealsPerDay = value!),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(child: _number(_calories, 'Daily calories')),
-            const SizedBox(width: 10),
-            Expanded(child: _number(_protein, 'Protein g')),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'About ${((int.tryParse(_calories.text) ?? 2000) / _mealsPerDay).round()} kcal per meal, per person',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(child: _number(_carbs, 'Carbs g')),
-            const SizedBox(width: 10),
-            Expanded(child: _number(_fat, 'Fat g')),
-          ],
-        ),
-        const SizedBox(height: 24),
-        FilledButton.icon(
-          onPressed: _save,
-          icon: const Icon(Icons.save_outlined),
-          label: const Text('Save preferences'),
-        ),
-      ],
+      ),
     ),
   );
 

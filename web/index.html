@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -18,21 +18,40 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="A calmer kitchen starts here. Track your pantry, discover recipes, cook with guidance and plan your next grocery shop with CulinaryAI.">
+  <meta name="theme-color" content="#2D654F">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="culinary_ai">
+  <meta name="apple-mobile-web-app-title" content="CulinaryAI">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>culinary_ai</title>
+  <title>CulinaryAI · Your everyday kitchen companion</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    html, body { margin: 0; background: #FAFAF6; }
+    #launch { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; font: 16px system-ui, sans-serif; color: #193B2D; }
+    #launch strong { font-size: 28px; letter-spacing: -1px; }
+    #launch p { color: #637166; font-size: 14px; }
+    #launch .mark { margin: 0 auto 20px; width: 56px; height: 56px; border-radius: 18px; background: #2D654F; color: white; display: grid; place-content: center; font-size: 27px; }
+    #launch .progress { width: 96px; height: 3px; margin: 16px auto; border-radius: 3px; background: #DDE6DD; overflow: hidden; }
+    #launch .progress::after { content: ''; display: block; width: 40%; height: 100%; border-radius: inherit; background: #2D654F; animation: load 1.2s ease-in-out infinite alternate; }
+    @keyframes load { to { transform: translateX(150%); } }
+    @media (prefers-reduced-motion: reduce) { #launch .progress::after { animation: none; } }
+  </style>
 </head>
 <body>
+  <div id="launch" role="status" aria-label="Opening CulinaryAI">
+    <img class="mark" src="icons/Icon-192.png" alt="" aria-hidden="true">
+    <strong>CulinaryAI</strong>
+    <p>Your everyday kitchen companion.</p>
+    <div class="progress" aria-hidden="true"></div>
+    <noscript>Please enable JavaScript to open your kitchen.</noscript>
+  </div>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
@@ -41,6 +60,12 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
-  <script src="flutter_bootstrap.js" async></script>
+  <script src="assets/packages/flutter_inappwebview_web/assets/web/web_support.js" defer></script>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      document.getElementById('launch')?.remove();
+    });
+  </script>
+  <script src="flutter_bootstrap.js" defer></script>
 </body>
 </html>

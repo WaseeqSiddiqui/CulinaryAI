@@ -19,6 +19,10 @@ class PantryItemModel {
   final String name;
   final double quantity;
   final String unit;
+  final String category;
+  final String? packageType;
+  final double? packageCount;
+  final double? quantityPerPackage;
   final String location;
   final double lowStockThreshold;
   final String addedVia; // 'manual' or 'receipt_scan'
@@ -38,6 +42,10 @@ class PantryItemModel {
     required this.name,
     required this.quantity,
     required this.unit,
+    this.category = 'Other',
+    this.packageType,
+    this.packageCount,
+    this.quantityPerPackage,
     required String location,
     this.lowStockThreshold = 1.0,
     this.addedVia = 'manual',
@@ -53,6 +61,29 @@ class PantryItemModel {
   }) : location = PantryZoneResolver.normalize(location);
 
   bool get isLowStock => quantity <= lowStockThreshold;
+  double get remainingQuantity => quantity;
+  bool get isOpened => openedDate != null;
+  bool get hasKnownPackageCapacity =>
+      packageType != null &&
+      packageType!.trim().isNotEmpty &&
+      packageCount != null &&
+      quantityPerPackage != null &&
+      packageCount! > 0 &&
+      quantityPerPackage! > 0;
+  bool get needsPackageDetails =>
+      !hasKnownPackageCapacity &&
+      const {
+        'pc',
+        'pcs',
+        'piece',
+        'pieces',
+        'pack',
+        'packs',
+      }.contains(unit.trim().toLowerCase()) &&
+      RegExp(
+        r'\b(sauce|oil|milk|cream|vinegar|ketchup|mayonnaise|drink|juice|water)\b',
+        caseSensitive: false,
+      ).hasMatch(name);
 
   int? daysUntilExpiryAt(DateTime now) {
     final date = expiryDate;
@@ -95,6 +126,12 @@ class PantryItemModel {
       'name': name,
       'quantity': quantity,
       'unit': unit,
+      'category': category,
+      'package_type': packageType,
+      'package_count': packageCount,
+      'quantity_per_package': quantityPerPackage,
+      'remaining_quantity': quantity,
+      'package_status': isOpened ? 'opened' : 'unopened',
       'location': location,
       'low_stock_threshold': lowStockThreshold,
       'added_via': addedVia,
@@ -115,8 +152,15 @@ class PantryItemModel {
       id: id,
       householdId: map['household_id'] ?? '',
       name: map['name'] ?? '',
-      quantity: (map['quantity'] as num?)?.toDouble() ?? 0.0,
+      quantity:
+          (map['remaining_quantity'] as num?)?.toDouble() ??
+          (map['quantity'] as num?)?.toDouble() ??
+          0.0,
       unit: map['unit'] ?? 'pcs',
+      category: map['category'] ?? 'Other',
+      packageType: map['package_type']?.toString(),
+      packageCount: (map['package_count'] as num?)?.toDouble(),
+      quantityPerPackage: (map['quantity_per_package'] as num?)?.toDouble(),
       location: map['location'] ?? 'Pantry Shelf',
       lowStockThreshold:
           (map['low_stock_threshold'] as num?)?.toDouble() ?? 1.0,
@@ -149,6 +193,10 @@ class PantryItemModel {
     String? name,
     double? quantity,
     String? unit,
+    String? category,
+    Object? packageType = _unset,
+    Object? packageCount = _unset,
+    Object? quantityPerPackage = _unset,
     String? location,
     double? lowStockThreshold,
     String? addedVia,
@@ -168,6 +216,16 @@ class PantryItemModel {
       name: name ?? this.name,
       quantity: quantity ?? this.quantity,
       unit: unit ?? this.unit,
+      category: category ?? this.category,
+      packageType: identical(packageType, _unset)
+          ? this.packageType
+          : packageType as String?,
+      packageCount: identical(packageCount, _unset)
+          ? this.packageCount
+          : packageCount as double?,
+      quantityPerPackage: identical(quantityPerPackage, _unset)
+          ? this.quantityPerPackage
+          : quantityPerPackage as double?,
       location: location ?? this.location,
       lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
       addedVia: addedVia ?? this.addedVia,

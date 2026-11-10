@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/theme/app_theme.dart';
+import '../../widgets/app_ui.dart';
+import '../../widgets/scan_ui.dart';
 import '../../models/pantry_item_model.dart';
 import '../../services/expiry_label_parser.dart';
 import '../../services/receipt_ocr_service.dart';
@@ -20,7 +22,14 @@ class ConfirmedExpiry {
 }
 
 class ExpiryLabelScannerScreen extends StatefulWidget {
-  const ExpiryLabelScannerScreen({super.key});
+  const ExpiryLabelScannerScreen({
+    super.key,
+    this.imagePicker,
+    this.ocrService,
+  });
+
+  final ImagePicker? imagePicker;
+  final ReceiptOcrService? ocrService;
 
   @override
   State<ExpiryLabelScannerScreen> createState() =>
@@ -28,25 +37,26 @@ class ExpiryLabelScannerScreen extends StatefulWidget {
 }
 
 class _ExpiryLabelScannerScreenState extends State<ExpiryLabelScannerScreen> {
-  final _picker = ImagePicker();
-  final _ocr = ReceiptOcrService();
+  late final _picker = widget.imagePicker ?? ImagePicker();
+  late final _ocr = widget.ocrService ?? ReceiptOcrService();
   DateTime? _date;
   String? _matchedText;
   bool _busy = false;
   String? _message;
 
   Future<void> _scan(ImageSource source) async {
-    final image = await _picker.pickImage(
-      source: source,
-      imageQuality: 95,
-      maxWidth: 2400,
-    );
-    if (image == null || !mounted) return;
+    if (_busy) return;
     setState(() {
       _busy = true;
       _message = null;
     });
     try {
+      final image = await _picker.pickImage(
+        source: source,
+        imageQuality: 95,
+        maxWidth: 2400,
+      );
+      if (image == null || !mounted) return;
       final ocr = await _ocr.recognize(image.path);
       final parsed = ExpiryLabelParser.parse(ocr.rawText);
       if (!mounted) return;
@@ -80,6 +90,7 @@ class _ExpiryLabelScannerScreenState extends State<ExpiryLabelScannerScreen> {
     if (value != null && mounted) {
       setState(() {
         _date = value;
+        _matchedText = null;
         _message = 'Manually confirmed date.';
       });
     }
@@ -101,92 +112,75 @@ class _ExpiryLabelScannerScreenState extends State<ExpiryLabelScannerScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Scan expiry label')),
-      body: SafeArea(
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Scan an expiry label')),
+    body: SafeArea(
+      child: AppPageBody(
+        maxWidth: 760,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 36),
           children: [
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryFlame.withValues(alpha: .08),
-                borderRadius: BorderRadius.circular(20),
+            if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
+              ScanLanding(
+                embedded: true,
+                busy: _busy,
+                title: 'Make the fresh things last.',
+                description: 'Read the date on your package, then confirm it before saving.',
+                icon: Icons.event_available_outlined,
+                onCamera: () => _scan(ImageSource.camera),
+                onGallery: () => _scan(ImageSource.gallery),
+                tip: 'Keep EXP, Best Before or Use By text sharp and in focus. Compare the detected date with the package.',
               ),
-              child: const Column(
-                children: [
-                  Icon(
-                    Icons.document_scanner_outlined,
-                    size: 52,
-                    color: AppTheme.primaryFlame,
-                  ),
-                  SizedBox(height: 12),
-                  Text(
-                    'Keep EXP, Best Before or Use By text sharp and inside the frame.',
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Always check the detected date against the package.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ],
+            if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) ...[
+              const PageIntro(
+                title: 'Give freshness a date.',
+                subtitle: 'Choose the expiry date printed on your package. Check whether the label says Use By or Best Before.',
               ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: _busy ? null : () => _scan(ImageSource.camera),
-                    icon: const Icon(Icons.camera_alt_outlined),
-                    label: const Text('Take photo'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _busy ? null : () => _scan(ImageSource.gallery),
-                    icon: const Icon(Icons.photo_library_outlined),
-                    label: const Text('Gallery'),
-                  ),
-                ),
-              ],
-            ),
+              const SizedBox(height: 20),
+              const StatusNotice(
+                message: 'Photo date scanning is available on Android. You can confirm the printed date manually below.',
+              ),
+            ],
             if (_busy) ...[
               const SizedBox(height: 24),
-              const Center(child: CircularProgressIndicator()),
+              const LinearProgressIndicator(),
             ],
             if (_message != null) ...[
-              const SizedBox(height: 18),
-              Text(_message!, textAlign: TextAlign.center),
+              const SizedBox(height: 20),
+              StatusNotice(message: _message!),
             ],
-            const SizedBox(height: 18),
-            ListTile(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Theme.of(context).dividerColor),
-              ),
-              leading: const Icon(Icons.event_outlined),
-              title: Text(
-                _date == null
-                    ? 'No date selected'
-                    : DateFormat('d MMMM yyyy').format(_date!),
-              ),
-              subtitle: _matchedText == null ? null : Text(_matchedText!),
-              trailing: const Icon(Icons.edit_calendar_outlined),
-              onTap: _pickDate,
-            ),
-            const SizedBox(height: 18),
-            FilledButton(
-              onPressed: _date == null ? null : _confirm,
-              child: const Text('Confirm expiry date'),
+            const SizedBox(height: 24),
+            FormSection(
+              title: 'Confirm the date',
+              description: 'You can edit the date if it needs correcting.',
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    Icons.event_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  title: Text(
+                    _date == null
+                        ? 'Choose an expiry date'
+                        : DateFormat('d MMMM yyyy').format(_date!),
+                  ),
+                  subtitle: _matchedText == null
+                      ? const Text('Choose manually or scan a label above')
+                      : Text(_matchedText!),
+                  trailing: const Icon(Icons.edit_calendar_outlined),
+                  onTap: _busy ? null : _pickDate,
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _date == null || _busy ? null : _confirm,
+                  child: const Text('Confirm expiry date'),
+                ),
+              ],
             ),
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
 }

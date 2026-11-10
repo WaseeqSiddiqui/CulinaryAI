@@ -16,15 +16,21 @@ class MainActivity : FlutterActivity() {
     private var tesseractOcrChannel: TesseractOcrChannel? = null
     private var locationChannel: MethodChannel? = null
     private var pendingLocationResult: MethodChannel.Result? = null
+    private var currentLocationResolver: CurrentLocationResolver? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         tesseractOcrChannel = TesseractOcrChannel(this, flutterEngine)
+        currentLocationResolver = CurrentLocationResolver(this)
         locationChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             LOCATION_CHANNEL,
         ).also { channel ->
             channel.setMethodCallHandler { call, result ->
+                if (call.method == "getCurrentLocationAddress") {
+                    currentLocationResolver?.resolve(result)
+                    return@setMethodCallHandler
+                }
                 if (call.method != "requestLocationPermission") {
                     result.notImplemented()
                     return@setMethodCallHandler
@@ -85,6 +91,8 @@ class MainActivity : FlutterActivity() {
         pendingLocationResult = null
         locationChannel?.setMethodCallHandler(null)
         locationChannel = null
+        currentLocationResolver?.close()
+        currentLocationResolver = null
         tesseractOcrChannel?.close()
         tesseractOcrChannel = null
         super.cleanUpFlutterEngine(flutterEngine)

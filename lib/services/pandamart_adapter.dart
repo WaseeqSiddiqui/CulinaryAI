@@ -7,6 +7,8 @@ import '../models/store_models.dart';
 import 'store_adapter.dart';
 import 'store_money_parser.dart';
 import 'store_selector_config.dart';
+import 'store_checkout_service.dart';
+import 'pandamart_checkout_page.dart';
 
 class StoreAutomationException implements Exception {
   const StoreAutomationException(this.message, {this.selectorFailure = false});
@@ -25,6 +27,7 @@ class PandaMartAdapter implements StoreAdapter {
   int _actionGeneration = 0;
   int _searchNavigationSequence = 0;
   Uri? _activeStoreUri;
+  final checkout = StoreCheckoutService();
 
   double? lastCartTotal;
   bool lastCartReadWasVerified = false;
@@ -63,6 +66,11 @@ class PandaMartAdapter implements StoreAdapter {
     'cash_on_delivery',
     'final_purchase_button',
     'order_confirmation',
+    'cash_on_delivery_labels',
+    'final_purchase_labels',
+    'order_confirmation_labels',
+    'checkout_address',
+    'checkout_total',
   ]);
 
   @override
@@ -73,7 +81,10 @@ class PandaMartAdapter implements StoreAdapter {
 
   Uri? get activeStoreUri => _activeStoreUri;
 
-  void cancelPendingActions() => _actionGeneration++;
+  void cancelPendingActions() {
+    _actionGeneration++;
+    checkout.cancel();
+  }
 
   bool isAllowedUri(Uri? uri) {
     if (uri == null || uri.scheme != 'https') return false;
@@ -91,6 +102,25 @@ class PandaMartAdapter implements StoreAdapter {
       final normalized = allowed.toLowerCase();
       return host == normalized || host.endsWith('.$normalized');
     });
+  }
+
+  bool canOpenLoginPopup({
+    required Uri? opener,
+    required Uri? target,
+    required bool hasGesture,
+  }) {
+    if (!isAllowedUri(opener)) return false;
+    if (isExternalLoginUri(target)) return true;
+    if (isAllowedUri(target) &&
+        RegExp(
+          r'login|auth|account|oauth',
+          caseSensitive: false,
+        ).hasMatch(target!.path)) {
+      return true;
+    }
+    final blank =
+        target == null || (target.scheme == 'about' && target.path == 'blank');
+    return blank && hasGesture;
   }
 
   bool isStoreUri(Uri? uri) {
@@ -113,6 +143,10 @@ class PandaMartAdapter implements StoreAdapter {
       scheme: uri.scheme,
       host: uri.host,
       pathSegments: baseSegments,
+      queryParameters: {
+        for (final key in const ['lat', 'lng', 'latitude', 'longitude'])
+          if (uri.queryParameters[key] != null) key: uri.queryParameters[key]!,
+      },
     );
     return true;
   }
@@ -123,8 +157,13 @@ class PandaMartAdapter implements StoreAdapter {
     final path = config
         .value('search_path_template')
         .replaceAll('{query}', Uri.encodeQueryComponent(query.trim()));
-    return Uri.tryParse(
-      '${store.toString().replaceFirst(RegExp(r'/$'), '')}/$path',
+    final relative = Uri.tryParse(path);
+    if (relative == null || relative.hasScheme || relative.hasAuthority) {
+      return null;
+    }
+    return store.replace(
+      path: '${store.path.replaceFirst(RegExp(r'/$'), '')}/${relative.path}',
+      queryParameters: {...store.queryParameters, ...relative.queryParameters},
     );
   }
 
@@ -135,26 +174,247 @@ class PandaMartAdapter implements StoreAdapter {
   Future<bool> clickLocateMe(InAppWebViewController controller) async {
     await _requireAllowedPage(controller);
     final selector = config.value('locate_me_button');
-    final label = config.value('locate_me_text').trim().toLowerCase();
-    if (selector.isEmpty || label.isEmpty) return false;
+    final labels = {
+      config.value('locate_me_text').trim().toLowerCase(),
+      'locate me',
+      'use current location',
+      'use my current location',
+    }..remove('');
+    if (selector.isEmpty || labels.isEmpty) return false;
     final result = await _js(controller, '''
       (() => {
-        const button = Array.from(document.querySelectorAll(${_quoted(selector)}))
+        const element = Array.from(document.querySelectorAll(${_quoted(selector)}))
           .find((candidate) => {
-            const text = (candidate.textContent || '').trim().toLowerCase();
+            const names = [candidate.textContent, candidate.getAttribute('aria-label'), candidate.getAttribute('title')].map(value => (value || '').trim().toLowerCase());
             const style = window.getComputedStyle(candidate);
             const rect = candidate.getBoundingClientRect();
-            return text === ${_quoted(label)} &&
+            return names.some(name => ${jsonEncode(labels.toList())}.includes(name)) &&
               style.display !== 'none' &&
               style.visibility !== 'hidden' &&
               rect.width > 0 && rect.height > 0;
           });
+        const button = element?.matches('button,a,input,[role="button"]')
+          ? element : element?.querySelector('button,[role="button"]');
         if (!button || button.disabled) return false;
         button.click();
         return true;
       })()
     ''');
     return result == true;
+  }
+
+  Future<bool> openSignIn(InAppWebViewController controller) async {
+    await _requireAllowedPage(controller);
+    final alreadyOpen =
+        await _js(controller, '''
+      (() => {
+        const visible = e => { const r=e.getBoundingClientRect(),s=getComputedStyle(e); return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'; };
+        if ([...document.querySelectorAll('[role="dialog"]')].some(e => visible(e) && /log in|sign in|email|continue with/i.test(e.innerText||''))) return true;
+        const button = [...document.querySelectorAll(${_quoted(config.value('logged_out'))})].find(visible)
+          || [...document.querySelectorAll('button,a')].find(e => visible(e) && /^(log in|sign in|login)\$/i.test((e.innerText||'').trim()));
+        if (!button || button.disabled) return false;
+        button.scrollIntoView({block:'center'}); button.click(); return false;
+      })()
+    ''') ==
+        true;
+    if (alreadyOpen) return true;
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    return _setupFormVisible(controller, login: true);
+  }
+
+  Future<bool> openAddressEntry(InAppWebViewController controller) async {
+    await _requireAllowedPage(controller);
+    if (await isAddressEntryOpen(controller)) return true;
+    final selector = config.value('address_entry').trim().isEmpty
+        ? '[data-testid="location-search-button"], input[placeholder*="address" i]'
+        : config.value('address_entry');
+    final alreadyOpen =
+        await _js(controller, '''
+      (() => {
+        const visible = e => { const r=e.getBoundingClientRect(),s=getComputedStyle(e); return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'; };
+        if ([...document.querySelectorAll('[role="dialog"]')].some(e => visible(e) && /delivery address|confirm location|enter your address|exact location/i.test(e.innerText||''))) return true;
+        const element = [...document.querySelectorAll(${_quoted(selector)})].find(visible);
+        if (!element || element.disabled) return false;
+        if (element.getAttribute('aria-expanded') === 'true') return true;
+        element.scrollIntoView({block:'center'});
+        if (element.tagName === 'INPUT') { element.focus(); return true; }
+        element.click(); return false;
+      })()
+    ''') ==
+        true;
+    if (alreadyOpen) return true;
+    for (var attempt = 0; attempt < 10; attempt++) {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      if (await isAddressEntryOpen(controller)) return true;
+    }
+    return false;
+  }
+
+  Future<bool> isAddressEntryOpen(InAppWebViewController controller) async =>
+      await _setupFormVisible(controller, login: false);
+
+  Future<void> trackDeliveryAddressEdits(
+    InAppWebViewController controller,
+  ) async {
+    await _requireAllowedPage(controller);
+    await _js(controller, '''
+      (() => {
+        if (window.__culinaryAddressTracking) return;
+        window.__culinaryAddressTracking = true;
+        const visible=e=>{if(!e)return false;const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none';};
+        const input=()=>[...document.querySelectorAll('input[data-testid="restaurants-search-form__input"],input[aria-label="Enter delivery address"]')].find(visible);
+        // Let the merchant own selection and map state. React can emit input
+        // events while applying a suggestion; a separate dirty flag races it.
+        document.addEventListener('keydown', event => {
+          const field=input();
+          if(event.target!==field || event.isComposing || event.repeat ||
+              !(event.key==='Enter'||event.keyCode===13))return;
+          const scope=field.closest('[role="dialog"]') || document;
+          const options=[...scope.querySelectorAll('[data-testid="address-suggestion-item"]')].filter(visible);
+          const option=options.find(e=>e.getAttribute('aria-selected')==='true') || options[0];
+          if(!option)return;
+          event.preventDefault();event.stopImmediatePropagation();
+          option.click();
+        },true);
+      })()
+    ''');
+  }
+
+  Future<String> deliveryAddressDraft(InAppWebViewController controller) async {
+    await _requireAllowedPage(controller);
+    return (await _js(controller, '''
+      (() => {
+        const input = [...document.querySelectorAll('input[data-testid="restaurants-search-form__input"]')].find(e => {
+          const r=e.getBoundingClientRect(),s=getComputedStyle(e);
+          return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none';
+        });
+        return input?.value.trim() || '';
+      })()
+    '''))?.toString() ??
+        '';
+  }
+
+  Future<bool> addressSelectionReady(InAppWebViewController controller) async {
+    return await _js(controller, '''
+      (() => {
+        const visible=e=>{if(!e)return false;const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none';};
+        const button=[...document.querySelectorAll('[data-testid="map-modal-submit"]')].find(visible);
+        const input=[...(button?.closest('[role="dialog"]')?.querySelectorAll('input[data-testid="restaurants-search-form__input"],input[aria-label="Enter delivery address"]')||[])].find(visible);
+        if(!input?.value.trim()||!button||button.disabled)return false;
+        return button.getAttribute('aria-disabled')!=='true' && input.getAttribute('aria-invalid')!=='true';
+      })()
+    ''') ==
+        true;
+  }
+
+  bool addressMatchesDraft(String label, String draft) {
+    String normalized(String text) => text
+        .toLowerCase()
+        .replaceFirst(RegExp(r'^new\s*address\s*'), '')
+        .replaceAll(RegExp(r'[^a-z0-9\u0600-\u06ff]+'), ' ')
+        .trim();
+    final current = normalized(label);
+    final expected = normalized(draft);
+    return current.length >= 3 &&
+        expected.length >= 3 &&
+        (current == expected ||
+            current.contains(expected) ||
+            expected.contains(current));
+  }
+
+  Future<bool> openStoreSelection(InAppWebViewController controller) async {
+    await _requireAllowedPage(controller);
+    if (await hasActiveStore(controller)) return true;
+    return await _js(controller, '''
+      (() => {
+        const visible=e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none';};
+        const tabs=[...document.querySelectorAll('button[role="tab"],a[role="tab"]')].filter(visible);
+        const tab=tabs.find(e=>/^pandamart\$/i.test((e.textContent||'').trim()))
+          || tabs.find(e=>/^(shops|groceries)\$/i.test((e.textContent||'').trim()));
+        if(!tab||tab.disabled)return false;
+        if(tab.getAttribute('aria-selected')!=='true')tab.click();
+        return true;
+      })()
+    ''') ==
+        true;
+  }
+
+  Future<bool> searchDeliveryAddress(
+    InAppWebViewController controller,
+    String address,
+  ) async {
+    await _requireAllowedPage(controller);
+    await controller.requestFocus();
+    final inserted =
+        await _js(controller, '''
+      (() => {
+        const visible = e => { const r=e.getBoundingClientRect(),s=getComputedStyle(e); return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'; };
+        const input = [...document.querySelectorAll('[data-testid="restaurants-search-form__input"], input[aria-label="Enter delivery address"], input[placeholder*="Street" i]')].find(visible);
+        if (!input || input.disabled) return false;
+        input.focus(); input.select();
+        const inserted = document.execCommand('insertText', false, ${_quoted(address)});
+        return inserted && input.value === ${_quoted(address)};
+      })()
+    ''') ==
+        true;
+    if (inserted) {
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      await _js(controller, '''
+        (() => {
+          const input = document.activeElement;
+          if (input?.tagName === 'INPUT' && input.value === ${_quoted(address)}) {
+            input.dispatchEvent(new KeyboardEvent('keyup', {key:' ', bubbles:true}));
+          }
+        })()
+      ''');
+    }
+    return inserted;
+  }
+
+  /// This confirms only a delivery pin, never a cart or purchase.
+  Future<bool> confirmDeliveryAddress(InAppWebViewController controller) async {
+    await _requireAllowedPage(controller);
+    return await _js(controller, '''
+      (() => {
+        const visible = e => { const r=e.getBoundingClientRect(),s=getComputedStyle(e); return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'; };
+        const button = [...document.querySelectorAll('[data-testid="map-modal-submit"]')].find(visible);
+        const dialog = button?.closest('[role="dialog"]');
+        const input = [...(dialog?.querySelectorAll('input[data-testid="restaurants-search-form__input"], input[aria-label="Enter delivery address"]')||[])].find(visible);
+        if (!button || !visible(button) || button.disabled || button.getAttribute('aria-disabled') === 'true' || !input?.value.trim() || input.getAttribute('aria-invalid') === 'true') return false;
+        button.click(); return true;
+      })()
+    ''') ==
+        true;
+  }
+
+  Future<void> closeAddressEntry(InAppWebViewController controller) async {
+    await _requireAllowedPage(controller);
+    await _js(controller, '''
+      (() => {
+        const visible = e => { const r=e.getBoundingClientRect(),s=getComputedStyle(e); return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'; };
+        const button = [...document.querySelectorAll('[data-testid="map-modal-submit"]')].find(visible);
+        const dialog = button?.closest('[role="dialog"]');
+        dialog?.querySelector('[data-testid="close-presentation"]')?.click();
+      })()
+    ''');
+  }
+
+  Future<bool> _setupFormVisible(
+    InAppWebViewController controller, {
+    required bool login,
+  }) async {
+    final pattern = login
+        ? 'log in|sign in|email|continue with'
+        : 'delivery address|confirm location|enter your address|exact location';
+    return await _js(controller, """
+      (() => {
+        const visible = e => { const r=e.getBoundingClientRect(),s=getComputedStyle(e); return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'; };
+        return [...document.querySelectorAll('[role="dialog"]')].some(e => visible(e) &&
+          (new RegExp(${_quoted(pattern)},'i').test(e.innerText||'') ||
+          ${!login} && [...e.querySelectorAll('input')].some(i=>visible(i)&&/street|address|postal/i.test(i.placeholder||''))));
+      })()
+    """) ==
+        true;
   }
 
   String _quoted(String value) => jsonEncode(value);
@@ -183,14 +443,14 @@ class PandaMartAdapter implements StoreAdapter {
     if (selector.trim().isEmpty) return false;
     final result = await _js(controller, '''
       (() => {
-        const element = document.querySelector(${_quoted(selector)});
-        if (!element) return false;
+        return Array.from(document.querySelectorAll(${_quoted(selector)})).some(element => {
         const style = window.getComputedStyle(element);
         const rect = element.getBoundingClientRect();
         return style.display !== 'none' &&
           style.visibility !== 'hidden' &&
           Number(style.opacity || 1) !== 0 &&
           rect.width > 0 && rect.height > 0;
+        });
       })()
     ''');
     return result == true;
@@ -247,26 +507,6 @@ class PandaMartAdapter implements StoreAdapter {
   Future<bool> hasInterruption(InAppWebViewController controller) async =>
       await interruptionReason(controller) != null;
 
-  Future<bool> _waitForSelector(
-    InAppWebViewController controller,
-    String selector, {
-    required Duration timeout,
-    required int generation,
-  }) async {
-    final deadline = DateTime.now().add(timeout);
-    while (DateTime.now().isBefore(deadline)) {
-      if (generation != _actionGeneration) return false;
-      await _requireAllowedPage(controller);
-      final exists = await _js(
-        controller,
-        'Boolean(document.querySelector(${_quoted(selector)}))',
-      );
-      if (exists == true) return true;
-      await Future<void>.delayed(const Duration(milliseconds: 250));
-    }
-    return false;
-  }
-
   @override
   Future<bool> isLoggedIn(InAppWebViewController controller) async {
     await _requireAllowedPage(controller);
@@ -275,16 +515,23 @@ class PandaMartAdapter implements StoreAdapter {
   }
 
   Future<bool> hasSelectedAddress(InAppWebViewController controller) async {
+    return addressTextShowsSelection(await selectedAddressLabel(controller));
+  }
+
+  Future<String> selectedAddressLabel(InAppWebViewController controller) async {
     await _requireAllowedPage(controller);
     final selector = config.value('address_label');
-    if (selector.trim().isEmpty) return false;
+    if (selector.trim().isEmpty) return '';
     final value = await _js(controller, '''
       (() => {
-        const element = document.querySelector(${_quoted(selector)});
+        const element = [...document.querySelectorAll(${_quoted(selector)})].find(e => {
+          const r=e.getBoundingClientRect(),s=getComputedStyle(e);
+          return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none';
+        });
         return element ? (element.textContent || '').trim() : '';
       })()
     ''');
-    return addressTextShowsSelection(value?.toString() ?? '');
+    return value?.toString() ?? '';
   }
 
   bool addressTextShowsSelection(String value) {
@@ -558,6 +805,12 @@ class PandaMartAdapter implements StoreAdapter {
       }
       current = updated;
     }
+    if (current != target) {
+      return const AddResult(
+        AddStatus.failed,
+        'The store quantity differs from the requested quantity. Review the cart.',
+      );
+    }
     return AddResult(
       AddStatus.added,
       'Added and verified at quantity $current',
@@ -565,7 +818,13 @@ class PandaMartAdapter implements StoreAdapter {
   }
 
   @override
-  Future<List<CartLine>> readCart(InAppWebViewController controller) async {
+  Future<List<CartLine>> readCart(InAppWebViewController controller) =>
+      readCartSnapshot(controller);
+
+  Future<List<CartLine>> readCartSnapshot(
+    InAppWebViewController controller, {
+    bool openCart = true,
+  }) async {
     lastCartReadWasVerified = false;
     lastCartTotal = null;
     if (!isCartVerificationConfigured) {
@@ -575,7 +834,31 @@ class PandaMartAdapter implements StoreAdapter {
       );
     }
     await _requireAllowedPage(controller);
-    if (!await _isVisible(controller, config.value('cart_container'))) {
+    final empty = await _js(controller, '''
+      (() => {
+        const labels = ${jsonEncode(config.list('empty_cart_labels'))};
+        const visible = element => {
+          const rect=element.getBoundingClientRect(), style=getComputedStyle(element);
+          return rect.width>0&&rect.height>0&&style.display!=='none'&&style.visibility!=='hidden'&&Number(style.opacity||1)!==0;
+        };
+        if ([...document.querySelectorAll(${_quoted(config.value('cart_line'))})].some(visible)) return false;
+        const emptyControl = [...document.querySelectorAll('button[aria-label]')].some(element =>
+          visible(element) && element.disabled === true &&
+          labels.includes((element.getAttribute('aria-label')||'').trim().toLowerCase()));
+        if (emptyControl) return true;
+        return Array.from(document.querySelectorAll('h1,h2,h3,p,[role="status"]'))
+          .some(element => {
+            return visible(element) && labels.includes((element.textContent || '').trim().toLowerCase());
+          });
+      })()
+    ''');
+    if (empty == true) {
+      lastCartTotal = 0;
+      lastCartReadWasVerified = true;
+      return const [];
+    }
+    if (openCart &&
+        !await _isVisible(controller, config.value('cart_container'))) {
       final opened = await _clickVisibleSelector(
         controller,
         config.value('cart_open_button'),
@@ -595,6 +878,10 @@ class PandaMartAdapter implements StoreAdapter {
     }
     final result = await _js(controller, '''
       (() => Array.from(document.querySelectorAll(${_quoted(config.value('cart_line'))}))
+        .filter(line => {
+          const rect = line.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0 && window.getComputedStyle(line).visibility !== 'hidden';
+        })
         .map((line) => ({
           storeId: line.getAttribute('data-id') || line.getAttribute('data-testid'),
           name: line.querySelector(${_quoted(config.value('cart_line_name'))})?.textContent?.trim() || '',
@@ -629,11 +916,29 @@ class PandaMartAdapter implements StoreAdapter {
         .whereType<CartLine>()
         .toList(growable: false);
 
+    if (lines.length != result.length) {
+      throw const StoreAutomationException(
+        'A cart line could not be read. Review the cart manually.',
+        selectorFailure: true,
+      );
+    }
+
     final totalText = await _js(controller, '''
-      document.querySelector(${_quoted(config.value('cart_total'))})?.textContent?.trim() || ''
+      (() => {
+        const element = Array.from(document.querySelectorAll(${_quoted(config.value('cart_total'))}))
+          .find(element => {
+            const rect = element.getBoundingClientRect();
+            const style = window.getComputedStyle(element);
+            return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+          });
+        return element?.textContent?.trim() || '';
+      })()
     ''');
     lastCartTotal = parseStoreMoney(totalText?.toString());
-    if (lastCartTotal == null) {
+    if (lastCartTotal == null ||
+        !lastCartTotal!.isFinite ||
+        lastCartTotal! < 0 ||
+        (lines.isEmpty && lastCartTotal! > 0)) {
       throw const StoreAutomationException(
         'PandaMart cart total could not be verified.',
         selectorFailure: true,
@@ -666,7 +971,7 @@ class PandaMartAdapter implements StoreAdapter {
     if (selector.isEmpty) return false;
     final result = await _js(controller, '''
       (() => {
-        const button = Array.from(document.querySelectorAll(${_quoted(selector)}))
+        const element = Array.from(document.querySelectorAll(${_quoted(selector)}))
           .find((candidate) => {
             const style = window.getComputedStyle(candidate);
             const rect = candidate.getBoundingClientRect();
@@ -675,6 +980,8 @@ class PandaMartAdapter implements StoreAdapter {
               Number(style.opacity || 1) !== 0 &&
               rect.width > 0 && rect.height > 0;
           });
+        const button = element?.matches('button,a,input,[role="button"]')
+          ? element : element?.querySelector('button,[role="button"]');
         if (!button || button.disabled) return false;
         button.click();
         return true;
@@ -684,72 +991,22 @@ class PandaMartAdapter implements StoreAdapter {
   }
 
   @override
-  Future<CheckoutResult> placeOrder(InAppWebViewController controller) async {
-    await _requireAllowedPage(controller);
-    if (!canOpenCheckout) {
-      return const CheckoutResult(
-        CheckoutState.needsManualCompletion,
-        'Open and complete PandaMart checkout manually.',
-      );
-    }
-    if (!await _clickVisibleSelector(
-      controller,
-      config.value('checkout_button'),
-    )) {
-      return const CheckoutResult(
-        CheckoutState.needsManualCompletion,
-        'The checkout button is not ready. Check the address and minimum order.',
-      );
-    }
-
-    await Future<void>.delayed(const Duration(seconds: 2));
-    final interruption = await interruptionReason(controller);
-    if (interruption != null) {
-      return CheckoutResult(
-        CheckoutState.needsManualCompletion,
-        '$interruption Complete checkout manually.',
-      );
-    }
-    if (!canFinishCheckoutAutomatically) {
-      return const CheckoutResult(
-        CheckoutState.needsManualCompletion,
-        'Checkout is open. Choose the address and cash on delivery manually.',
-      );
-    }
-
-    if (!await _clickVisibleSelector(
-      controller,
-      config.value('cash_on_delivery'),
-    )) {
-      return const CheckoutResult(
-        CheckoutState.needsManualCompletion,
-        'Cash on delivery is unavailable. Finish checkout manually.',
-      );
-    }
-    if (!await _clickVisibleSelector(
-      controller,
-      config.value('final_purchase_button'),
-    )) {
-      return const CheckoutResult(
-        CheckoutState.needsManualCompletion,
-        'The final order button is not ready. Finish checkout manually.',
-      );
-    }
-
-    final confirmed = await _waitForSelector(
-      controller,
-      config.value('order_confirmation'),
-      timeout: const Duration(seconds: 30),
-      generation: _actionGeneration,
+  Future<CheckoutResult> placeOrder(
+    InAppWebViewController controller, {
+    required List<CartLine> expectedCart,
+    required CheckoutApproval approve,
+    Future<void> Function(CheckoutSummary summary)? beforeSubmit,
+  }) {
+    final generation = _actionGeneration;
+    return checkout.placeOrder(
+      page: PandaMartCheckoutPage(
+        controller: controller,
+        adapter: this,
+        isActive: () => generation == _actionGeneration,
+      ),
+      expectedCart: expectedCart,
+      approve: approve,
+      beforeSubmit: beforeSubmit,
     );
-    return confirmed
-        ? const CheckoutResult(
-            CheckoutState.placed,
-            'PandaMart confirmed the order',
-          )
-        : const CheckoutResult(
-            CheckoutState.needsManualCompletion,
-            'PandaMart has not confirmed the order yet. Verify it manually.',
-          );
   }
 }

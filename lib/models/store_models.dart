@@ -78,10 +78,47 @@ class CartLine {
 enum CheckoutState { placed, needsManualCompletion, failed }
 
 class CheckoutResult {
-  const CheckoutResult(this.state, this.message);
+  const CheckoutResult(
+    this.state,
+    this.message, {
+    this.summary,
+    this.orderReference,
+  });
   final CheckoutState state;
   final String message;
+  final CheckoutSummary? summary;
+  final String? orderReference;
 }
+
+class CheckoutSummary {
+  const CheckoutSummary({
+    required this.lines,
+    required this.total,
+    required this.deliveryAddress,
+    required this.cashOnDeliverySelected,
+  });
+
+  final List<CartLine> lines;
+  final double total;
+  final String deliveryAddress;
+  final bool cashOnDeliverySelected;
+
+  bool get isComplete =>
+      lines.isNotEmpty &&
+      lines.every(
+        (line) =>
+            line.name.trim().isNotEmpty &&
+            line.quantity > 0 &&
+            line.price.isFinite &&
+            line.price >= 0,
+      ) &&
+      total.isFinite &&
+      total > 0 &&
+      deliveryAddress.trim().isNotEmpty &&
+      cashOnDeliverySelected;
+}
+
+typedef CheckoutApproval = Future<bool> Function(CheckoutSummary summary);
 
 class AutomationItemResult {
   const AutomationItemResult({
@@ -94,6 +131,7 @@ class AutomationItemResult {
     this.productName,
     this.unitsAdded,
     this.unitPrice,
+    this.productId,
   });
 
   final String? wantedItemId;
@@ -105,6 +143,7 @@ class AutomationItemResult {
   final String? productName;
   final int? unitsAdded;
   final double? unitPrice;
+  final String? productId;
 }
 
 class CartComparison {

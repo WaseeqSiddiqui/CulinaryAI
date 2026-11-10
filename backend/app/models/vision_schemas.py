@@ -190,3 +190,73 @@ class MealNutritionEstimate(BaseModel):
     fiber_grams: float = Field(ge=0, le=500)
     confidence: float = Field(ge=0, le=1)
     assumptions: list[str] = Field(default_factory=list, max_length=8)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. STEP GUIDING & REAL-TIME COOKING VALIDATION SCHEMAS
+# ─────────────────────────────────────────────────────────────────────────────
+
+class CookingStepValidationResponse(BaseModel):
+    status: Literal[
+        "ready",
+        "needs_more_time",
+        "reduce_heat",
+        "increase_heat",
+        "attention_needed",
+        "unable_to_assess",
+    ] = "attention_needed"
+    headline: str
+    feedback: str
+    action_suggestion: str
+    visual_observations: list[str] = Field(default_factory=list)
+    confidence: float = Field(default=0.0, ge=0, le=1)
+    image_sufficient: bool = False
+    safety_note: str = (
+        "A photo cannot verify internal temperature, complete doneness, or food safety."
+    )
+    image_hash: str | None = None
+
+
+class StepExplanationRequest(BaseModel):
+    recipe_title: str
+    step_number: int
+    step_instruction: str
+
+
+class StepExplanationResponse(BaseModel):
+    recipe_title: str
+    step_number: int
+    action: str
+    overview: str = ""
+    pace: str = "Cook steadily and monitor closely"
+    estimated_duration: str = "Use observable doneness cues rather than time alone"
+    technique: str = "Check frequently and cook evenly"
+    visual_cues: list[str] = Field(default_factory=list)
+    texture_and_aroma: str = ""
+    aroma_and_sound: str = ""
+    heat_level: str = "Medium"
+    pro_tip: str = ""
+    precautions: list[str] = Field(default_factory=list)
+    mistakes_to_avoid: list[str] = Field(default_factory=list)
+    completion_criteria: str = "Proceed when the observable goal is met"
+
+
+class CookingChatTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=2000)
+
+
+class CookingStepChatRequest(BaseModel):
+    recipe_title: str
+    step_number: int
+    step_instruction: str
+    message: str
+    conversation_history: list[CookingChatTurn] = Field(
+        default_factory=list, max_length=12
+    )
+    adjustments: list[str] = Field(default_factory=list, max_length=20)
+    dietary_restrictions: list[str] = Field(default_factory=list, max_length=20)
+
+
+class CookingStepChatResponse(BaseModel):
+    reply: str

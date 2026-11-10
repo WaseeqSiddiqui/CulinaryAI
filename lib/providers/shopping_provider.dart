@@ -22,10 +22,14 @@ class ShoppingProvider extends ChangeNotifier {
   bool _pantryReady = false;
   bool _syncingPantry = false;
   bool _pantrySyncRequested = false;
+  final Map<String, Future<ShoppingOrder?>> _storeOrderWrites = {};
 
   List<ShoppingListItem> get items => List.unmodifiable(_items);
   bool get isLoading => _loading;
   String? get householdId => _householdId;
+  Future<List<ShoppingOrder>> loadOrders() => _householdId == null
+      ? Future.value([])
+      : _service.loadOrders(_householdId!);
 
   void bindHousehold(
     String? householdId,
@@ -134,7 +138,7 @@ class ShoppingProvider extends ChangeNotifier {
 
   Future<void> setQuantity(String id, double quantity) async {
     final index = _items.indexWhere((item) => item.id == id);
-    if (index < 0 || quantity <= 0) return;
+    if (index < 0 || !quantity.isFinite || quantity <= 0) return;
     final item = _items[index];
     _items[index] = ShoppingListItem(
       id: item.id,
@@ -208,29 +212,107 @@ class ShoppingProvider extends ChangeNotifier {
     required String storeName,
     required double total,
     required Set<String> purchasedItemIds,
-  }) async {
+    String? orderId,
+    String? expectedHouseholdId,
+    List<ShoppingListItem>? purchasedItems,
+    String? storeOrderReference,
+  }) {
     final householdId = _householdId;
-    final purchased = _items
+    if (householdId == null ||
+        (expectedHouseholdId != null && householdId != expectedHouseholdId) ||
+        !total.isFinite ||
+        total <= 0 ||
+        storeName.trim().isEmpty) {
+      return Future.value(null);
+    }
+    final id = orderId ?? _uuid.v4();
+    final key = '$householdId/$id';
+    final existing = _storeOrderWrites[key];
+    if (existing != null) return existing;
+    final work = _recordStoreOrder(
+      id: id,
+      householdId: householdId,
+      storeName: storeName,
+      total: total,
+      purchasedItemIds: purchasedItemIds,
+      purchasedItems: purchasedItems,
+      storeOrderReference: storeOrderReference,
+    );
+    _storeOrderWrites[key] = work;
+    // Keep successful writes to make repeated confirmation taps idempotent.
+    // Failed persistence can be retried with the same order ID.
+    unawaited(
+      work.then<void>(
+        (result) {
+          if (result == null) _storeOrderWrites.remove(key);
+        },
+        onError: (Object error, StackTrace stack) {
+          _storeOrderWrites.remove(key);
+        },
+      ),
+    );
+    return work;
+  }
+
+  Future<ShoppingOrder?> _recordStoreOrder({
+    required String id,
+    required String householdId,
+    required String storeName,
+    required double total,
+    required Set<String> purchasedItemIds,
+    List<ShoppingListItem>? purchasedItems,
+    String? storeOrderReference,
+  }) async {
+    final purchased = (purchasedItems ?? _items)
         .where((item) => purchasedItemIds.contains(item.id))
         .toList();
-    if (householdId == null || purchased.isEmpty) return null;
+    if (purchased.isEmpty ||
+        purchased.any(
+          (item) => !item.quantity.isFinite || item.quantity <= 0,
+        )) {
+      return null;
+    }
     final order = ShoppingOrder(
-      id: _uuid.v4(),
+      id: id,
       householdId: householdId,
       items: purchased,
       status: 'ordered (pending delivery)',
       createdAt: DateTime.now(),
       storeName: storeName,
       total: total,
+      storeOrderReference: storeOrderReference,
     );
+    final startingItems = List.of(_items);
+    final startingSuppressed = Set.of(_suppressedPantryIds);
+    final startingLowStockIds = _latestPantryItems
+        .where((item) => item.isLowStock)
+        .map((item) => item.id)
+        .toSet();
     await _service.createOrder(order);
-    _suppressPendingLowStockItems(purchasedItemIds);
-    _items.removeWhere(
-      (item) => purchasedItemIds.contains(item.id) && !item.keepAfterOrder,
+    final stillCurrent = _householdId == householdId;
+    final currentItems = stillCurrent ? _items : startingItems;
+    final currentSuppressed = stillCurrent
+        ? _suppressedPantryIds
+        : startingSuppressed;
+    currentSuppressed.addAll(
+      purchasedItemIds.where(startingLowStockIds.contains),
     );
-    await _persist();
-    await _persistSuppressedPantryIds();
-    notifyListeners();
+    currentItems.removeWhere(
+      (item) =>
+          purchased.any(
+            (ordered) =>
+                ordered.id == item.id &&
+                ordered.quantity == item.quantity &&
+                ordered.name == item.name &&
+                ordered.unit == item.unit,
+          ) &&
+          !item.keepAfterOrder,
+    );
+    final remaining = List.of(currentItems);
+    final suppressed = Set.of(currentSuppressed);
+    await _service.saveList(householdId, remaining);
+    await _service.saveSuppressedPantryIds(householdId, suppressed);
+    if (_householdId == householdId) notifyListeners();
     return order;
   }
 

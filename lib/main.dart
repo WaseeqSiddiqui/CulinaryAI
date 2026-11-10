@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'
+    show LicenseEntryWithLineBreaks, LicenseRegistry;
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:provider/provider.dart';
 
 import 'core/theme/app_theme.dart';
@@ -15,6 +18,11 @@ import 'services/server_config_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks([
+      'Plus Jakarta Sans',
+    ], await rootBundle.loadString('assets/fonts/OFL-PlusJakartaSans.txt'));
+  });
   await FirebaseService.initialize();
   await ServerConfigService.init();
   runApp(const CulinaryAiApp());
@@ -42,7 +50,10 @@ class CulinaryAiApp extends StatelessWidget {
           create: (_) => PantryProvider(),
           update: (_, household, pantry) {
             final value = pantry ?? PantryProvider();
-            value.bindHousehold(household.pantryScopeId);
+            value.bindHousehold(
+              household.pantryScopeId,
+              actorId: household.userId,
+            );
             return value;
           },
         ),

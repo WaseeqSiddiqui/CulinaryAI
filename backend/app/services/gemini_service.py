@@ -20,6 +20,8 @@ from app.models.vision_schemas import (
     ValidatedReceiptItem,
     ValidatedReceiptResponse,
     MealNutritionEstimate,
+    CookingStepValidationResponse,
+    StepExplanationResponse,
 )
 from app.services.ingredient_catalog import IngredientCatalogService
 
@@ -244,104 +246,60 @@ class GeminiVisionService:
                 candidates.append(fallback)
         return candidates
 
-    def _invoke_gemini_receipt(
-        self, image_bytes: bytes, mime_type: str
-    ) -> GeminiReceiptResponse:
-        client = self._get_client()
+    def _invoke_structured_scan(self, image_bytes, mime_type, schema, prompt, operation):
         from google.genai import types
 
-        candidate_models = self._get_candidate_models()
-        last_error: Exception | None = None
-
-        for idx, model in enumerate(candidate_models):
-            try:
-                logger.info("Parsing receipt with model: %s (attempt %d/%d)", model, idx + 1, len(candidate_models))
-                part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-                response = client.models.generate_content(
-                    model=model,
-                    contents=[part, RECEIPT_SYSTEM_PROMPT],
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        response_schema=GeminiReceiptResponse,
-                        temperature=0.0,
-                        http_options=types.HttpOptions(timeout=25_000),  # 25s timeout per attempt
-                    ),
-                )
-
-                if getattr(response, "parsed", None) is not None:
-                    return response.parsed  # type: ignore
-
-                if response.text:
-                    return GeminiReceiptResponse.model_validate_json(response.text)
-
-                raise HTTPException(
-                    status_code=422,
-                    detail="Gemini returned an empty response. The receipt may be unreadable.",
-                )
-            except HTTPException:
-                raise
-            except Exception as err:
-                last_error = err
-                err_str = str(err).lower()
-                is_transient = any(kw in err_str for kw in ["503", "504", "deadline", "timeout", "unavailable", "demand", "resource_exhausted", "quota", "429", "404", "not_found"])
-                if is_transient and idx + 1 < len(candidate_models):
-                    logger.warning("Model %s transient error: %s. Trying fallback model %s...", model, err, candidate_models[idx + 1])
-                    continue
-                break
-
-        if last_error:
-            self._handle_genai_error(last_error)
-            raise HTTPException(status_code=500, detail=str(last_error)) from last_error
-
-        raise HTTPException(status_code=500, detail="Failed to parse receipt after all model attempts.")
-
-    def _invoke_gemini_fridge(
-        self, image_bytes: bytes, mime_type: str
-    ) -> GeminiFridgeScan:
         client = self._get_client()
-        from google.genai import types
-
-        candidate_models = self._get_candidate_models()
-        last_error: Exception | None = None
-
-        for idx, model in enumerate(candidate_models):
+        deadline = time.monotonic() + 32
+        models = self._get_candidate_models()
+        last_error = None
+        for index, model in enumerate(models):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise HTTPException(status_code=504, detail="Scanning took too long. Please try again shortly.")
             try:
-                logger.info("Scanning fridge with model: %s (attempt %d/%d)", model, idx + 1, len(candidate_models))
-                part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+                logger.info("%s with model %s (attempt %d/%d)", operation, model, index + 1, len(models))
                 response = client.models.generate_content(
                     model=model,
-                    contents=[part, FRIDGE_SYSTEM_PROMPT],
+                    contents=[types.Part.from_bytes(data=image_bytes, mime_type=mime_type), prompt],
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
-                        response_schema=GeminiFridgeScan,
+                        response_schema=schema,
                         temperature=0.0,
-                        http_options=types.HttpOptions(timeout=25_000),  # 25s timeout per attempt
+                        http_options=types.HttpOptions(
+                            timeout=min(25_000, max(1, int(remaining * 1000))),
+                            retry_options=types.HttpRetryOptions(attempts=1),
+                        ),
                     ),
                 )
-
-                if getattr(response, "parsed", None) is not None:
-                    return response.parsed  # type: ignore
-
+                parsed = getattr(response, "parsed", None)
+                if parsed is not None:
+                    return parsed if isinstance(parsed, schema) else schema.model_validate(parsed)
                 if response.text:
-                    return GeminiFridgeScan.model_validate_json(response.text)
-
-                return GeminiFridgeScan(items=[])
+                    return schema.model_validate_json(response.text)
+                raise HTTPException(status_code=422, detail="No food items could be read from this photo. Try a clear, well-lit image.")
             except HTTPException:
                 raise
-            except Exception as err:
-                last_error = err
-                err_str = str(err).lower()
-                is_transient = any(kw in err_str for kw in ["503", "504", "deadline", "timeout", "unavailable", "demand", "resource_exhausted", "quota", "429", "404", "not_found"])
-                if is_transient and idx + 1 < len(candidate_models):
-                    logger.warning("Model %s transient error: %s. Trying fallback model %s...", model, err, candidate_models[idx + 1])
-                    continue
-                break
-
-        if last_error:
+            except Exception as error:
+                last_error = error
+                message = str(error).lower()
+                # A project quota or invalid request will not improve by waiting
+                # through several models using the same credentials.
+                if any(word in message for word in ("429", "quota", "resource_exhausted", "invalid_argument", "bad request", "permission_denied", "unauthenticated", "api_key_invalid")):
+                    self._handle_genai_error(error)
+                    raise HTTPException(status_code=503, detail="The scanning service is not configured correctly. Please try again later.") from None
+                transient = any(word in message for word in ("503", "504", "timeout", "deadline", "unavailable", "demand", "404", "not_found"))
+                if not transient:
+                    break
+        if last_error is not None:
             self._handle_genai_error(last_error)
-            raise HTTPException(status_code=500, detail=str(last_error)) from last_error
+        raise HTTPException(status_code=503, detail="The scanning service is temporarily unavailable. Please try again later.")
 
-        return GeminiFridgeScan(items=[])
+    def _invoke_gemini_receipt(self, image_bytes: bytes, mime_type: str) -> GeminiReceiptResponse:
+        return self._invoke_structured_scan(image_bytes, mime_type, GeminiReceiptResponse, RECEIPT_SYSTEM_PROMPT, "Parsing receipt")
+
+    def _invoke_gemini_fridge(self, image_bytes: bytes, mime_type: str) -> GeminiFridgeScan:
+        return self._invoke_structured_scan(image_bytes, mime_type, GeminiFridgeScan, FRIDGE_SYSTEM_PROMPT, "Scanning fridge")
 
     def _handle_genai_error(self, err: Exception) -> None:
         err_msg = str(err).lower()
@@ -558,5 +516,265 @@ class GeminiVisionService:
         return (
             "I'm Chef CulinaryAI! I can help you choose what to cook, find ingredient substitutes, "
             "and guide you through any recipe. Tell me what flavors you are in the mood for!"
+        )
+
+    def validate_cooking_step(
+        self,
+        image_bytes: bytes,
+        mime_type: str,
+        recipe_title: str,
+        step_number: int,
+        step_instruction: str,
+        user_question: str | None = None,
+        user_id: str = "default_user",
+    ) -> CookingStepValidationResponse:
+        self.rate_limiter.check_and_record(user_id)
+        self._validate_image_bytes(image_bytes)
+        image_hash = hashlib.sha256(image_bytes).hexdigest()
+
+        question_text = (user_question or "").strip()
+        if not question_text:
+            question_text = "Does my cooking progress in this photo meet the requirements of this step?"
+
+        prompt = (
+            f"You are an expert executive chef evaluating a home cook's cooking step in real-time.\n"
+            f"Recipe: {recipe_title}\n"
+            f"Step {step_number}: {step_instruction}\n"
+            f"Cook's query / check: {question_text}\n\n"
+            "Analyze the image carefully for doneness, color (e.g. golden brown vs pale or burnt), "
+            "texture, moisture, and visible signs of pan heat. First decide whether the photo is clear, "
+            "well-lit, and actually shows enough food to assess. Never infer internal temperature, "
+            "microbial safety, or complete doneness from appearance alone.\n"
+            "Return structured JSON matching CookingStepValidationResponse:\n"
+            "- status: 'ready', 'needs_more_time', 'reduce_heat', 'increase_heat', "
+            "'attention_needed', or 'unable_to_assess'\n"
+            "- headline: short encouraging 3-6 word title (e.g. 'Golden Brown & Ready!', 'Almost There — Needs Time')\n"
+            "- feedback: concise expert culinary feedback directly answering the cook's question\n"
+            "- action_suggestion: immediate practical next step for the cook at the stove\n"
+            "- visual_observations: list of 2-3 specific visual cues observed\n"
+            "- confidence: 0.0 to 1.0\n"
+            "- image_sufficient: false when blur, darkness, framing, steam, or occlusion prevents assessment\n"
+            "- safety_note: explicitly say a photo cannot verify internal temperature or food safety"
+        )
+
+        try:
+            client = self._get_client()
+            from google.genai import types
+
+            part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+            for model in self._get_candidate_models():
+                try:
+                    response = client.models.generate_content(
+                        model=model,
+                        contents=[part, prompt],
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=CookingStepValidationResponse,
+                            temperature=0.1,
+                            http_options=types.HttpOptions(timeout=25_000),
+                        ),
+                    )
+                    if getattr(response, "parsed", None) is not None:
+                        res: CookingStepValidationResponse = response.parsed  # type: ignore
+                        res.image_hash = image_hash
+                        return res
+                    if response.text:
+                        res = CookingStepValidationResponse.model_validate_json(response.text)
+                        res.image_hash = image_hash
+                        return res
+                except Exception as model_err:
+                    logger.warning("Step validation failed on %s: %s", model, model_err)
+                    continue
+        except Exception as err:
+            logger.error("Failed to query Gemini for step validation: %s", err)
+
+        # A failed model call has not inspected the image. Be explicit rather than
+        # fabricating a visual assessment.
+        return CookingStepValidationResponse(
+            status="unable_to_assess",
+            headline="Photo Check Unavailable",
+            feedback=(
+                "I could not reliably analyze this photo right now, so I cannot say whether "
+                f"Step {step_number} is complete."
+            ),
+            action_suggestion=(
+                f"Use the displayed cues for '{step_instruction}', or retry with a clear, "
+                "well-lit close photo that shows the whole pan."
+            ),
+            visual_observations=[],
+            confidence=0.0,
+            image_sufficient=False,
+            safety_note=(
+                "A photo cannot verify internal temperature, complete doneness, or food safety; "
+                "use a food thermometer whenever the recipe requires one."
+            ),
+            image_hash=image_hash,
+        )
+
+    def get_step_explanation(
+        self,
+        recipe_title: str,
+        step_number: int,
+        step_instruction: str,
+    ) -> StepExplanationResponse:
+        """Provide detailed culinary breakdown and sensory cues for a step."""
+        system_prompt = (
+            "You are a master culinary educator. Provide a sensory-rich, practical breakdown of how to execute "
+            f"this step with professional technique.\n"
+            f"Recipe: {recipe_title}\n"
+            f"Step {step_number}: {step_instruction}\n"
+            "Treat all times as estimates and make observable doneness and food-safety checks primary. "
+            "Return JSON matching StepExplanationResponse with fields: recipe_title, step_number, action, "
+            "overview, heat_level (low/medium-low/medium/medium-high/high where applicable), pace, "
+            "estimated_duration, technique (including how often to stir/flip/check), visual_cues (list), "
+            "texture_and_aroma, aroma_and_sound, precautions (list), mistakes_to_avoid (list), "
+            "completion_criteria, and pro_tip."
+        )
+
+        try:
+            client = self._get_client()
+            from google.genai import types
+
+            for model in self._get_candidate_models():
+                try:
+                    response = client.models.generate_content(
+                        model=model,
+                        contents=system_prompt,
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=StepExplanationResponse,
+                            temperature=0.2,
+                            http_options=types.HttpOptions(timeout=20_000),
+                        ),
+                    )
+                    if getattr(response, "parsed", None) is not None:
+                        return response.parsed  # type: ignore
+                    if response.text:
+                        return StepExplanationResponse.model_validate_json(response.text)
+                except Exception as model_err:
+                    logger.warning("Step explanation failed on %s: %s", model, model_err)
+                    continue
+        except Exception as err:
+            logger.error("Failed to query Gemini for step explanation: %s", err)
+
+        # Heuristic fallback based on step content
+        lower = step_instruction.lower()
+        heat = "Medium heat"
+        if any(w in lower for w in ["sear", "boil", "high"]):
+            heat = "Medium-high to high heat"
+        elif any(w in lower for w in ["simmer", "low", "melt"]):
+            heat = "Low to medium-low heat"
+
+        visuals = [
+            f"Look for expected physical change specified in: '{step_instruction}'",
+            "Color should transition gradually and evenly without scorching",
+        ]
+        if "onion" in lower or "golden" in lower or "brown" in lower:
+            visuals = [
+                "Onions turn from translucent white to a rich honey-amber gold",
+                "Edges soften and caramelize without blackened burnt spots",
+            ]
+
+        return StepExplanationResponse(
+            recipe_title=recipe_title,
+            step_number=step_number,
+            action=step_instruction,
+            overview=(
+                f"Execute this step with care: {step_instruction}. "
+                "Keep heat controlled and monitor your food closely to develop flavor without overcooking."
+            ),
+            pace="Cook steadily and check progress often",
+            estimated_duration="Timing varies; prioritize the visible, texture, and aroma cues",
+            technique="Stir, turn, or check often enough to prevent hot spots and uneven cooking",
+            visual_cues=visuals,
+            texture_and_aroma="Look for the expected texture change and a clean, developed aroma without acrid smoke.",
+            aroma_and_sound="A steady gentle sizzle and rising savory aromas indicate proper heat transfer.",
+            heat_level=heat,
+            pro_tip="Do not overcrowd the pan; allowing moisture to evaporate produces browning rather than steaming.",
+            precautions=[
+                "Treat time as an estimate and never use color alone for food-safety decisions",
+                "Use a food thermometer for meat, poultry, seafood, and reheated food when appropriate",
+            ],
+            mistakes_to_avoid=[
+                "Rushing with heat too high, which burns exterior before cooking through",
+                "Neglecting to stir periodically, leading to hot spots in the pan",
+            ],
+            completion_criteria=(
+                "Proceed only when the instruction's observable goal is met and any required "
+                "safe internal temperature has been checked."
+            ),
+        )
+
+    def chat_cooking_step(
+        self,
+        recipe_title: str,
+        step_number: int,
+        step_instruction: str,
+        message: str,
+        conversation_history: list[dict[str, str]] | None = None,
+        adjustments: list[str] | None = None,
+        dietary_restrictions: list[str] | None = None,
+    ) -> str:
+        """Provide immediate, step-aware sous chef assistance for questions asked verbally or typed."""
+        system_instruction = (
+            "You are Chef CulinaryAI, a warm, reassuring sous-chef in the user's kitchen.\n"
+            f"Recipe in progress: {recipe_title}\n"
+            f"Current Step #{step_number}: '{step_instruction}'\n"
+            "The cook is currently at the stove and asking a question verbally or via chat.\n"
+            "Rules:\n"
+            "1. Give an immediate, concise, practical answer directly answering their question.\n"
+            "2. If they ask 'what is the requirement?' or 'what do I need to do?', clearly explain "
+            "the goal of this step, how to tell when it's done, and flame/technique tips.\n"
+            "3. If they ask about sensory checks (like golden brown onion), explain the exact visual, "
+            "color, and texture signs to look for.\n"
+            "4. Never claim an image or color proves a safe internal temperature. Recommend a thermometer "
+            "where food safety matters (poultry: 74°C/165°F).\n"
+            "5. Do not advance the recipe unless the cook explicitly asks to move to the next step.\n"
+            "6. Respond naturally in English, Urdu, or the user's mixed-language style.\n"
+            "7. Keep it concise, friendly, and easy to read while busy (under 2 short paragraphs)."
+        )
+
+        history_text = "\n".join(
+            f"{turn.get('role', 'user')}: {turn.get('content', '')}"
+            for turn in (conversation_history or [])[-10:]
+        )
+        context_text = (
+            f"\nDietary restrictions: {', '.join(dietary_restrictions or []) or 'none provided'}"
+            f"\nCooking adjustments so far: {', '.join(adjustments or []) or 'none'}"
+            f"\nRecent conversation:\n{history_text or 'none'}"
+        )
+
+        try:
+            client = self._get_client()
+            models_to_try = self._get_candidate_models()
+            for model in models_to_try:
+                try:
+                    response = client.models.generate_content(
+                        model=model,
+                        contents=f"{system_instruction}{context_text}\n\nCook's Question: {message}",
+                    )
+                    if response and response.text:
+                        return response.text.strip()
+                except Exception as model_err:
+                    logger.warning("Step chat error on %s: %s", model, model_err)
+                    continue
+        except Exception as err:
+            logger.error("Failed to query Gemini for step chat: %s", err)
+
+        # Fallback response
+        msg_lower = message.lower()
+        if "requirement" in msg_lower or "what should i do" in msg_lower or "what to do" in msg_lower:
+            return (
+                f"For Step {step_number}, your main goal is: {step_instruction}. "
+                "Keep your heat at a steady medium level, stir periodically, and look for even color and texture."
+            )
+        elif "onion" in msg_lower or "golden" in msg_lower or "brown" in msg_lower:
+            return (
+                "Golden brown onions should look rich amber and sweet-scented, soft but not crispy or blackened. "
+                "If they are still white or pale yellow, give them 3-5 more minutes on medium-low heat with occasional stirring."
+            )
+        return (
+            f"For Step {step_number} of {recipe_title}: {step_instruction}. "
+            "Take your time, keep flame moderate, and let me know if you want to verify your progress with a quick photo!"
         )
 

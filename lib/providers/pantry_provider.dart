@@ -5,12 +5,24 @@ import 'package:uuid/uuid.dart';
 
 import '../models/fridge_vision_models.dart';
 import '../models/pantry_item_model.dart';
+import '../models/recipe_ingredient.dart';
 import '../models/receipt_vision_models.dart';
 import '../services/pantry_service.dart';
 import '../services/pantry_zone_resolver.dart';
 import '../services/expiry_estimation_service.dart';
+import '../services/inventory_quantity_service.dart';
 
 enum PantryExpiryFilter { all, useSoon, expired, estimated }
+
+class PantryConsumptionResult {
+  final int changedItems;
+  final List<RecipeIngredient> consumedIngredients;
+
+  const PantryConsumptionResult({
+    required this.changedItems,
+    required this.consumedIngredients,
+  });
+}
 
 class PantryProvider extends ChangeNotifier {
   PantryProvider({PantryService? service})
@@ -34,6 +46,7 @@ class PantryProvider extends ChangeNotifier {
   final List<PantryItemModel> _items = [];
   StreamSubscription<List<PantryItemModel>>? _subscription;
   String? _householdId;
+  String? _actorId;
   String _searchQuery = '';
   String? _selectedZone;
   PantryExpiryFilter _expiryFilter = PantryExpiryFilter.all;
@@ -99,7 +112,8 @@ class PantryProvider extends ChangeNotifier {
   int get expiredCount =>
       _items.where((item) => item.expiryStatus == ExpiryStatus.expired).length;
 
-  void bindHousehold(String? householdId) {
+  void bindHousehold(String? householdId, {String? actorId}) {
+    _actorId = actorId;
     if (_householdId == householdId) return;
     _householdId = householdId;
     _items.clear();
@@ -223,6 +237,10 @@ class PantryProvider extends ChangeNotifier {
     required double quantity,
     required String unit,
     required String location,
+    String category = 'Other',
+    String? packageType,
+    double? packageCount,
+    double? quantityPerPackage,
     double lowStockThreshold = 1.0,
     String? customImageUrl,
     String addedVia = 'manual',
@@ -240,6 +258,10 @@ class PantryProvider extends ChangeNotifier {
       name: name.trim(),
       quantity: quantity,
       unit: unit,
+      category: category,
+      packageType: packageType,
+      packageCount: packageCount,
+      quantityPerPackage: quantityPerPackage,
       location: location,
       lowStockThreshold: lowStockThreshold,
       addedVia: addedVia,
@@ -254,6 +276,7 @@ class PantryProvider extends ChangeNotifier {
     );
     _items.add(item);
     _persistAndSync(item);
+    _recordAudit(scopeId, type: 'stock_added', item: item, quantity: quantity);
     notifyListeners();
   }
 
@@ -319,8 +342,34 @@ class PantryProvider extends ChangeNotifier {
 
       if (existingIndex != -1) {
         final existing = _items[existingIndex];
+        final convertedQuantity = InventoryQuantityService.convert(
+          quantity: scanned.totalQty,
+          fromUnit: scanned.unit,
+          toUnit: existing.unit,
+          ingredientName: targetName,
+        );
+        if (convertedQuantity == null) {
+          existingIndex = -1;
+        }
+      }
+
+      if (existingIndex != -1) {
+        final existing = _items[existingIndex];
+        final convertedQuantity = InventoryQuantityService.convert(
+          quantity: scanned.totalQty,
+          fromUnit: scanned.unit,
+          toUnit: existing.unit,
+          ingredientName: targetName,
+        )!;
         final updated = existing.copyWith(
-          quantity: existing.quantity + scanned.totalQty,
+          quantity: existing.quantity + convertedQuantity,
+          packageType: scanned.packSize == null
+              ? existing.packageType
+              : 'Package',
+          packageCount: scanned.count == null
+              ? existing.packageCount
+              : (existing.packageCount ?? 0) + scanned.count!,
+          quantityPerPackage: scanned.packSize ?? existing.quantityPerPackage,
           location: existing.addedVia == 'receipt_scan'
               ? zone
               : existing.location,
@@ -343,6 +392,9 @@ class PantryProvider extends ChangeNotifier {
           name: targetName,
           quantity: scanned.totalQty,
           unit: scanned.unit,
+          packageType: scanned.packSize == null ? null : 'Package',
+          packageCount: scanned.count,
+          quantityPerPackage: scanned.packSize,
           location: zone,
           lowStockThreshold: _defaultThreshold(scanned.unit),
           addedVia: 'receipt_scan',
@@ -502,15 +554,31 @@ class PantryProvider extends ChangeNotifier {
     );
     _items[index] = item;
     _persistAndSync(item);
+    _recordAudit(
+      item.householdId,
+      type: 'stock_updated',
+      item: item,
+      quantity: item.quantity,
+    );
     notifyListeners();
   }
 
   void deleteItem(String id) {
     final householdId = _householdId;
     if (householdId == null) return;
+    final removedIndex = _items.indexWhere((item) => item.id == id);
+    final removed = removedIndex < 0 ? null : _items[removedIndex];
     _items.removeWhere((item) => item.id == id);
     unawaited(_service.saveLocal(householdId, _items));
     unawaited(_service.delete(householdId, id));
+    if (removed != null) {
+      _recordAudit(
+        householdId,
+        type: 'stock_removed',
+        item: removed,
+        quantity: removed.quantity,
+      );
+    }
     notifyListeners();
   }
 
@@ -527,46 +595,124 @@ class PantryProvider extends ChangeNotifier {
     );
     _items[index] = updated;
     _persistAndSync(updated);
+    _recordAudit(
+      updated.householdId,
+      type: delta >= 0 ? 'stock_added' : 'stock_adjusted',
+      item: updated,
+      quantity: delta.abs(),
+    );
     notifyListeners();
   }
 
-  int deductIngredients(List<String> ingredientNames) {
-    final changed = <PantryItemModel>[];
-    final usedIds = <String>{};
-    for (final ingredientName in ingredientNames) {
-      final required = ingredientName.toLowerCase();
-      final index = _items.indexWhere((item) {
-        if (usedIds.contains(item.id) || item.quantity <= 0) return false;
-        final available = item.name.toLowerCase();
-        return available.contains(required) || required.contains(available);
-      });
-      if (index == -1) continue;
+  List<IngredientAvailability> previewConsumption(
+    Iterable<RecipeIngredient> ingredients,
+  ) => ingredients
+      .map(
+        (ingredient) =>
+            InventoryQuantityService.availability(ingredient, _items),
+      )
+      .toList();
+
+  Future<PantryConsumptionResult> consumeIngredients({
+    required List<RecipeIngredient> ingredients,
+    required String recipeId,
+    required String recipeTitle,
+    String? actorId,
+  }) async {
+    final householdId = _householdId;
+    if (householdId == null) {
+      throw StateError('No pantry is selected.');
+    }
+    final previews = previewConsumption(ingredients);
+    final insufficient = previews.where((item) => !item.isSufficient).toList();
+    if (insufficient.isNotEmpty) {
+      final names = insufficient.map((item) => item.ingredient.name).join(', ');
+      throw StateError('Not enough compatible stock for: $names.');
+    }
+
+    final amountsByItem = <String, double>{};
+    final unitsByItem = <String, String>{};
+    for (final preview in previews) {
+      for (final allocation in preview.allocations) {
+        amountsByItem.update(
+          allocation.item.id,
+          (value) => value + allocation.amountInPantryUnit,
+          ifAbsent: () => allocation.amountInPantryUnit,
+        );
+        unitsByItem[allocation.item.id] = allocation.item.unit;
+      }
+    }
+    final deductions = [
+      for (final entry in amountsByItem.entries)
+        PantryStockDeduction(
+          itemId: entry.key,
+          amount: entry.value,
+          unit: unitsByItem[entry.key]!,
+        ),
+    ];
+    final now = DateTime.now();
+    final event = <String, dynamic>{
+      'id': _uuid.v4(),
+      'household_id': householdId,
+      'type': 'recipe_consumption',
+      'recipe_id': recipeId,
+      'recipe_title': recipeTitle,
+      'actor_id': actorId ?? _actorId ?? 'unknown',
+      'timestamp': now.toIso8601String(),
+      'ingredients': [
+        for (final ingredient in ingredients)
+          {
+            'name': ingredient.name,
+            'quantity': ingredient.quantity,
+            'unit': ingredient.unit,
+          },
+      ],
+      'deductions': [
+        for (final deduction in deductions)
+          {
+            'item_id': deduction.itemId,
+            'quantity': deduction.amount,
+            'unit': deduction.unit,
+          },
+      ],
+    };
+
+    final isSharedHousehold = !householdId.startsWith('personal_');
+    if (isSharedHousehold && _service.supportsCloudSync) {
+      await _service.consumeAtomically(
+        householdId: householdId,
+        deductions: deductions,
+        ledgerEvent: event,
+      );
+    }
+
+    for (final deduction in deductions) {
+      final index = _items.indexWhere((item) => item.id == deduction.itemId);
+      if (index < 0) continue;
       final current = _items[index];
-      final amount = _recipeUseAmount(current.unit);
-      final updated = current.copyWith(
-        quantity: (current.quantity - amount)
+      _items[index] = current.copyWith(
+        quantity: (current.quantity - deduction.amount)
             .clamp(0.0, double.infinity)
             .toDouble(),
-        updatedAt: DateTime.now(),
+        openedDate: current.openedDate ?? now,
+        updatedAt: now,
       );
-      _items[index] = updated;
-      usedIds.add(updated.id);
-      changed.add(updated);
     }
-    for (final item in changed) {
-      _persistAndSync(item);
+    await _service.saveLocal(householdId, _items);
+    if (!isSharedHousehold || !_service.supportsCloudSync) {
+      for (final deduction in deductions) {
+        final item = _items.firstWhere((entry) => entry.id == deduction.itemId);
+        await _service.upsert(item);
+      }
+      await _service.recordLedgerEvent(householdId, event);
+    } else {
+      await _service.recordLedgerEvent(householdId, event, syncRemote: false);
     }
-    if (changed.isNotEmpty) notifyListeners();
-    return changed.length;
-  }
-
-  double _recipeUseAmount(String unit) {
-    return switch (unit.toLowerCase()) {
-      'g' || 'ml' => 100,
-      'kg' || 'l' || 'litres' => 0.2,
-      'dozen' => 0.25,
-      _ => 1,
-    };
+    notifyListeners();
+    return PantryConsumptionResult(
+      changedItems: deductions.length,
+      consumedIngredients: List.unmodifiable(ingredients),
+    );
   }
 
   void _persistAndSync(PantryItemModel item) {
@@ -574,6 +720,28 @@ class PantryProvider extends ChangeNotifier {
     if (householdId == null) return;
     unawaited(_service.saveLocal(householdId, _items));
     unawaited(_service.upsert(item));
+  }
+
+  void _recordAudit(
+    String householdId, {
+    required String type,
+    required PantryItemModel item,
+    required double quantity,
+  }) {
+    if (_householdId == null) return;
+    unawaited(
+      _service.recordLedgerEvent(householdId, {
+        'id': _uuid.v4(),
+        'household_id': householdId,
+        'type': type,
+        'item_id': item.id,
+        'item_name': item.name,
+        'quantity': quantity,
+        'unit': item.unit,
+        'actor_id': _actorId ?? 'unknown',
+        'timestamp': DateTime.now().toIso8601String(),
+      }),
+    );
   }
 
   @override

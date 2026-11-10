@@ -1,7 +1,9 @@
 import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'firebase_service.dart';
 
 class HouseholdAliasService {
@@ -31,7 +33,8 @@ class HouseholdAliasService {
             .collection('households')
             .doc(householdId)
             .collection('aliases')
-            .get();
+            .get()
+            .timeout(const Duration(seconds: 3));
         for (final doc in snapshot.docs) {
           final data = doc.data();
           final raw = data['raw_text']?.toString().toLowerCase().trim();

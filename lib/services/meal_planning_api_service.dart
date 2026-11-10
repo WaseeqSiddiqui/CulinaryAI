@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/backend_meal_recommendation.dart';
 import '../models/pantry_item_model.dart';
+import '../models/recipe_discovery.dart';
 
 import 'server_config_service.dart';
 
@@ -37,6 +38,82 @@ class MealPlanningApiService {
   final http.Client _client;
   final Uri baseUri;
   final Duration timeout;
+
+  Future<RecipeDiscoveryResult> discoverRecipes({
+    required String question,
+    required List<PantryItemModel> pantryItems,
+    int resultCount = 5,
+    List<String> dietaryPreferences = const [],
+    List<String> avoidIngredients = const [],
+    DateTime? referenceDate,
+    DateTime? requestedDate,
+  }) async {
+    String dateOnly(DateTime value) => value.toIso8601String().split('T').first;
+    try {
+      final response = await _client
+          .post(
+            baseUri.resolve('/discover-recipes'),
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'question': question,
+              'reference_date': dateOnly(referenceDate ?? DateTime.now()),
+              if (requestedDate != null)
+                'requested_date': dateOnly(requestedDate),
+              'meal_count': resultCount.clamp(1, 7),
+              'dietary_preferences': dietaryPreferences
+                  .map((item) => item.trim().toLowerCase())
+                  .where(
+                    (item) =>
+                        item.isNotEmpty &&
+                        !{'none', 'balanced', 'omnivore'}.contains(item),
+                  )
+                  .toList(),
+              'avoid_ingredients': avoidIngredients,
+              'pantry_items': [
+                for (final item in pantryItems)
+                  {
+                    'name': item.name,
+                    'quantity': item.quantity,
+                    'unit': item.unit,
+                    if (item.expiryDate != null)
+                      'expiry_date': dateOnly(item.expiryDate!),
+                  },
+              ],
+            }),
+          )
+          .timeout(const Duration(seconds: 75));
+      if (response.statusCode == 404) {
+        throw const MealPlanningApiException(
+          'Live recipe search is not available right now. Please try again later.',
+        );
+      }
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        String? message;
+        try {
+          final body = jsonDecode(response.body);
+          if (body is Map && body['detail'] is String) {
+            message = body['detail'] as String;
+          }
+        } catch (_) {}
+        throw MealPlanningApiException(
+          message ?? 'Live recipe search could not finish. Please try again.',
+        );
+      }
+      return RecipeDiscoveryResult.fromJson(
+        Map<String, dynamic>.from(jsonDecode(response.body) as Map),
+      );
+    } on MealPlanningApiException {
+      rethrow;
+    } on TimeoutException {
+      throw const MealPlanningApiException(
+        'Live recipe search took too long. Please retry; your pantry is unchanged.',
+      );
+    } on Object {
+      throw const MealPlanningApiException(
+        'Live recipe search is unavailable. Please retry; no demo recipes were substituted.',
+      );
+    }
+  }
 
   Future<BackendMealPlan> generatePlan({
     String question = '',

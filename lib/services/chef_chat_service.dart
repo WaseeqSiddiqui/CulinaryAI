@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 
 import '../models/pantry_item_model.dart';
@@ -12,6 +13,11 @@ class ChefChatService {
 
   static bool isMealPlanningQuestion(String question) {
     final query = question.trim().toLowerCase();
+    if (RegExp(
+      r'\b(recipe|recipes|cook|cooking|meal|meals|dinner|lunch|breakfast|supper|banau|pakau|pakao)\b',
+    ).hasMatch(query)) {
+      return true;
+    }
     return _containsAny(query, [
       'what can i cook',
       'recommend',
@@ -44,11 +50,7 @@ class ChefChatService {
       });
 
       final res = await httpClient
-          .post(
-            uri,
-            headers: {'Content-Type': 'application/json'},
-            body: body,
-          )
+          .post(uri, headers: {'Content-Type': 'application/json'}, body: body)
           .timeout(const Duration(seconds: 8));
 
       if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -116,7 +118,12 @@ class ChefChatService {
       return 'Common kitchen substitutes:\n• Heavy Cream: Whole milk + butter (or plain Greek yogurt)\n• Olive Oil: Canola, vegetable, or coconut oil\n• Eggs (baking): Applesauce or mashed banana\n• Lemon Juice: Vinegar or lime juice';
     }
 
-    if (_containsAny(query, ['help', 'who are you', 'what can you do', 'features'])) {
+    if (_containsAny(query, [
+      'help',
+      'who are you',
+      'what can you do',
+      'features',
+    ])) {
       return 'I am Chef CulinaryAI, your smart kitchen assistant! Here is what I can do:\n• Scan grocery receipts and fridge shelves to manage stock\n• Recommend recipes based on what ingredients you actually have\n• Alert you when ingredients are running low\n• Guide you step-by-step through interactive cooking';
     }
 

@@ -40,6 +40,7 @@ class ProductMatchingService {
         canonical.isEmpty ||
         canonical.length > 120 ||
         confidence == null ||
+        !confidence.isFinite ||
         confidence < 0 ||
         confidence > 1 ||
         changed is! bool ||
@@ -88,6 +89,16 @@ class ProductMatchingService {
       );
     }
     final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final confidence = (body['confidence'] as num?)?.toDouble();
+    final reason = body['reason'];
+    if (confidence == null ||
+        !confidence.isFinite ||
+        confidence < 0 ||
+        confidence > 1 ||
+        reason is! String ||
+        reason.trim().isEmpty) {
+      throw const FormatException('Invalid product match confidence or reason');
+    }
     final index = body['chosen_index'] as int?;
     final units = body['units_to_buy'] as int?;
     if (index != null && (index < 0 || index >= candidates.length)) {
@@ -102,8 +113,8 @@ class ProductMatchingService {
     return ProductMatch(
       chosenIndex: index,
       unitsToBuy: units,
-      confidence: (body['confidence'] as num).toDouble(),
-      reason: body['reason'] as String,
+      confidence: confidence,
+      reason: reason.trim(),
     );
   }
 }

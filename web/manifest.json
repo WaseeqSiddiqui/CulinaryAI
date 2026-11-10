@@ -1,12 +1,12 @@
 {
-    "name": "culinary_ai",
-    "short_name": "culinary_ai",
+    "name": "CulinaryAI",
+    "short_name": "CulinaryAI",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#FAFAF6",
+    "theme_color": "#2D654F",
+    "description": "Your everyday kitchen companion for pantry tracking, recipes, guided cooking and groceries.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

@@ -115,6 +115,20 @@ void main() {
     expect(result.unitsToBuy, isNull);
   });
 
+  for (final confidence in [-0.1, 1.1]) {
+    test('rejects out-of-range match confidence $confidence', () async {
+      await expectLater(
+        serviceReturning({
+          'chosen_index': 0,
+          'units_to_buy': 2,
+          'confidence': confidence,
+          'reason': 'Invalid confidence',
+        }).match(wanted, candidates),
+        throwsFormatException,
+      );
+    });
+  }
+
   test('accepts a valid general shopping-query normalization', () async {
     final service = serviceReturning({
       'search_query': 'milk',

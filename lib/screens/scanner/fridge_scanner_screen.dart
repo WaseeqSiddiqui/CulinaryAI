@@ -1,14 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../widgets/app_ui.dart';
+import '../../widgets/scan_ui.dart';
 import '../../models/fridge_vision_models.dart';
 import '../../providers/pantry_provider.dart';
 import '../../services/food_image_service.dart';
 import '../../services/vision_api_service.dart';
-
 
 class FridgeScannerScreen extends StatefulWidget {
   const FridgeScannerScreen({super.key});
@@ -26,6 +30,7 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen>
   Uint8List? _fridgeImage;
   FridgeScanResponse? _scanResponse;
   String? _scanError;
+  bool _pickingImage = false;
 
   late AnimationController _scanLineController;
   late AnimationController _pulseController;
@@ -38,11 +43,11 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen>
     _scanLineController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
+    );
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
+    );
 
     _scanLineAnim = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _scanLineController, curve: Curves.easeInOut),
@@ -61,14 +66,18 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen>
   }
 
   Future<void> _startScan(ImageSource source) async {
-    XFile? image;
+    if (_pickingImage) return;
+    _pickingImage = true;
+    late Uint8List bytes;
     try {
-      image = await _imagePicker.pickImage(
+      final image = await _imagePicker.pickImage(
         source: source,
         maxWidth: 2048,
         maxHeight: 2048,
         imageQuality: 92,
       );
+      if (image == null || !mounted) return;
+      bytes = await image.readAsBytes();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -77,9 +86,12 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen>
         ),
       );
       return;
+    } finally {
+      _pickingImage = false;
     }
-    if (image == null || !mounted) return;
-    final bytes = await image.readAsBytes();
+    if (!mounted) return;
+    _scanLineController.repeat(reverse: true);
+    _pulseController.repeat(reverse: true);
     setState(() {
       _scanState = _ScanState.scanning;
       _fridgeImage = bytes;
@@ -88,6 +100,8 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen>
 
     await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted) return;
+    _scanLineController.stop();
+    _pulseController.stop();
     setState(() => _scanState = _ScanState.processing);
 
     try {
@@ -125,7 +139,7 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen>
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _scanError = 'Failed to analyze fridge shelf. Check your backend server and connection.';
+        _scanError = 'We could not read this shelf. Check your connection and try another photo.';
         _scanState = _ScanState.error;
       });
     }
@@ -144,12 +158,15 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen>
     final resp = _scanResponse;
     if (resp == null) return;
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: const BoxConstraints(maxWidth: 760),
+      useSafeArea: true,
+      showDragHandle: false,
       isDismissible: false,
-      builder: (_) => _FridgeReconciliationSheet(
+      builder: (_) => FridgeReviewSheet(
         response: resp,
         onConfirm: _applyReconciliation,
         onRescan: () {
@@ -157,7 +174,9 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen>
           _resetScan();
         },
       ),
-    );
+    ).whenComplete(() {
+      if (mounted && _scanState == _ScanState.reconcile) _resetScan();
+    });
   }
 
   Future<void> _applyReconciliation(
@@ -243,29 +262,21 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      backgroundColor: isDark ? AppTheme.bgDark : const Color(0xFF2A2420),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
-          'Scan fridge',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-        ),
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.white70,
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Scan your fridge'),
+      actions: [
+        if (_scanState == _ScanState.done)
+          TextButton.icon(
+            onPressed: _resetScan,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('New scan'),
           ),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: _buildBody(),
-    );
-  }
+        const SizedBox(width: 12),
+      ],
+    ),
+    body: SafeArea(child: AppPageBody(child: _buildBody())),
+  );
 
   Widget _buildBody() {
     return switch (_scanState) {
@@ -288,7 +299,6 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen>
       _ScanState.done => _DoneFridgeView(onNewScan: _resetScan),
     };
   }
-
 }
 
 enum _ScanState { idle, scanning, processing, reconcile, error, done }
@@ -301,120 +311,16 @@ class _IdleFridgeView extends StatelessWidget {
   const _IdleFridgeView({required this.onCamera, required this.onGallery});
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 290,
-                  height: 220,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppTheme.zoneFridge, width: 2),
-                    color: Colors.white.withValues(alpha: 0.03),
-                  ),
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.kitchen_rounded,
-                          size: 52,
-                          color: AppTheme.zoneFridge.withValues(alpha: 0.8),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Photograph your open fridge',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Full fridge or one shelf—no arranging needed',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: Text(
-                    'The scanner checks the full image, including cluttered shelves and door compartments. You review every item before pantry stock changes.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
-                      fontSize: 12,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 36),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onGallery,
-                  icon: const Icon(Icons.photo_library_rounded, size: 20),
-                  label: const Text('Gallery'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.2),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton.icon(
-                  onPressed: onCamera,
-                  icon: const Icon(Icons.camera_alt_rounded, size: 22),
-                  label: const Text(
-                    'Scan fridge',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.zoneFridge,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 4,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => ScanLanding(
+    title: 'See what is fresh.',
+    description: 'Photograph a shelf and compare what is there with your pantry. You choose which changes to keep.',
+    icon: Icons.kitchen_outlined,
+    photoAsset: 'assets/images/pantry_basket.jpg',
+    onCamera: onCamera,
+    onGallery: onGallery,
+    tip: 'Use good light and photograph one shelf at a time. Keep packaging and labels visible.',
+  );
 }
-
-// ── Scanning & Processing Views ──────────────────────────────────────────────
 
 class _ScanningFridgeView extends StatelessWidget {
   final Animation<double> scanLineAnim;
@@ -438,7 +344,10 @@ class _ScanningFridgeView extends StatelessWidget {
           child: ScaleTransition(
             scale: pulseAnim,
             child: Container(
-              width: 300,
+              width: (MediaQuery.sizeOf(context).width - 48).clamp(
+                180.0,
+                320.0,
+              ),
               height: 400,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
@@ -480,46 +389,11 @@ class _ProcessingFridgeView extends StatelessWidget {
   const _ProcessingFridgeView();
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppTheme.zoneFridge.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: const Center(
-              child: CircularProgressIndicator(
-                color: AppTheme.zoneFridge,
-                strokeWidth: 3,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Auditing Fridge Stock...',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Reconciling detected items with your pantry inventory',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
-              fontSize: 13,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const ScanStatusView(
+    busy: true,
+    title: 'Getting to know your shelf.',
+    message: 'Matching visible ingredients to your pantry and preparing the changes for your review.',
+  );
 }
 
 class _FridgeErrorView extends StatelessWidget {
@@ -534,76 +408,22 @@ class _FridgeErrorView extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.error_outline_rounded,
-              color: Colors.redAccent,
-              size: 48,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Audit Incomplete',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.65),
-                fontSize: 12.5,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 22),
-            ElevatedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Try Again'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.zoneFridge,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 13,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-            TextButton.icon(
-              onPressed: onUseDemo,
-              icon: const Icon(
-                Icons.kitchen_rounded,
-                size: 18,
-                color: AppTheme.zoneFridge,
-              ),
-              label: const Text(
-                'Test with Sample Fridge Scan',
-                style: TextStyle(
-                  color: AppTheme.zoneFridge,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
+  Widget build(BuildContext context) => ScanStatusView(
+    icon: Icons.document_scanner_outlined,
+    title: 'Let us try that again.',
+    message: message,
+    actions: [
+      FilledButton.icon(
+        onPressed: onRetry,
+        icon: const Icon(Icons.refresh_rounded),
+        label: const Text('Try another photo'),
       ),
-    );
-  }
+      TextButton(
+        onPressed: onUseDemo,
+        child: const Text('Explore a sample fridge scan'),
+      ),
+    ],
+  );
 }
 
 class _DoneFridgeView extends StatelessWidget {
@@ -611,88 +431,63 @@ class _DoneFridgeView extends StatelessWidget {
   const _DoneFridgeView({required this.onNewScan});
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.verified_rounded,
-              color: AppTheme.zoneFridge,
-              size: 56,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Fridge Reconciled',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Stock counts verified and adjusted based on your confirmation.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 28),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white70,
-                  ),
-                  child: const Text('Return Home'),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton(
-                  onPressed: onNewScan,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.zoneFridge,
-                  ),
-                  child: const Text(
-                    'Scan Another Shelf',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+  Widget build(BuildContext context) => ScanStatusView(
+    icon: Icons.check_rounded,
+    title: 'Your pantry is up to date.',
+    message: 'Your confirmed stock changes have been saved. The next good meal starts here.',
+    actions: [
+      FilledButton.icon(
+        onPressed: onNewScan,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Scan another shelf'),
       ),
-    );
-  }
+      OutlinedButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Back to your kitchen'),
+      ),
+    ],
+  );
 }
 
-// ── Fridge Reconciliation Bottom Sheet ───────────────────────────────────────
-
-class _FridgeReconciliationSheet extends StatefulWidget {
+class FridgeReviewSheet extends StatefulWidget {
   final FridgeScanResponse response;
-  final void Function(List<ReconciledFridgeItem>) onConfirm;
+  final FutureOr<void> Function(List<ReconciledFridgeItem>) onConfirm;
   final VoidCallback onRescan;
 
-  const _FridgeReconciliationSheet({
+  const FridgeReviewSheet({
+    super.key,
     required this.response,
     required this.onConfirm,
     required this.onRescan,
   });
 
   @override
-  State<_FridgeReconciliationSheet> createState() =>
-      _FridgeReconciliationSheetState();
+  State<FridgeReviewSheet> createState() => _FridgeReviewSheetState();
 }
 
-class _FridgeReconciliationSheetState
-    extends State<_FridgeReconciliationSheet> {
+class _FridgeReviewSheetState extends State<FridgeReviewSheet> {
   late List<ReconciledFridgeItem> _items;
+  bool _saving = false;
+  bool _saved = false;
+
+  Future<void> _save() async {
+    if (_saving || _saved) return;
+    setState(() => _saving = true);
+    try {
+      await widget.onConfirm(_items);
+      if (mounted) setState(() => _saved = true);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Changes could not be saved. Please try again.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   @override
   void initState() {
@@ -708,130 +503,159 @@ class _FridgeReconciliationSheetState
     final newItems = _items.where((i) => i.status == 'new_item').toList();
     final verified = _items.where((i) => i.status == 'verified').toList();
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.88,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (_, controller) => Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppTheme.surfaceDark : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          children: [
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(top: 10, bottom: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+    return PopScope(
+      canPop: !_saving,
+      child: AbsorbPointer(
+        absorbing: _saving || _saved,
+        child: DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.88,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (_, controller) => Material(
+            color: Theme.of(context).colorScheme.surface,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Fridge Reconciliation',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 8),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 8,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _statusChip(
-                        '${verified.length} Verified',
-                        AppTheme.primaryEmerald,
+                      const Text(
+                        'Review your fridge',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      if (mismatches.isNotEmpty) ...[
-                        _statusChip(
-                          '${mismatches.length} Questions',
-                          AppTheme.warmAmber,
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                      if (newItems.isNotEmpty)
-                        _statusChip(
-                          '${newItems.length} New',
-                          AppTheme.zoneFridge,
-                        ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _statusChip(
+                            '${verified.length} Verified',
+                            AppTheme.primaryEmerald,
+                          ),
+                          const SizedBox(width: 8),
+                          if (mismatches.isNotEmpty) ...[
+                            _statusChip(
+                              '${mismatches.length} ${mismatches.length == 1 ? 'Question' : 'Questions'}',
+                              AppTheme.warmAmber,
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          if (newItems.isNotEmpty)
+                            _statusChip(
+                              '${newItems.length} New',
+                              AppTheme.zoneFridge,
+                            ),
+                        ],
+                      ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView(
-                controller: controller,
-                padding: const EdgeInsets.all(16),
-                children: [
-                  if (mismatches.isNotEmpty) ...[
-                    _sectionHeader(
-                      'Stock Questions (User Clarification Required)',
-                    ),
-                    ...mismatches.map(
-                      (item) => _buildMismatchTile(item, isDark),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  if (newItems.isNotEmpty) ...[
-                    _sectionHeader('Spotted New Items (Not in Ledger)'),
-                    ...newItems.map((item) => _buildNewItemTile(item, isDark)),
-                    const SizedBox(height: 16),
-                  ],
-                  if (verified.isNotEmpty) ...[
-                    _sectionHeader('Verified Matching Stock'),
-                    ...verified.map((item) => _buildVerifiedTile(item, isDark)),
-                  ],
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-              decoration: BoxDecoration(
-                color: isDark ? AppTheme.surfaceDark : Colors.white,
-                border: Border(
-                  top: BorderSide(
-                    color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView(
+                    controller: controller,
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      if (mismatches.isNotEmpty) ...[
+                        _sectionHeader('A few things to check'),
+                        ...mismatches.map(
+                          (item) => _buildMismatchTile(item, isDark),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      if (newItems.isNotEmpty) ...[
+                        _sectionHeader('New to your pantry'),
+                        ...newItems.map(
+                          (item) => _buildNewItemTile(item, isDark),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      if (verified.isNotEmpty) ...[
+                        _sectionHeader('Already up to date'),
+                        ...verified.map(
+                          (item) => _buildVerifiedTile(item, isDark),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: widget.onRescan,
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: const Text('Re-snap'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: () => widget.onConfirm(_items),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.zoneFridge,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: const Text(
-                        'Apply Confirmed Updates',
-                        style: TextStyle(fontWeight: FontWeight.w700),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.surfaceDark : Colors.white,
+                    border: Border(
+                      top: BorderSide(
+                        color: isDark
+                            ? AppTheme.borderDark
+                            : AppTheme.borderLight,
                       ),
                     ),
                   ),
-                ],
-              ),
+                  child: SafeArea(
+                    top: false,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _saving ? null : widget.onRescan,
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            child: const Text('Retake'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: _saving || _saved ? null : _save,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.zoneFridge,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            child: Text(
+                              _saving
+                                  ? 'Saving…'
+                                  : _saved
+                                  ? 'Saved'
+                                  : 'Save changes',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -840,14 +664,7 @@ class _FridgeReconciliationSheetState
   Widget _sectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8, top: 4),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          color: AppTheme.textSecondary,
-        ),
-      ),
+      child: Text(title, style: Theme.of(context).textTheme.titleSmall),
     );
   }
 
@@ -893,10 +710,10 @@ class _FridgeReconciliationSheetState
                       ),
                     ),
                     Text(
-                      'Pantry: ${item.currentQuantity} ${item.unit}  •  Scan: ${item.suggestedQuantity} ${item.unit}',
-                      style: const TextStyle(
+                      'In pantry: ${_formatFridgeQty(item.currentQuantity)} ${item.unit} · In photo: ${_formatFridgeQty(item.suggestedQuantity)} ${item.unit}',
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppTheme.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -925,12 +742,14 @@ class _FridgeReconciliationSheetState
               color: Colors.blueGrey.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(4),
             ),
-            child: const Text(
-              'estimated = true',
+            child: Text(
+              item.estimated
+                  ? 'Photo estimate · check the quantity'
+                  : 'Detected quantity',
               style: TextStyle(
                 fontSize: 10,
-                fontFamily: 'monospace',
-                color: AppTheme.textSecondary,
+                fontFamily: 'PlusJakartaSans',
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -977,9 +796,9 @@ class _FridgeReconciliationSheetState
                 ),
                 Text(
                   item.question ?? 'Found on shelf. Add to pantry?',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppTheme.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -1005,22 +824,22 @@ class _FridgeReconciliationSheetState
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.check_circle_rounded,
-            color: AppTheme.primaryEmerald,
+            color: Theme.of(context).colorScheme.primary,
             size: 20,
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              '${item.matchedName ?? item.detectedName} (${item.currentQuantity} ${item.unit})',
+              '${item.matchedName ?? item.detectedName} (${_formatFridgeQty(item.currentQuantity)} ${item.unit})',
               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
             ),
           ),
-          const Text(
+          Text(
             'Verified',
             style: TextStyle(
-              color: AppTheme.primaryEmerald,
+              color: Theme.of(context).colorScheme.primary,
               fontWeight: FontWeight.w700,
               fontSize: 11,
             ),
@@ -1040,7 +859,9 @@ class _FridgeReconciliationSheetState
       child: Text(
         label,
         style: TextStyle(
-          color: color,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Theme.of(context).colorScheme.onSurface
+              : color,
           fontSize: 11,
           fontWeight: FontWeight.w700,
         ),
@@ -1048,3 +869,6 @@ class _FridgeReconciliationSheetState
     );
   }
 }
+
+String _formatFridgeQty(double? value) =>
+    value == null ? '—' : NumberFormat('0.###').format(value);

@@ -1,5 +1,5 @@
 name: culinary_ai
-description: "A new Flutter project."
+description: "Your everyday kitchen companion for pantry tracking, recipes, guided cooking and groceries."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -49,6 +49,8 @@ dependencies:
   crypto: ^3.0.6
   http_parser: ^4.1.2
   flutter_inappwebview: 6.2.0-beta.3
+  speech_to_text: ^7.5.0
+  flutter_tts: ^4.2.5
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -81,6 +83,13 @@ flutter:
   assets:
     - assets/images/
     - assets/store_selectors.json
+    - assets/tessdata/eng.traineddata
+    - assets/fonts/OFL-PlusJakartaSans.txt
+
+  fonts:
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-Variable.ttf
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

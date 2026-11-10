@@ -17,6 +17,68 @@ void main() {
     }),
   );
 
+  test('allows a user-initiated blank OAuth popup from Foodpanda', () {
+    final opener = Uri.parse(
+      'https://www.foodpanda.pk/darkstore/shop/pandamart',
+    );
+    expect(
+      adapter.canOpenLoginPopup(
+        opener: opener,
+        target: Uri.parse('about:blank'),
+        hasGesture: true,
+      ),
+      isTrue,
+    );
+    expect(
+      adapter.canOpenLoginPopup(opener: opener, target: null, hasGesture: true),
+      isTrue,
+    );
+    expect(
+      adapter.canOpenLoginPopup(
+        opener: opener,
+        target: Uri.parse('about:blank'),
+        hasGesture: false,
+      ),
+      isFalse,
+    );
+  });
+
+  test('login popups retain origin and destination restrictions', () {
+    final opener = Uri.parse('https://www.foodpanda.pk/');
+    expect(
+      adapter.canOpenLoginPopup(
+        opener: opener,
+        target: Uri.parse('https://accounts.google.com/o/oauth2/auth'),
+        hasGesture: true,
+      ),
+      isTrue,
+    );
+    expect(
+      adapter.canOpenLoginPopup(
+        opener: opener,
+        target: Uri.parse('https://www.foodpanda.pk/login'),
+        hasGesture: true,
+      ),
+      isTrue,
+    );
+    expect(
+      adapter.canOpenLoginPopup(
+        opener: opener,
+        target: Uri.parse('https://attacker.example/login'),
+        hasGesture: true,
+      ),
+      isFalse,
+    );
+    expect(
+      adapter.canOpenLoginPopup(
+        opener: Uri.parse('https://attacker.example/'),
+        target: Uri.parse('about:blank'),
+        hasGesture: true,
+      ),
+      isFalse,
+    );
+  });
+
   test('recognizes only configured HTTPS social-login hosts', () {
     expect(
       adapter.isExternalLoginUri(
@@ -53,6 +115,34 @@ void main() {
     );
     expect(adapter.addressTextShowsSelection('sultan town Lahore'), isTrue);
     expect(adapter.addressTextShowsSelection('F-10 Islamabad'), isTrue);
+  });
+
+  test('a Karachi label cannot confirm a newly selected Lahore address', () {
+    expect(
+      adapter.addressMatchesDraft('New address245 Karachi', 'Lahore'),
+      isFalse,
+    );
+    expect(
+      adapter.addressMatchesDraft('New addressLahore', 'Lahore, Pakistan'),
+      isTrue,
+    );
+    expect(adapter.addressMatchesDraft('', 'Lahore'), isFalse);
+    expect(adapter.addressMatchesDraft('New address', ''), isFalse);
+  });
+
+  test('search navigation preserves the selected delivery coordinates', () {
+    adapter.rememberStoreUri(
+      Uri.parse(
+        'https://www.foodpanda.pk/darkstore/test/pandamart?lat=24.1&lng=67.2&q=old&utm_source=test',
+      ),
+    );
+    final search = adapter.searchUriFor('milk & eggs')!;
+    expect(search.path, '/darkstore/test/pandamart/search');
+    expect(search.queryParameters, {
+      'lat': '24.1',
+      'lng': '67.2',
+      'q': 'milk & eggs',
+    });
   });
 
   test('uses whichever PandaMart branch the user selected', () {

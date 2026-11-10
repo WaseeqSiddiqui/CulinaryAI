@@ -27,9 +27,13 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Take a photo of a grocery receipt to add items to your pantry.</string>
+	<string>Take photos of receipts, ingredients, and cooking progress for AI-assisted kitchen guidance.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Select a receipt photo to add items to your pantry.</string>
+	<string>Select receipt, meal, or cooking-progress photos for AI-assisted kitchen guidance.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>CulinaryAI needs access to your microphone so you can ask recipe and cooking questions hands-free.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>CulinaryAI uses speech recognition so you can ask verbal cooking questions while hands are busy.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Use your current location to show PandaMart stores that deliver to you.</string>
 	<key>UIApplicationSceneManifest</key>

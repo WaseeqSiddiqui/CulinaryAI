@@ -43,44 +43,36 @@ class ProfileScreen extends StatelessWidget {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 32),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
         children: [
           Container(
-            padding: const EdgeInsets.all(22),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              gradient: isDark
-                  ? AppTheme.heroDarkGradient
-                  : AppTheme.heroGradient,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primaryFlame.withValues(alpha: 0.18),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+              color: surface,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: border),
             ),
             child: Column(
               children: [
                 _ProfileAvatar(user: user),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
                 Text(
                   user.name,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 23,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   user.email,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.82),
-                    fontSize: 13,
-                  ),
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(color: secondaryText),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'YOUR KITCHEN, YOUR WAY',
+                  style: Theme.of(context).textTheme.labelSmall
+                      ?.copyWith(letterSpacing: 1.3, color: secondaryText),
                 ),
               ],
             ),
@@ -226,14 +218,14 @@ class _ProfileAvatar extends StatelessWidget {
 
     return CircleAvatar(
       radius: 42,
-      backgroundColor: Colors.white.withValues(alpha: 0.2),
+      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
       foregroundImage: photoUrl == null || photoUrl.isEmpty
           ? null
           : NetworkImage(photoUrl),
       child: Text(
         initials.isEmpty ? 'C' : initials,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.primary,
           fontSize: 25,
           fontWeight: FontWeight.w800,
         ),

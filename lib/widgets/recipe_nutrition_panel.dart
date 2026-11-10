@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
-import '../core/theme/app_theme.dart';
+import 'app_ui.dart';
 import '../models/nutrition_facts.dart';
 import '../models/recipe_ingredient.dart';
 import '../models/recipe_recommendation_model.dart';
@@ -9,11 +10,13 @@ import '../services/nutrition_calculator_service.dart';
 class RecipeNutritionPanel extends StatefulWidget {
   final RecipeRecommendationModel recipe;
   final bool isDark;
+  final ValueChanged<int>? onServingsChanged;
 
   const RecipeNutritionPanel({
     super.key,
     required this.recipe,
     required this.isDark,
+    this.onServingsChanged,
   });
 
   @override
@@ -40,128 +43,110 @@ class _RecipeNutritionPanelState extends State<RecipeNutritionPanel> {
       ingredients: ingredients,
       servings: _servings,
     );
-    final textColor = widget.isDark
-        ? AppTheme.textDarkPrimary
-        : AppTheme.textLightPrimary;
-    final secondary = widget.isDark
-        ? AppTheme.textDarkSecondary
-        : AppTheme.textLightSecondary;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: widget.isDark ? AppTheme.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: widget.isDark ? AppTheme.borderDark : AppTheme.borderLight,
-        ),
-      ),
+    final colors = Theme.of(context).colorScheme;
+    return SurfacePanel(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Text(
+            'Make enough for everyone.',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Ingredients and nutrition adjust with your portions.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 18),
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Portion scaler',
-                      style: TextStyle(
-                        color: textColor,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      'Ingredients and totals update together',
-                      style: TextStyle(color: secondary, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
               IconButton.filledTonal(
+                tooltip: 'Fewer servings',
                 onPressed: _servings > 1
-                    ? () => setState(() => _servings--)
+                    ? () {
+                        setState(() => _servings--);
+                        widget.onServingsChanged?.call(_servings);
+                      }
                     : null,
                 icon: const Icon(Icons.remove_rounded),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+              Expanded(
                 child: Column(
                   children: [
                     Text(
                       '$_servings',
-                      style: TextStyle(
-                        color: textColor,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                      ),
+                      style: Theme.of(context).textTheme.headlineMedium,
                     ),
-                    Text('servings', style: TextStyle(color: secondary)),
+                    Text(
+                      'servings',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ],
                 ),
               ),
               IconButton.filledTonal(
+                tooltip: 'More servings',
                 onPressed: _servings < 12
-                    ? () => setState(() => _servings++)
+                    ? () {
+                        setState(() => _servings++);
+                        widget.onServingsChanged?.call(_servings);
+                      }
                     : null,
                 icon: const Icon(Icons.add_rounded),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 22),
+          const Divider(),
+          const SizedBox(height: 20),
           Text(
-            'Scaled ingredients',
-            style: TextStyle(color: textColor, fontWeight: FontWeight.w700),
+            'What you will need',
+            style: Theme.of(context).textTheme.titleSmall,
           ),
-          const SizedBox(height: 8),
-          ...ingredients.map(
-            (ingredient) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+          const SizedBox(height: 12),
+          for (final ingredient in ingredients)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
                 children: [
                   Expanded(
+                    flex: 3,
                     child: Text(
                       ingredient.name,
-                      style: TextStyle(color: secondary),
+                      style: Theme.of(context).textTheme.bodyMedium
+                          ?.copyWith(color: colors.onSurfaceVariant),
                     ),
                   ),
-                  Text(
-                    _formatIngredient(ingredient),
-                    style: TextStyle(
-                      color: textColor,
-                      fontWeight: FontWeight.w700,
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      _formatIngredient(ingredient),
+                      textAlign: TextAlign.end,
+                      style: Theme.of(context).textTheme.labelLarge,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          const Divider(height: 28),
+          const SizedBox(height: 22),
           Text(
-            'Nutrition',
-            style: TextStyle(color: textColor, fontWeight: FontWeight.w700),
+            'Nutrition at a glance',
+            style: Theme.of(context).textTheme.titleSmall,
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _MacroColumn(
-                  title: 'Per serving',
-                  facts: nutrition.perServing,
-                  color: AppTheme.primaryFlame,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _MacroColumn(
-                  title: 'Recipe total',
-                  facts: nutrition.total,
-                  color: AppTheme.freshHerb,
-                ),
-              ),
-            ],
+          const SizedBox(height: 14),
+          FormFieldPair(
+            first: _MacroColumn(
+              title: 'Per serving',
+              facts: nutrition.perServing,
+              color: colors.primary,
+            ),
+            second: _MacroColumn(
+              title: 'Whole recipe',
+              facts: nutrition.total,
+              color: colors.primary,
+            ),
           ),
         ],
       ),
@@ -169,9 +154,7 @@ class _RecipeNutritionPanelState extends State<RecipeNutritionPanel> {
   }
 
   String _formatIngredient(RecipeIngredient ingredient) {
-    final quantity = ingredient.quantity;
-    final digits = quantity == quantity.roundToDouble() ? 0 : 1;
-    return '${quantity.toStringAsFixed(digits)} ${ingredient.unit}';
+    return '${NumberFormat('0.###').format(ingredient.quantity)} ${ingredient.unit}';
   }
 }
 

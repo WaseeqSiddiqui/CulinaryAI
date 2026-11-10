@@ -26,4 +26,19 @@ void main() {
     expect(restored.single.name, 'Rice');
     expect(restored.single.householdId, 'household-1');
   });
+
+  test('legacy piece records remain ambiguous instead of inventing capacity', () {
+    final legacy = PantryItemModel.fromMap({
+      'household_id': 'household-1',
+      'name': 'Mustard Sauce',
+      'quantity': 1,
+      'unit': 'pcs',
+      'location': 'Pantry Shelf',
+    }, 'legacy-sauce');
+
+    expect(legacy.quantity, 1);
+    expect(legacy.quantityPerPackage, isNull);
+    expect(legacy.packageCount, isNull);
+    expect(legacy.needsPackageDetails, isTrue);
+  });
 }
