@@ -43,6 +43,10 @@ from app.services.product_matcher import ProductMatcher
 from app.services.recipe_repository import VerifiedRecipeRepository
 from app.models.recipe_discovery import RecipeDiscoveryRequest, RecipeDiscoveryResponse
 from app.services.live_recipe_discovery import LiveRecipeDiscoveryService, RecipeProviderUnavailable
+from app.models.dish_options import DishOptionsRequest, DishOptionsResponse, RestaurantSearchRequest, RestaurantSearchResponse
+from app.services.dish_options import DishOptionsService
+from app.services.restaurant_search import RestaurantSearchService, RestaurantSearchUnavailable
+from app.services.dish_recipe_lookup import DishRecipeLookup
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -54,6 +58,8 @@ vision_service = GeminiVisionService(catalog_service=catalog_service)
 fridge_reconciler = FridgeReconciler(catalog=catalog_service)
 product_matcher = ProductMatcher()
 recipe_discovery = LiveRecipeDiscoveryService()
+dish_options = DishOptionsService(recipe_discovery.provider, fallback=DishRecipeLookup())
+restaurant_search = RestaurantSearchService()
 
 app = FastAPI(
     title="CulinaryAI API",
@@ -97,6 +103,22 @@ def root() -> dict:
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse(status="ok", indexed_recipes=len(repository.recipes))
+
+
+@app.post("/dish-options", response_model=DishOptionsResponse)
+async def check_dish(request: DishOptionsRequest) -> DishOptionsResponse:
+    try:
+        return await asyncio.to_thread(dish_options.check, request)
+    except RecipeProviderUnavailable:
+        raise HTTPException(status_code=503, detail="The recipe source could not be reached. Please retry the pantry check.") from None
+
+
+@app.post("/nearby-restaurants", response_model=RestaurantSearchResponse)
+async def nearby_restaurants(request: RestaurantSearchRequest) -> RestaurantSearchResponse:
+    try:
+        return await asyncio.to_thread(restaurant_search.search, request)
+    except RestaurantSearchUnavailable as error:
+        raise HTTPException(status_code=503, detail=str(error)) from None
 
 
 

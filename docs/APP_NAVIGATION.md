@@ -12,6 +12,7 @@ below the first screen. The existing color palette is unchanged.
 | Scan an expiry label | Home → Check expiry → ingredient → Scan label |
 | Pantry quantities and zones | My Pantry tab |
 | Find or create recipes | Recipes tab → Find recipes or Create recipe |
+| Request a dish and check restaurant alternatives | Recipes → Request a dish |
 | Guided cooking | Recipe details → Start guided cooking |
 | Weekly planning | Recipes tab → Meal plan |
 | Nutrition goals | Recipes tab → Nutrition |

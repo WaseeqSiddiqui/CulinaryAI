@@ -15,6 +15,7 @@ import '../../services/meal_planning_api_service.dart';
 import '../../services/recipe_recommendation_service.dart';
 import '../cooking/guided_cooking_screen.dart';
 import '../scanner/meal_scanner_screen.dart';
+import 'dish_request_screen.dart';
 
 enum RecipeSection { pantry, create, macros, weekly, saved }
 
@@ -329,6 +330,14 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
             children: [
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute(builder: (_) => const DishRequestScreen()),
+                ),
+                icon: const Icon(Icons.room_service_outlined),
+                label: const Text('Request a dish · cook or order'),
+              ),
+              const SizedBox(height: 16),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,

@@ -14,6 +14,7 @@ import 'package:culinary_ai/screens/cooking/guided_cooking_screen.dart';
 import 'package:culinary_ai/screens/household/household_screen.dart';
 import 'package:culinary_ai/screens/profile/personal_details_screen.dart';
 import 'package:culinary_ai/screens/recipes/recipe_hub_screen.dart';
+import 'package:culinary_ai/screens/recipes/dish_request_screen.dart';
 import 'package:culinary_ai/screens/scanner/expiry_label_scanner_screen.dart';
 import 'package:culinary_ai/screens/scanner/fridge_scanner_screen.dart';
 import 'package:culinary_ai/screens/scanner/meal_scanner_screen.dart';
@@ -178,6 +179,7 @@ void main() {
         await visit(entry.$1, RecipeHubScreen(section: entry.$2));
       }
       await visit('cooking_preferences', const CookingPreferencesScreen());
+      await visit('dish_request', const DishRequestScreen());
       await visit('personal_details', const PersonalDetailsScreen());
       await visit('receipt_scan', const ReceiptScannerScreen());
       await visit('fridge_scan', const FridgeScannerScreen());

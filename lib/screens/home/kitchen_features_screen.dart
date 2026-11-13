@@ -7,6 +7,7 @@ import '../pantry/expiry_overview_screen.dart';
 import '../pantry/pantry_screen.dart';
 import '../profile/profile_screen.dart';
 import '../recipes/recipe_hub_screen.dart';
+import '../recipes/dish_request_screen.dart';
 import '../scanner/fridge_scanner_screen.dart';
 import '../scanner/meal_scanner_screen.dart';
 import '../scanner/receipt_scanner_screen.dart';
@@ -222,6 +223,13 @@ class _KitchenFeaturesScreenState extends State<KitchenFeaturesScreen> {
       (
         'Cooking and nutrition',
         [
+          KitchenTask(
+            title: 'Request a dish',
+            description:
+                'Check pantry ingredients or find restaurant menus nearby',
+            icon: Icons.room_service_outlined,
+            onTap: () => _open(const DishRequestScreen()),
+          ),
           KitchenTask(
             title: 'Find recipes',
             description: 'Cook with ingredients you already have',

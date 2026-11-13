@@ -12,12 +12,20 @@ import '../../providers/pantry_provider.dart';
 import '../../providers/recipe_experience_provider.dart';
 import '../../services/chef_chat_service.dart';
 import '../../services/meal_planning_api_service.dart';
+import '../../services/dish_options_service.dart';
+import '../recipes/dish_request_screen.dart';
 
 class ChatbotScreen extends StatefulWidget {
   final String? initialQuestion;
   final MealPlanningApiService? mealPlanningApi;
+  final DishOptionsService? dishOptionsApi;
 
-  const ChatbotScreen({super.key, this.initialQuestion, this.mealPlanningApi});
+  const ChatbotScreen({
+    super.key,
+    this.initialQuestion,
+    this.mealPlanningApi,
+    this.dishOptionsApi,
+  });
 
   @override
   State<ChatbotScreen> createState() => _ChatbotScreenState();
@@ -36,6 +44,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     'What is low stock?',
     'What do I have in my pantry?',
     'How do I cook tomato pasta?',
+    'I want chicken biryani',
   ];
 
   @override
@@ -60,6 +69,21 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   Future<void> _send([String? value]) async {
     final question = (value ?? _controller.text).trim();
     if (question.isEmpty || _isReplying) return;
+    final requestedDish = DishRequestIntent.extract(question);
+    if (requestedDish != null) {
+      _controller.clear();
+      FocusScope.of(context).unfocus();
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => DishRequestScreen(
+            initialDish: requestedDish,
+            autoCheck: true,
+            service: widget.dishOptionsApi,
+          ),
+        ),
+      );
+      return;
+    }
     final pantryItems = context
         .read<PantryProvider>()
         .allItems

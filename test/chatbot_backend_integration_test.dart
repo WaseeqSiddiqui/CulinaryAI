@@ -6,6 +6,8 @@ import 'package:culinary_ai/providers/pantry_provider.dart';
 import 'package:culinary_ai/providers/recipe_experience_provider.dart';
 import 'package:culinary_ai/screens/chat/chatbot_screen.dart';
 import 'package:culinary_ai/services/meal_planning_api_service.dart';
+import 'package:culinary_ai/services/dish_options_service.dart';
+import 'package:culinary_ai/screens/recipes/dish_request_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -23,6 +25,7 @@ void main() {
     WidgetTester tester,
     MealPlanningApiService api, {
     bool small = false,
+    DishOptionsService? dishApi,
   }) async {
     if (small) {
       tester.view.physicalSize = const Size(320, 740);
@@ -47,13 +50,53 @@ void main() {
         ],
         child: MaterialApp(
           theme: AppTheme.lightTheme,
-          home: ChatbotScreen(mealPlanningApi: api),
+          home: ChatbotScreen(mealPlanningApi: api, dishOptionsApi: dishApi),
         ),
       ),
     );
     await tester.pumpAndSettle();
     return pantry;
   }
+
+  testWidgets(
+    'named dish requests open the actual inventory check without general chat search',
+    (tester) async {
+      final dishApi = DishOptionsService(
+        baseUrl: 'https://test.local',
+        client: MockClient((req) async {
+          expect(req.url.path, '/dish-options');
+          expect((jsonDecode(req.body) as Map)['dish'], 'rice bowl');
+          return http.Response(
+            jsonEncode({
+              'dish': 'rice bowl',
+              'status': 'ready',
+              'message': 'Your pantry covers this recipe.',
+              'quantities_note': 'Check portions.',
+              'recipe': (liveRecipeFixture()['meals'] as List).first,
+            }),
+            200,
+          );
+        }),
+      );
+      await open(
+        tester,
+        MealPlanningApiService(
+          client: MockClient((_) async {
+            fail(
+              'A named dish must not invoke pantry-only recipe recommendations',
+            );
+          }),
+        ),
+        dishApi: dishApi,
+      );
+      await tester.enterText(find.byType(TextField), 'I want rice bowl');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(find.byType(DishRequestScreen), findsOneWidget);
+      expect(find.text('You can cook this recipe'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'Chef Chat searches live pantry recipes and renders source and quantities on a small phone',
