@@ -315,6 +315,9 @@ class _DashboardTabState extends State<_DashboardTab> {
         title: const Text('Home'),
         actions: [
           TextButton.icon(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
+            ),
             onPressed: () => _open(const KitchenFeaturesScreen()),
             icon: const Icon(Icons.grid_view_outlined, size: 18),
             label: const Text('All features'),

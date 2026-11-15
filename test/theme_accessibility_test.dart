@@ -34,6 +34,30 @@ void main() {
           theme.snackBarTheme.contentTextStyle!.color!,
           theme.snackBarTheme.backgroundColor!,
         ),
+        'app bar title': (
+          theme.appBarTheme.titleTextStyle!.color!,
+          theme.appBarTheme.backgroundColor!,
+        ),
+        'app bar actions': (
+          theme.appBarTheme.actionsIconTheme!.color!,
+          theme.appBarTheme.backgroundColor!,
+        ),
+        'navigation label': (
+          theme.navigationBarTheme.labelTextStyle!.resolve({})!.color!,
+          theme.navigationBarTheme.backgroundColor!,
+        ),
+        'selected navigation label': (
+          theme.navigationBarTheme.labelTextStyle!.resolve({
+            WidgetState.selected,
+          })!.color!,
+          theme.navigationBarTheme.backgroundColor!,
+        ),
+        'selected navigation icon': (
+          theme.navigationBarTheme.iconTheme!.resolve({
+            WidgetState.selected,
+          })!.color!,
+          theme.navigationBarTheme.indicatorColor!,
+        ),
       };
       for (final pair in pairs.entries) {
         expect(

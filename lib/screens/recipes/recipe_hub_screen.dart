@@ -309,6 +309,9 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
         actions: [
           if (_mode == RecipeSection.macros)
             TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
+              ),
               label: const Text('Scan meal'),
               onPressed: () => Navigator.push(
                 context,

@@ -45,12 +45,12 @@ class DashboardPlaceholderScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: AppTheme.primaryEmerald.withValues(alpha: 0.15),
+                color: Colors.white.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(
                 Icons.restaurant,
-                color: AppTheme.primaryEmerald,
+                color: Colors.white,
                 size: 20,
               ),
             ),

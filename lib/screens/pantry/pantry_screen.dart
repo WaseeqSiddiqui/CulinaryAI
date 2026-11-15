@@ -181,7 +181,6 @@ class _PantryScreenState extends State<PantryScreen>
     return SliverAppBar(
       pinned: true,
       automaticallyImplyLeading: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       title: const Text('My pantry'),
       actions: [
         IconButton(
@@ -201,34 +200,37 @@ class _PantryScreenState extends State<PantryScreen>
       ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(184),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-              child: Text(
-                '${pantry.totalCount} ingredients, a world of possibilities.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+        child: ColoredBox(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                child: Text(
+                  '${pantry.totalCount} ingredients, a world of possibilities.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: TextField(
-                controller: _searchController,
-                onChanged: pantry.setSearch,
-                decoration: const InputDecoration(
-                  hintText: 'Find an ingredient',
-                  prefixIcon: Icon(Icons.search_rounded, size: 21),
-                  isDense: true,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: pantry.setSearch,
+                  decoration: const InputDecoration(
+                    hintText: 'Find an ingredient',
+                    prefixIcon: Icon(Icons.search_rounded, size: 21),
+                    isDense: true,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            _buildZoneChips(pantry, isDark),
-            _buildExpiryChips(pantry),
-          ],
+              const SizedBox(height: 10),
+              _buildZoneChips(pantry, isDark),
+              _buildExpiryChips(pantry),
+            ],
+          ),
         ),
       ),
     );

@@ -122,6 +122,9 @@ class ShoppingListScreen extends StatelessWidget {
         title: const Text('Shopping list'),
         actions: [
           TextButton.icon(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
+            ),
             label: const Text('Order history'),
             icon: const Icon(Icons.history),
             onPressed: () => Navigator.push(

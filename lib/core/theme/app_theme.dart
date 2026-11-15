@@ -69,6 +69,7 @@ class AppTheme {
     final surface = dark ? surfaceDark : surfaceLight;
     final background = dark ? bgDark : bgLight;
     final accent = dark ? primaryFlameLight : primaryFlame;
+    final barBackground = dark ? primaryFlameDark : primaryFlame;
     final base = ThemeData(
       useMaterial3: true,
       fontFamily: 'PlusJakartaSans',
@@ -151,8 +152,10 @@ class AppTheme {
         ),
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: background,
-        foregroundColor: ink,
+        backgroundColor: barBackground,
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actionsIconTheme: const IconThemeData(color: Colors.white),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -163,7 +166,7 @@ class AppTheme {
           fontSize: 21,
           fontWeight: FontWeight.w600,
           letterSpacing: -.6,
-          color: ink,
+          color: Colors.white,
         ),
       ),
       cardTheme: CardThemeData(
@@ -263,22 +266,36 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         height: 76,
         elevation: 0,
-        backgroundColor: surface,
+        backgroundColor: barBackground,
         surfaceTintColor: Colors.transparent,
-        indicatorColor: scheme.primaryContainer,
+        indicatorColor: terracottaAccent,
+        overlayColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.pressed)) {
+            return Colors.white.withValues(alpha: .16);
+          }
+          if (states.contains(WidgetState.hovered) ||
+              states.contains(WidgetState.focused)) {
+            return Colors.white.withValues(alpha: .08);
+          }
+          return null;
+        }),
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => typography.labelSmall?.copyWith(
             fontSize: 11,
             fontWeight: states.contains(WidgetState.selected)
                 ? FontWeight.w700
                 : FontWeight.w500,
-            color: states.contains(WidgetState.selected) ? accent : muted,
+            color: states.contains(WidgetState.selected)
+                ? copperLight
+                : primaryFlameLight,
           ),
         ),
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
             size: 22,
-            color: states.contains(WidgetState.selected) ? accent : muted,
+            color: states.contains(WidgetState.selected)
+                ? Colors.white
+                : primaryFlameLight,
           ),
         ),
       ),

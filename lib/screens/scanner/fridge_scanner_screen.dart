@@ -268,6 +268,9 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen>
       actions: [
         if (_scanState == _ScanState.done)
           TextButton.icon(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
+            ),
             onPressed: _resetScan,
             icon: const Icon(Icons.refresh_rounded, size: 18),
             label: const Text('New scan'),

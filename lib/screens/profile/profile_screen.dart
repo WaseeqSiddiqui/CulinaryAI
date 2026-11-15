@@ -35,6 +35,9 @@ class ProfileScreen extends StatelessWidget {
         title: const Text('My Profile'),
         actions: [
           TextButton.icon(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
+            ),
             onPressed: () => _openPersonalDetails(context),
             icon: const Icon(Icons.edit_outlined, size: 18),
             label: const Text('Edit'),
