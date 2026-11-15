@@ -13,6 +13,7 @@ import 'providers/theme_provider.dart';
 import 'providers/recipe_experience_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/main_shell.dart';
+import 'screens/startup/splash_screen.dart';
 import 'services/firebase_service.dart';
 import 'services/server_config_service.dart';
 
@@ -82,23 +83,15 @@ class CulinaryAiApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
-            home: authProvider.isInitializing
-                ? const _SessionLoadingScreen()
-                : authProvider.isAuthenticated
-                ? const MainShell()
-                : const LoginScreen(),
+            home: StartupGate(
+              isInitializing: authProvider.isInitializing,
+              child: authProvider.isAuthenticated
+                  ? const MainShell()
+                  : const LoginScreen(),
+            ),
           );
         },
       ),
     );
-  }
-}
-
-class _SessionLoadingScreen extends StatelessWidget {
-  const _SessionLoadingScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

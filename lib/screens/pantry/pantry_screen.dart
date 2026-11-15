@@ -150,9 +150,10 @@ class _PantryScreenState extends State<PantryScreen>
     final grouped = pantry.itemsByZone;
 
     return Scaffold(
+      appBar: _buildAppBar(context, pantry),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          _buildSliverAppBar(context, pantry, isDark, innerBoxIsScrolled),
+          SliverToBoxAdapter(child: _buildPantryHeader(context, pantry)),
         ],
         body: pantry.allItems.isEmpty
             ? _buildEmptyState(context)
@@ -172,69 +173,78 @@ class _PantryScreenState extends State<PantryScreen>
     );
   }
 
-  SliverAppBar _buildSliverAppBar(
-    BuildContext context,
-    PantryProvider pantry,
-    bool isDark,
-    bool innerBoxIsScrolled,
-  ) {
-    return SliverAppBar(
-      pinned: true,
-      automaticallyImplyLeading: true,
-      title: const Text('My pantry'),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.document_scanner_outlined),
-          tooltip: 'Scan fridge',
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const FridgeScannerScreen()),
-          ),
-        ),
-        IconButton(
-          icon: const Icon(Icons.tune_rounded),
-          tooltip: 'Filter by Zone',
-          onPressed: () => _showZoneFilterSheet(context, pantry),
-        ),
-        const SizedBox(width: 12),
-      ],
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(184),
-        child: ColoredBox(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-                child: Text(
-                  '${pantry.totalCount} ingredients, a world of possibilities.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: pantry.setSearch,
-                  decoration: const InputDecoration(
-                    hintText: 'Find an ingredient',
-                    prefixIcon: Icon(Icons.search_rounded, size: 21),
-                    isDense: true,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              _buildZoneChips(pantry, isDark),
-              _buildExpiryChips(pantry),
-            ],
-          ),
+  AppBar _buildAppBar(BuildContext context, PantryProvider pantry) => AppBar(
+    title: const Text('My pantry'),
+    actions: [
+      IconButton(
+        icon: const Icon(Icons.document_scanner_outlined),
+        tooltip: 'Scan fridge',
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const FridgeScannerScreen()),
         ),
       ),
-    );
-  }
+      IconButton(
+        icon: const Icon(Icons.tune_rounded),
+        tooltip: 'Filter by Zone',
+        onPressed: () => _showZoneFilterSheet(context, pantry),
+      ),
+      const SizedBox(width: 12),
+    ],
+  );
+
+  Widget _buildPantryHeader(
+    BuildContext context,
+    PantryProvider pantry,
+  ) => Padding(
+    padding: const EdgeInsets.fromLTRB(24, 18, 24, 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '${pantry.totalCount} ingredients, a world of possibilities.',
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 14),
+        TextField(
+          controller: _searchController,
+          onChanged: pantry.setSearch,
+          decoration: const InputDecoration(
+            hintText: 'Find an ingredient',
+            prefixIcon: Icon(Icons.search_rounded, size: 21),
+            isDense: true,
+          ),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          key: ValueKey('pantry-zone-${pantry.selectedZone ?? 'all'}'),
+          initialValue: pantry.selectedZone ?? 'All',
+          isExpanded: true,
+          decoration: InputDecoration(
+            labelText: 'Storage zone',
+            prefixIcon: Icon(
+              _zoneMeta[pantry.selectedZone]?.icon ?? Icons.grid_view_rounded,
+              size: 20,
+            ),
+          ),
+          items: [
+            const DropdownMenuItem(value: 'All', child: Text('All Zones')),
+            ...PantryProvider.zones.map(
+              (zone) => DropdownMenuItem(
+                value: zone,
+                child: Text(_zoneMeta[zone]!.label),
+              ),
+            ),
+          ],
+          onChanged: (zone) =>
+              pantry.setZoneFilter(zone == 'All' ? null : zone),
+        ),
+        const SizedBox(height: 12),
+        _buildExpiryChips(pantry),
+      ],
+    ),
+  );
 
   Widget _buildExpiryChips(PantryProvider pantry) {
     final entries = <(PantryExpiryFilter, String, IconData, int?)>[
@@ -263,63 +273,23 @@ class _PantryScreenState extends State<PantryScreen>
         null,
       ),
     ];
-    return SizedBox(
-      height: 44,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
-        itemCount: entries.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (_, index) {
-          final entry = entries[index];
-          final selected = pantry.expiryFilter == entry.$1;
-          return FilterChip(
-            selected: selected,
-            showCheckmark: false,
-            avatar: Icon(entry.$3, size: 15),
-            label: Text(
-              entry.$4 == null ? entry.$2 : '${entry.$2} ${entry.$4}',
-            ),
-            onSelected: (_) => pantry.setExpiryFilter(entry.$1),
-            visualDensity: VisualDensity.compact,
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildZoneChips(PantryProvider pantry, bool isDark) {
-    return SizedBox(
-      height: 52,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        children: [
-          _ZoneChip(
-            label: 'All',
-            icon: Icons.grid_view_rounded,
-            color: isDark ? AppTheme.primaryFlameLight : AppTheme.primaryFlame,
-            isSelected: pantry.selectedZone == null,
-            onTap: () => pantry.setZoneFilter(null),
-          ),
-          const SizedBox(width: 8),
-          ...PantryProvider.zones.map((zone) {
-            final meta = _zoneMeta[zone]!;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: _ZoneChip(
-                label: meta.label,
-                icon: meta.icon,
-                color: meta.color,
-                isSelected: pantry.selectedZone == zone,
-                onTap: () => pantry.setZoneFilter(
-                  pantry.selectedZone == zone ? null : zone,
-                ),
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: entries
+          .map(
+            (entry) => FilterChip(
+              selected: pantry.expiryFilter == entry.$1,
+              showCheckmark: false,
+              avatar: Icon(entry.$3, size: 15),
+              label: Text(
+                entry.$4 == null ? entry.$2 : '${entry.$2} ${entry.$4}',
               ),
-            );
-          }),
-        ],
-      ),
+              onSelected: (_) => pantry.setExpiryFilter(entry.$1),
+              visualDensity: VisualDensity.compact,
+            ),
+          )
+          .toList(),
     );
   }
 
@@ -866,77 +836,6 @@ class _QtyBtn extends StatelessWidget {
 }
 
 // ── Zone Chip ─────────────────────────────────────────────────────────────────
-
-class _ZoneChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _ZoneChip({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? color.withValues(alpha: isDark ? 0.2 : 0.14)
-              : (isDark ? AppTheme.surfaceDark2 : Colors.white),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? color
-                : (isDark ? AppTheme.borderDark : AppTheme.borderLight),
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: isSelected
-                  ? color
-                  : (isDark
-                        ? AppTheme.textDarkSecondary
-                        : AppTheme.textLightSecondary),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected
-                    ? color
-                    : (isDark
-                          ? AppTheme.textDarkSecondary
-                          : AppTheme.textLightSecondary),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Stat Chip ─────────────────────────────────────────────────────────────────
-
-// ── Add / Edit Sheet ──────────────────────────────────────────────────────────
 
 class _AddEditSheet extends StatefulWidget {
   final PantryItemModel? item;

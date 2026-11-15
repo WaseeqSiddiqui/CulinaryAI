@@ -8,20 +8,25 @@ class AppTheme {
   static const freshHerb = Color(0xFF2D7B56);
   static const freshHerbLight = Color(0xFFA9D4B9);
   static const freshHerbDark = Color(0xFF205B3D);
-  static const warmSaffron = Color(0xFFA76B20);
-  static const warmSaffronLight = Color(0xFFF5DCAD);
+  static const accentViolet = Color(0xFF7055C6);
+  static const accentVioletLight = Color(0xFFD7CAFF);
+  static const accentVioletBright = Color(0xFFB9A5FF);
+  static const accentVioletSoft = Color(0xFFF0EAFF);
+  // Compatibility aliases keep existing badges and controls on one palette.
+  static const warmSaffron = accentViolet;
+  static const warmSaffronLight = accentVioletSoft;
   static const errorRed = Color(0xFFBA2F3D);
   static const successGreen = freshHerb;
   static const primaryEmerald = primaryFlame;
   static const primaryLight = primaryFlameLight;
   static const primaryDark = primaryFlameDark;
-  static const terracottaAccent = Color(0xFFA2643F);
-  static const copperLight = Color(0xFFE3BB9F);
+  static const terracottaAccent = accentViolet;
+  static const copperLight = accentVioletLight;
   static const warmAmber = warmSaffron;
   static const zoneFridge = Color(0xFF3E7C9C);
   static const zoneFreezer = Color(0xFF7B70B1);
-  static const zonePantry = Color(0xFFA76B20);
-  static const zoneSpice = Color(0xFFA2643F);
+  static const zonePantry = accentViolet;
+  static const zoneSpice = Color(0xFF5E459F);
   static const creamWarm = Color(0xFFF7F8FA);
   static const creamBeige = Color(0xFFEFF0F3);
   static const creamSurface = Color(0xFFF3F4F6);
@@ -90,11 +95,11 @@ class AppTheme {
         ).copyWith(
           primary: accent,
           onPrimary: dark ? bgDark : Colors.white,
-          secondary: dark ? copperLight : terracottaAccent,
+          secondary: dark ? accentVioletLight : accentViolet,
           onSecondary: dark ? bgDark : Colors.white,
-          secondaryContainer: dark ? surfaceDark3 : const Color(0xFFF4EAE3),
+          secondaryContainer: dark ? surfaceDark3 : accentVioletSoft,
           onSecondaryContainer: ink,
-          tertiary: dark ? copperLight : terracottaAccent,
+          tertiary: dark ? accentVioletLight : accentViolet,
           onTertiary: dark ? bgDark : Colors.white,
           surface: surface,
           onSurface: ink,
@@ -104,7 +109,7 @@ class AppTheme {
           onPrimaryContainer: ink,
           outline: border,
           outlineVariant: border,
-          error: dark ? const Color(0xFFE9A095) : errorRed,
+          error: dark ? const Color(0xFFFFB4BF) : errorRed,
           onError: dark ? bgDark : Colors.white,
         );
     return base.copyWith(
@@ -268,7 +273,7 @@ class AppTheme {
         elevation: 0,
         backgroundColor: barBackground,
         surfaceTintColor: Colors.transparent,
-        indicatorColor: terracottaAccent,
+        indicatorColor: accentVioletBright,
         overlayColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.pressed)) {
             return Colors.white.withValues(alpha: .16);
@@ -286,7 +291,7 @@ class AppTheme {
                 ? FontWeight.w700
                 : FontWeight.w500,
             color: states.contains(WidgetState.selected)
-                ? copperLight
+                ? accentVioletLight
                 : primaryFlameLight,
           ),
         ),
@@ -294,7 +299,7 @@ class AppTheme {
           (states) => IconThemeData(
             size: 22,
             color: states.contains(WidgetState.selected)
-                ? Colors.white
+                ? primaryFlameDark
                 : primaryFlameLight,
           ),
         ),

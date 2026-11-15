@@ -19,4 +19,6 @@ Downloaded from Unsplash under the [Unsplash License](https://unsplash.com/licen
 | onions.jpg | https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb |
 | tomatoes.jpg | https://images.unsplash.com/photo-1592924357228-91a4daadcfea |
 
-The UI uses deep navy actions, white surfaces and restrained copper accents. Dark mode uses graphite surfaces and light blue actions. Food photos stay in the recipe and pantry content rather than competing with navigation.
+The UI uses deep navy actions and bars, white surfaces and violet accents. The selected bottom tab uses light violet with a navy icon. Dark mode uses graphite surfaces and light blue actions. Food photos stay in the recipe and pantry content rather than competing with navigation.
+
+The splash screen reuses the app's Material spa outlined leaf mark. Native vector source: [Google Material Design Icons](https://github.com/google/material-design-icons/blob/master/src/places/spa/materialiconsoutlined/24px.svg), licensed under [Apache 2.0](https://github.com/google/material-design-icons/blob/master/LICENSE). iOS splash images are rendered from the same Flutter Material icon.

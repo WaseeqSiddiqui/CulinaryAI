@@ -382,7 +382,7 @@ class _GuidedCookingViewState extends State<_GuidedCookingView> {
               bottom: const TabBar(
                 labelColor: Colors.white,
                 unselectedLabelColor: AppTheme.primaryFlameLight,
-                indicatorColor: AppTheme.copperLight,
+                indicatorColor: AppTheme.accentVioletLight,
                 tabs: [
                   Tab(icon: Icon(Icons.soup_kitchen_rounded), text: 'Cook'),
                   Tab(icon: Icon(Icons.forum_outlined), text: 'Ask Chef'),

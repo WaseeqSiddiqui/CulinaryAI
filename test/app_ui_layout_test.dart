@@ -173,6 +173,28 @@ void main() {
           reason: '${config.$1}: ${tab.$2}',
         );
         await capture(tab.$2);
+        if (tab.$2 == 'pantry' && config.$1 == 'phone') {
+          final pantry = tester
+              .element(find.byType(Scaffold).first)
+              .read<PantryProvider>();
+          final zones = find.byType(DropdownButtonFormField<String>);
+          await tester.tap(zones);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Freezer').last);
+          await tester.pumpAndSettle();
+          expect(pantry.selectedZone, 'Freezer');
+          await tester.tap(find.byType(DropdownButtonFormField<String>));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('All Zones').last);
+          await tester.pumpAndSettle();
+          expect(pantry.selectedZone, isNull);
+          await tester.tap(find.widgetWithText(FilterChip, 'Expired 0'));
+          await tester.pumpAndSettle();
+          expect(pantry.expiryFilter, PantryExpiryFilter.expired);
+          await tester.tap(find.widgetWithText(FilterChip, 'All dates'));
+          await tester.pumpAndSettle();
+          expect(pantry.expiryFilter, PantryExpiryFilter.all);
+        }
         if (tab.$2 == 'recipes') {
           await tester.tap(find.widgetWithText(ChoiceChip, 'Meal plan'));
           await tester.pumpAndSettle();

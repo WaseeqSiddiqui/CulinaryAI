@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/user_model.dart';
@@ -6,9 +8,12 @@ import '../services/profile_service.dart';
 import '../services/session_service.dart';
 
 class AuthProvider extends ChangeNotifier {
-  final AuthService _authService = AuthService();
-  final ProfileService _profileService = ProfileService();
-  final SessionService _sessionService = SessionService();
+  final AuthService _authService;
+  final ProfileService _profileService;
+  final SessionService _sessionService;
+  late final Future<void> initialized;
+  int _sessionVersion = 0;
+  bool _disposed = false;
 
   UserModel? _currentUser;
   bool _isInitializing = true;
@@ -23,16 +28,34 @@ class AuthProvider extends ChangeNotifier {
   bool get isProfileSaving => _isProfileSaving;
   String? get errorMessage => _errorMessage;
 
-  AuthProvider() {
-    _restoreSession();
+  AuthProvider({
+    AuthService? authService,
+    ProfileService? profileService,
+    SessionService? sessionService,
+  }) : _authService = authService ?? AuthService(),
+       _profileService = profileService ?? ProfileService(),
+       _sessionService = sessionService ?? SessionService() {
+    initialized = _restoreSession();
   }
 
   Future<void> _restoreSession() async {
+    final version = _sessionVersion;
     try {
-      final user = _authService.currentUser ?? await _sessionService.loadUser();
+      final cached = await _sessionService.loadUser();
+      final nativeUser = await _authService.restoreUser();
+      if (_disposed || version != _sessionVersion) return;
+      // A cached profile is not a substitute for Firebase authentication.
+      final user = nativeUser != null
+          ? cached?.id == nativeUser.id
+                ? cached!.copyWith(email: nativeUser.email)
+                : nativeUser
+          : !_authService.usesFirebase || cached?.id == 'demo_chef'
+          ? cached
+          : null;
       if (user != null) {
-        _currentUser = await _profileService.loadProfile(user);
-        await _sessionService.saveUser(_currentUser!);
+        _currentUser = user;
+        await _sessionService.saveUser(user);
+        unawaited(_refreshRestoredProfile(user, version));
       }
     } catch (error) {
       if (kDebugMode) {
@@ -40,8 +63,37 @@ class AuthProvider extends ChangeNotifier {
       }
     } finally {
       _isInitializing = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
+  }
+
+  Future<UserModel> _loadProfileOrKeepUser(UserModel user) async {
+    try {
+      return await _profileService
+          .loadProfile(user)
+          .timeout(const Duration(seconds: 4));
+    } catch (error) {
+      if (kDebugMode) debugPrint('Using saved profile: $error');
+      return user;
+    }
+  }
+
+  Future<void> _refreshRestoredProfile(UserModel user, int version) async {
+    final refreshed = await _loadProfileOrKeepUser(user);
+    if (_disposed ||
+        version != _sessionVersion ||
+        _currentUser?.id != user.id) {
+      return;
+    }
+    _currentUser = refreshed;
+    // Refreshing a profile must not write an authenticated session after logout.
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 
   void clearError() {
@@ -50,13 +102,14 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> login(String email, String password) async {
+    _sessionVersion++;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
       final user = await _authService.signIn(email: email, password: password);
-      _currentUser = await _profileService.loadProfile(user);
+      _currentUser = await _loadProfileOrKeepUser(user);
       await _sessionService.saveUser(_currentUser!);
       _isLoading = false;
       notifyListeners();
@@ -70,6 +123,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> register(String email, String password, String name) async {
+    _sessionVersion++;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -94,13 +148,14 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> loginWithGoogle() async {
+    _sessionVersion++;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
       final user = await _authService.signInWithGoogle();
-      _currentUser = await _profileService.loadProfile(user);
+      _currentUser = await _loadProfileOrKeepUser(user);
       await _sessionService.saveUser(_currentUser!);
       _isLoading = false;
       notifyListeners();
@@ -114,6 +169,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> continueAsDemo() async {
+    _sessionVersion++;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -133,6 +189,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    _sessionVersion++;
     _isLoading = true;
     notifyListeners();
     try {
@@ -153,6 +210,7 @@ class AuthProvider extends ChangeNotifier {
     }
 
     _isProfileSaving = true;
+    _sessionVersion++;
     _errorMessage = null;
     notifyListeners();
 

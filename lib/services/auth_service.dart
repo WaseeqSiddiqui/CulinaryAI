@@ -31,6 +31,17 @@ class AuthService {
     return _mockCurrentUser;
   }
 
+  bool get usesFirebase => _firebaseAuth != null;
+
+  /// The first event arrives after Firebase restores its persisted native user.
+  Future<UserModel?> restoreUser() async {
+    if (_firebaseAuth == null) return _mockCurrentUser;
+    return authStateChanges.first.timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => currentUser,
+    );
+  }
+
   Stream<UserModel?> get authStateChanges async* {
     if (_firebaseAuth != null) {
       yield* _firebaseAuth.authStateChanges().map((user) {
