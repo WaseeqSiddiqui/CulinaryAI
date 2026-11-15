@@ -1,4 +1,5 @@
 from pathlib import Path
+import argparse
 import re
 
 from docx import Document
@@ -10,10 +11,10 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 ROOT = Path(__file__).resolve().parent
 SOURCE = ROOT / 'MANUAL_TESTING_GUIDE.md'
-OUTPUT = ROOT / 'CulinaryAI_Manual_Testing_Guide.docx'
+OUTPUT = ROOT / 'CulinaryAI_Test_Cases.docx'
 
 
-def build():
+def build(output=OUTPUT):
     doc = Document()
     section = doc.sections[0]
     section.page_width, section.page_height = Inches(8.5), Inches(11)
@@ -24,6 +25,8 @@ def build():
         style = doc.styles[name]
         style.font.name = 'Calibri'
         style.font.color.rgb = RGBColor(0, 0, 0)
+        for border in list(style.element.xpath('.//w:pBdr')):
+            border.getparent().remove(border)
     normal = doc.styles['Normal']
     normal.font.size = Pt(11)
     normal.paragraph_format.line_spacing = 1.03
@@ -39,7 +42,7 @@ def build():
     header.runs[0].font.size = Pt(9)
     footer = section.footer.paragraphs[0]
     footer.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    footer.add_run('10 November 2026   |   ')
+    footer.add_run('Updated 15 November 2026   |   ')
     field = OxmlElement('w:fldSimple')
     field.set(qn('w:instr'), 'PAGE')
     footer._p.append(field)
@@ -53,7 +56,11 @@ def build():
         if not line:
             continue
         if line == '<!-- page -->':
-            doc.add_page_break()
+            # Keep the introduction and result sheet separate. Let the test
+            # sections flow naturally so a final case does not get a sparse page.
+            following = next((value.strip() for value in lines[i:] if value.strip()), '')
+            if following in ('## Account profile aur household', '## Result sheet aur release decision'):
+                doc.add_page_break()
         elif line.startswith('# '):
             doc.add_paragraph(line[2:], 'Title')
         elif line.startswith('## '):
@@ -122,9 +129,11 @@ def build():
     doc.core_properties.title = 'CulinaryAI manual testing guide'
     doc.core_properties.subject = 'Manual feature checks excluding automated purchasing and checkout'
     doc.core_properties.author = 'CulinaryAI project'
-    doc.save(OUTPUT)
-    print(OUTPUT)
+    doc.save(output)
+    print(output)
 
 
 if __name__ == '__main__':
-    build()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output', type=Path, default=OUTPUT)
+    build(parser.parse_args().output)

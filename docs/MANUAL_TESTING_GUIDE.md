@@ -1,24 +1,26 @@
 # CulinaryAI manual testing guide
 
-Roman Urdu guide | 10 November 2026 | Android test build
+Roman Urdu guide | Updated 15 November 2026 | Feature baseline 4e1d6f8 with current UI refresh | 61 manual cases
 
 Yeh guide automatic purchasing aur checkout automation ke ilawa app ke features ko khud test karne ke liye hai. Har case mein screen ka rasta, test ka tareeqa aur pass hone ki condition di gayi hai. Case ko sirf tab PASS likhein jab aap us ka result phone par dekh lein.
 
 ## Abhi ki verified condition
 
-- Flutter analysis mein koi issue nahi mila. Latest Flutter suite ke 216 tests pass hue.
-- Local backend ke 96 tests pass hue. Yeh local code ki checking hai; hosted server par har feature ki availability ka proof nahi.
-- Updated Android debug APK Vivo V2440 par install hua. Address selection ka extra blocking message hata diya gaya; Enter ab visible address suggestion select karta hai. Address fix ke baad user ka positive feedback mila; final scripted Sultan Town test complete nahi hua.
-- Device par WebView JavaScript, backend HTTPS, TTS playback aur speech engine initialization check hue. Asal boli hui speech ki recognition abhi manually test karni hai.
-- OCR model pehle APK mein missing tha. Asset ab bundle hota hai aur asset test pass hai; native expiry OCR ko corrected APK par dobara test karna zaroori hai.
+- Latest Flutter suite ke 227 aur backend ke 117 tests pass hue; Flutter analysis clean hai. Yeh automated checks hain, tamam phone tests ka live pass nahi.
+- 13 November ko hosted Render backend par Chicken Biryani check successful hua: khali inventory ke liye 12 missing ingredients aur Lahore ke 5 restaurant menu links mile. Dono APIs ne 200 response diya; koi order place nahi hua.
+- Home, Recipes, All features aur direct expiry editor ke navigation/layout checks phone, tablet, desktop, dark mode aur large text par pass hue. Latest debug APK build hui; is build ki physical-phone acceptance abhi baqi hai.
+- Naye navy aur white theme mein Home par recipe photo, Recipes mein large food photos aur My Pantry mein ingredient photos check karein. Internet band karke bhi bundled fallback photo aur readable buttons nazar aane chahiye.
+- Pehle Vivo V2440 par WebView, HTTPS, TTS playback aur speech engine initialization verify hue. OCR model bundling ka test bhi pass hai; actual label recognition aur boli hui speech ab manually retest karein.
 
 ## Khuli hui cheezen
 
-Hosted backend par latest audit mein discover-recipes, step-explanation, cooking-step-chat aur validate-cooking-step endpoints 404 de rahe the. In online features ka full pass backend deploy aur retest ke baad hi milega. Household invites aur cross-device cloud writes ki live verification bhi baqi hai. Meal scanner ne non-food image par zero-confidence result diya tha; usay meal log mein save hone dena ek known gap hai.
+Hosted backend par recipe discovery aur advanced cooking endpoints ab listed hain; dish-options aur nearby-restaurants ke live calls bhi verify hue. Har endpoint ki device-level acceptance alag test karein. Household invites, cross-device cloud writes, expiry OCR aur actual speech recognition abhi manual retest maangte hain. Non-food meal result ko log mein save hone dena ek known gap hai; S07 ko zaroor check karein.
 
 ## Test shuru karne se pehle
 
-Ek test account aur alag test household use karein. Sample stock banayein: Milk 1 L, Rice 1 kg, Tomato 4 pcs aur Eggs 6 pcs. Fresh, kal expire hone wala aur guzri hui expiry wala alag test item rakhein. Ek saaf receipt, expiry label, fridge photo aur meal photo tayyar rakhein. Camera aur microphone permissions zaroorat par dein. Data delete ya household switch se pehle apna asli stock alag rakhein.
+Latest test APK aur alag test household use karein. Sample stock: Milk 1 L, Rice 1 kg, Tomato 4 pcs aur Eggs 6 pcs. Fresh, kal expire hone wala aur expired test item rakhein. Receipt, expiry label, fridge aur meal photos tayyar rakhein. Asli household data ko test se alag rakhein.
+
+Navigation: bottom tabs Home, My Pantry, Recipes, Shopping aur Profile hain. Har tool Home > All features mein milta hai. Naya flow Recipes > Request a dish se khulta hai; Chef Chat ke liye Home > Ask Chef use karein.
 
 Har case ke liye PASS, FAIL, BLOCKED ya NOT RUN likhein. Network, permission ya server ki wajah se case na chal sake to BLOCKED likhein. Is document mein neeche diye gaye cases checklist hain; in sab ka live pass claim nahi kiya gaya.
 
@@ -89,7 +91,7 @@ Test: Saaf EXP ya Best Before label scan karein. Detected date ko asal label se 
 Pass: Confirmed date item form mein aaye aur Save ke baad retained ho. Manufacture date ko expiry samajhna FAIL hai; unclear scan ko manually correct kiya ja sake.
 
 ### P06 Estimate aur opened package
-Kahan: Item edit form > Package details > Estimate aur Mark opened.
+Kahan: Item edit form > Freshness & expiry > Estimate aur Mark opened.
 Test: Pehle printed expiry note karein. Estimated expiry aur opened state set karein; reopen karein.
 Pass: Estimate ki nature clear rahe, opened state save ho, printed aur estimated dates confuse na hon. Estimate ko food safety ki guarantee na samjhein.
 
@@ -175,6 +177,71 @@ Test: People aur goals set karke plan banayein; din aur meals dekhein. Preferenc
 Pass: Sahi din, meal count aur servings hon; nayi preferences reflect hon. Failure par purane plan ko naya successful response keh kar na dikhaya jaye.
 
 <!-- page -->
+## Requested dish aur restaurant menus
+
+Is module ke liye latest app build, internet aur deployed backend use karein. Restaurant scope Pakistan ke entered area aur city ke menu pages hain. Koi real purchase place karna is test ka hissa nahi hai.
+
+### D01 Naya feature dhoondhna
+Kahan: Recipes > Request a dish; Home > All features > Request a dish.
+Test: Dono raston se screen kholein; Dish name, Area and city aur Check my pantry dekhein. Android Back se wapas aayein.
+Pass: Dono raste same dish-request flow kholein; labels readable hon aur Back pichhli screen par le jaye. Pantry data is navigation se na badle.
+
+### D02 Khali pantry aur requested dish
+Kahan: Request a dish > Dish name > Check my pantry.
+Test: Alag test household ki pantry khali rakhein. Chicken Biryani likhein; area filhal khali chhorein; check karein.
+Pass: Matching source recipe aur us ke missing ingredients dikhain. Empty pantry ki wajah se ingredient check skip na ho. Baghair area ke automatic restaurant search na chale; area dalne ka rasta mile.
+
+### D03 Missing ingredients aur automatic restaurant list
+Kahan: Request a dish > Dish name aur Area and city.
+Test: Khali ya partial pantry ke saath Chicken Biryani aur Lahore enter karein. Check my pantry dabayein aur result dekhein.
+Pass: Missing list ke saath matching restaurant menu pages aayen. Cards par source aur View menu and order action ho. Restaurant count web results ke saath badal sakta hai; fixed five results ko requirement na banayein.
+
+### D04 Puri inventory ho to cooking result
+Kahan: Request a dish; recipe ke source link; My Pantry.
+Test: Aisi source recipe chunein jis ke amounts aur units saaf hon. Har ingredient sufficient quantity aur compatible unit mein add karein; phir usi dish ko dobara check karein.
+Pass: Sab quantities confirmed hon to You can cook this recipe aaye aur automatic restaurant list na aaye. Source portions check karein; unknown amount ho to D06 ka result expect karein, ready force na karein.
+
+### D05 Quantity kam ho ya ingredient expired ho
+Kahan: My Pantry > item edit; phir Request a dish.
+Test: Source mein required ingredient ki quantity kam karein, ya us ki expiry guzri hui set karein. Usi dish ko dobara check karein.
+Pass: Kam quantity insufficient ho aur missing amount dikhe jahan calculate ho sakta ho. Expired item usable stock na gina jaye. Check karne se pantry quantity ya expiry khud na badle.
+
+### D06 Unknown quantity aur units
+Kahan: Request a dish > result > Check ingredients.
+Test: Source mein to taste ya range wali quantity, ya grams ke muqablay mein pantry ke pieces/pack wala ingredient check karein.
+Pass: Amount ya unit verify karne ka message aaye; app guessed conversion se ready claim na kare. Missing, insufficient aur check amount states ko alag samjha ja sake.
+
+### D07 Naam se dish aur recipe ki pehchan
+Kahan: Request a dish > Dish name.
+Test: Chicken Biryani request karein aur returned source ka naam dekhein. Phir koi unsupported ya made-up dish name enter karein.
+Pass: Chicken ki jagah lamb recipe chupke substitute na ho. Source na mile to ingredients verify na hone ka clear message aaye; app fake missing list ya fake restaurant na banaye. Manual restaurant search ka option reh sakta hai.
+
+### D08 Chef Chat se dish request
+Kahan: Home > Ask Chef.
+Test: Alag runs mein I want chicken biryani, biryani aur mujhe biryani chahiye bhejein. Phir What can I cook aur weekly-plan sawal bhejein.
+Pass: Named requests dish screen kholein aur inventory check shuru ho. General pantry recommendations aur weekly planning apne existing flows mein rahen; har sawal ko dish request na samjha jaye.
+
+### D09 Area badalna aur purana response
+Kahan: Request a dish > Area and city.
+Test: Missing-ingredient result ke saath Lahore search karein. Search ke dauran ya baad Karachi enter karein aur Find restaurants dobara dabayein.
+Pass: Purane Lahore results nayi Karachi selection ban kar na dikhain. New cards aur area label nayi query se match hon. Exact distance, current availability ya delivery eligibility source verify kiye baghair claim na ho.
+
+### D10 Empty result aur search failure
+Kahan: Request a dish > restaurant section.
+Test: Ek bahut specific area/dish combination try karein jahan index mein result na ho. Phir request ke waqt network band karein; reconnect karke retry karein.
+Pass: No matching menus aur network/provider error alag clear states hon. Pehle se successful ingredient check retained rahe. Fake sample restaurants na aayen aur retry mumkin ho.
+
+### D11 Menu link aur order handoff
+Kahan: Restaurant card > View menu and order.
+Test: Ek matching restaurant ka button dabayein; browser ya merchant app mein khulne wala page dekhein. Menu dekh kar wapas aayein; payment ya order submit na karein.
+Pass: Sahi Foodpanda restaurant menu khule; darkstore ya unrelated page na ho. User menu, price aur delivery coverage khud confirm kar sake. App koi automatic purchase ya successful-order claim na kare.
+
+### D12 Changed inventory aur small screen
+Kahan: Request a dish; My Pantry; Android text-size settings.
+Test: Result ke baad stock update karke dish screen par wapas aayein. Chhoti screen aur large text par form, missing list aur menu buttons tak scroll karein.
+Pass: Stock badalne par previous result stale bataya jaye aur recheck manga jaye. Check my pantry reachable rahe; text, keyboard aur buttons overlap na hon. Recheck nayi inventory use kare.
+
+<!-- page -->
 ## Guided cooking aur Chef Chat
 
 ### C01 Cooking start aur step navigation
@@ -190,7 +257,7 @@ Pass: Guide current step ka ho; local fallback aur live response ka status clear
 ### C03 Step chat aur photo question
 Kahan: Guided cooking > Ask Chef; camera ya photo option.
 Test: Current step par sawal poochein. Phir food photo ke saath Question for Chef aur Ask Chef use karein.
-Pass: Response current step se relevant ho; request fail ho to clear error ho aur retry chale. Photo validation hosted deployment tak BLOCKED ho sakti hai.
+Pass: Response current step se relevant ho; request fail ho to clear error ho aur retry chale. Server par endpoint listed hona successful photo-validation response ka proof nahi; actual result record karein.
 
 ### C04 Voice input aur spoken guidance
 Kahan: Guided cooking > microphone ya voice control; speech playback controls.
@@ -299,6 +366,7 @@ Har test ID ke saamne apna actual result likhein. Sab rows shuru mein NOT RUN ha
 | Pantry aur expiry | P01 to P07 | NOT RUN | |
 | Scanners | S01 to S07 | NOT RUN | |
 | Recipes aur goals | R01 to R07 | NOT RUN | |
+| Requested dish aur restaurant menus | D01 to D12 | NOT RUN | |
 | Cooking aur Chef Chat | C01 to C07 | NOT RUN | |
 | Shopping aur screens | L01 to L07 | NOT RUN | |
 | Offline aur memory | M01 to M07 | NOT RUN | |
@@ -323,7 +391,7 @@ Screenshot ya screen recording ka naam:
 
 ## Kab module ko pass kehna hai
 
-Related cases phone par pass hon, saved data reopen ke baad sahi ho, aur us module ki koi unresolved critical failure na ho. BLOCKED aur NOT RUN ko PASS mein count na karein. Hosted backend deployment ke baghair online recipe discovery aur advanced cooking assistance ko fully working mark na karein.
+Related cases phone par pass hon, saved data reopen ke baad sahi ho, aur us module ki koi unresolved critical failure na ho. BLOCKED aur NOT RUN ko PASS mein count na karein. Backend deployment aur API success ko tamam device flows ki acceptance se alag rakhein.
 
 Expiry OCR, non-food meal handling, speech recognition aur household cross-device behavior priority retests hain. Purchasing automation is guide ke scope se bahar hai; koi real order is checklist ke liye place karna zaroori nahi. Pehle testing mein merchant cart mein temporary products add hue the; agle real checkout se pehle unhein review aur remove karein.
 
