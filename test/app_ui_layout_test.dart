@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:culinary_ai/main.dart';
-import 'package:culinary_ai/providers/theme_provider.dart';
 import 'package:culinary_ai/providers/pantry_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -26,7 +25,7 @@ void main() {
     ('phone', const Size(390, 844), false, 1),
     ('small_phone', const Size(320, 740), false, 1),
     ('desktop', const Size(1440, 1000), false, 1),
-    ('dark_phone', const Size(390, 844), true, 1),
+    ('system_dark_phone', const Size(390, 844), true, 1),
     ('tablet', const Size(768, 1024), false, 1),
     ('larger_text', const Size(390, 844), false, 1.3),
   ]) {
@@ -78,11 +77,13 @@ void main() {
         }
       });
       if (config.$3) {
-        tester
-            .element(find.byType(Scaffold).first)
-            .read<ThemeProvider>()
-            .setThemeMode(ThemeMode.dark);
+        tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
         await tester.pumpAndSettle();
+        expect(
+          Theme.of(tester.element(find.byType(Scaffold).first)).brightness,
+          Brightness.light,
+        );
       }
       Future<void> capture(String name) async {
         await tester.pump(const Duration(milliseconds: 300));

@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import '../../widgets/app_ui.dart';
 import '../../core/utils/auth_validators.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/theme_provider.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -86,19 +85,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final theme = context.watch<ThemeProvider>();
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create an account'),
-        actions: [
-          IconButton(
-            tooltip: 'Switch appearance',
-            onPressed: theme.toggleTheme,
-            icon: const Icon(Icons.contrast_rounded),
-          ),
-          const SizedBox(width: 12),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Create an account')),
       body: AppPageBody(
         maxWidth: 600,
         child: Form(

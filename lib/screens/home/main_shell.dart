@@ -8,7 +8,6 @@ import '../../models/recipe_recommendation_model.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/pantry_provider.dart';
-import '../../providers/theme_provider.dart';
 import '../../services/recipe_recommendation_service.dart';
 import '../../services/nutrition_calculator_service.dart';
 import '../../widgets/recipe_nutrition_panel.dart';
@@ -196,13 +195,6 @@ class _MainShellState extends State<MainShell> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          TextButton.icon(
-                            onPressed: () =>
-                                context.read<ThemeProvider>().toggleTheme(),
-                            icon: const Icon(Icons.contrast_rounded, size: 18),
-                            label: const Text('Switch appearance'),
-                          ),
                         ],
                       ),
                     ),
@@ -299,14 +291,12 @@ class _DashboardTabState extends State<_DashboardTab> {
   Widget build(BuildContext context) {
     final pantry = context.watch<PantryProvider>();
     final user = context.watch<AuthProvider>().currentUser;
-    final theme = context.watch<ThemeProvider>();
     final dark = Theme.of(context).brightness == Brightness.dark;
     final shell = MainShell._of(context);
     return Scaffold(
       drawer: _KitchenDrawer(
         user: user,
         pantry: pantry,
-        themeProvider: theme,
         isDark: dark,
         onLogout: _logout,
       ),
@@ -324,7 +314,7 @@ class _DashboardTabState extends State<_DashboardTab> {
           ),
           Builder(
             builder: (drawer) => IconButton(
-              tooltip: 'Account and appearance',
+              tooltip: 'Account menu',
               onPressed: () => Scaffold.of(drawer).openDrawer(),
               icon: const Icon(Icons.menu_rounded),
             ),
@@ -1508,14 +1498,12 @@ class _PulseStat extends StatelessWidget {
 class _KitchenDrawer extends StatelessWidget {
   final UserModel? user;
   final PantryProvider pantry;
-  final ThemeProvider themeProvider;
   final bool isDark;
   final VoidCallback onLogout;
 
   const _KitchenDrawer({
     required this.user,
     required this.pantry,
-    required this.themeProvider,
     required this.isDark,
     required this.onLogout,
   });
@@ -1864,63 +1852,6 @@ class _KitchenDrawer extends StatelessWidget {
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 8),
                     child: Divider(height: 1),
-                  ),
-
-                  // Mode Switcher inside Drawer
-                  Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isDark ? AppTheme.surfaceDark2 : AppTheme.bgLight,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: borderColor),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          themeProvider.isDarkMode
-                              ? Icons.dark_mode_rounded
-                              : Icons.light_mode_rounded,
-                          size: 20,
-                          color: themeProvider.isDarkMode
-                              ? AppTheme.warmSaffron
-                              : AppTheme.primaryFlame,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Appearance',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: itemColor,
-                                ),
-                              ),
-                              Text(
-                                themeProvider.isDarkMode
-                                    ? 'Dark mode'
-                                    : 'Light mode',
-                                style: TextStyle(fontSize: 11, color: subColor),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Switch(
-                          value: themeProvider.isDarkMode,
-                          activeThumbColor: AppTheme.warmSaffron,
-                          activeTrackColor: AppTheme.warmSaffron.withValues(
-                            alpha: 0.3,
-                          ),
-                          onChanged: (_) => themeProvider.toggleTheme(),
-                        ),
-                      ],
-                    ),
                   ),
                 ],
               ),

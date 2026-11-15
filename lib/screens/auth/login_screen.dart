@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 
 import '../../core/utils/auth_validators.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/theme_provider.dart';
 import 'register_screen.dart';
 import '../../widgets/app_ui.dart';
 
@@ -319,16 +318,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             vertical: 32,
                           ),
                           child: form,
-                        ),
-                      ),
-                      Positioned(
-                        top: 8,
-                        right: 12,
-                        child: IconButton(
-                          tooltip: 'Switch appearance',
-                          icon: const Icon(Icons.contrast_rounded, size: 21),
-                          onPressed: () =>
-                              context.read<ThemeProvider>().toggleTheme(),
                         ),
                       ),
                     ],

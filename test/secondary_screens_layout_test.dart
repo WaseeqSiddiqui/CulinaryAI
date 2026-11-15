@@ -8,7 +8,6 @@ import 'package:culinary_ai/models/fridge_vision_models.dart';
 import 'package:culinary_ai/models/shopping_models.dart';
 import 'package:culinary_ai/providers/pantry_provider.dart';
 import 'package:culinary_ai/providers/shopping_provider.dart';
-import 'package:culinary_ai/providers/theme_provider.dart';
 import 'package:culinary_ai/screens/auth/register_screen.dart';
 import 'package:culinary_ai/screens/cooking/guided_cooking_screen.dart';
 import 'package:culinary_ai/screens/household/household_screen.dart';
@@ -73,7 +72,7 @@ void main() {
     ('small_phone', const Size(320, 740), false, 1),
     ('phone', const Size(390, 844), false, 1),
     ('desktop', const Size(1440, 1000), false, 1),
-    ('dark_phone', const Size(390, 844), true, 1),
+    ('system_dark_phone', const Size(390, 844), true, 1),
     ('larger_text', const Size(390, 844), false, 1.3),
   ]) {
     testWidgets('secondary routes fit ${config.$1}', (tester) async {
@@ -106,8 +105,13 @@ void main() {
       await tester.pumpAndSettle();
       final rootContext = tester.element(find.byType(Navigator).first);
       if (config.$3) {
-        rootContext.read<ThemeProvider>().setThemeMode(ThemeMode.dark);
+        tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
         await tester.pumpAndSettle();
+        expect(
+          Theme.of(tester.element(find.byType(Scaffold).first)).brightness,
+          Brightness.light,
+        );
       }
       final recipe = RecipeRecommendationService.getHeroRecommendation(
         rootContext.read<PantryProvider>().allItems,

@@ -9,10 +9,7 @@ double contrast(Color first, Color second) {
 }
 
 void main() {
-  for (final entry in {
-    'light': AppTheme.lightTheme,
-    'dark': AppTheme.darkTheme,
-  }.entries) {
+  for (final entry in {'light': AppTheme.lightTheme}.entries) {
     test('${entry.key} theme keeps controls and body text readable', () {
       final theme = entry.value;
       final scheme = theme.colorScheme;

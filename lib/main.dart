@@ -9,7 +9,6 @@ import 'providers/auth_provider.dart';
 import 'providers/household_provider.dart';
 import 'providers/pantry_provider.dart';
 import 'providers/shopping_provider.dart';
-import 'providers/theme_provider.dart';
 import 'providers/recipe_experience_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/main_shell.dart';
@@ -36,7 +35,6 @@ class CulinaryAiApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => RecipeExperienceProvider()),
         ChangeNotifierProxyProvider<AuthProvider, HouseholdProvider>(
@@ -75,14 +73,13 @@ class CulinaryAiApp extends StatelessWidget {
           },
         ),
       ],
-      child: Consumer2<AuthProvider, ThemeProvider>(
-        builder: (context, authProvider, themeProvider, _) {
+      child: Consumer<AuthProvider>(
+        builder: (context, authProvider, _) {
           return MaterialApp(
             title: 'CulinaryAI',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: themeProvider.themeMode,
+            themeMode: ThemeMode.light,
             home: StartupGate(
               isInitializing: authProvider.isInitializing,
               child: authProvider.isAuthenticated

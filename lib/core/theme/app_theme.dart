@@ -65,7 +65,6 @@ class AppTheme {
   static const herbGradient = primaryGradient;
 
   static ThemeData get lightTheme => _build(false);
-  static ThemeData get darkTheme => _build(true);
 
   static ThemeData _build(bool dark) {
     final ink = dark ? textDarkPrimary : textLightPrimary;
