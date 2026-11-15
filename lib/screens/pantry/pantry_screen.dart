@@ -69,13 +69,14 @@ class PantryScreen extends StatefulWidget {
 }
 
 class _PantryScreenState extends State<PantryScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final _searchController = TextEditingController();
   late AnimationController _fabAnim;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _fabAnim = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -84,7 +85,13 @@ class _PantryScreenState extends State<PantryScreen>
   }
 
   @override
+  void didChangeMetrics() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     _fabAnim.dispose();
     super.dispose();
@@ -193,58 +200,82 @@ class _PantryScreenState extends State<PantryScreen>
     ],
   );
 
-  Widget _buildPantryHeader(
-    BuildContext context,
-    PantryProvider pantry,
-  ) => Padding(
-    padding: const EdgeInsets.fromLTRB(24, 18, 24, 8),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          '${pantry.totalCount} ingredients, a world of possibilities.',
-          style: Theme.of(context).textTheme.bodyMedium
-              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-        ),
-        const SizedBox(height: 14),
-        TextField(
-          controller: _searchController,
-          onChanged: pantry.setSearch,
-          decoration: const InputDecoration(
-            hintText: 'Find an ingredient',
-            prefixIcon: Icon(Icons.search_rounded, size: 21),
-            isDense: true,
-          ),
-        ),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          key: ValueKey('pantry-zone-${pantry.selectedZone ?? 'all'}'),
-          initialValue: pantry.selectedZone ?? 'All',
-          isExpanded: true,
-          decoration: InputDecoration(
-            labelText: 'Storage zone',
-            prefixIcon: Icon(
-              _zoneMeta[pantry.selectedZone]?.icon ?? Icons.grid_view_rounded,
-              size: 20,
+  Widget _buildPantryHeader(BuildContext context, PantryProvider pantry) {
+    // The shell's Scaffold consumes MediaQuery insets before building its body.
+    final keyboardOpen = View.of(context).viewInsets.bottom > 0;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Visibility(
+            visible: !keyboardOpen,
+            maintainState: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '${pantry.totalCount} ingredients, a world of possibilities.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
             ),
           ),
-          items: [
-            const DropdownMenuItem(value: 'All', child: Text('All Zones')),
-            ...PantryProvider.zones.map(
-              (zone) => DropdownMenuItem(
-                value: zone,
-                child: Text(_zoneMeta[zone]!.label),
-              ),
+          TextField(
+            controller: _searchController,
+            onChanged: pantry.setSearch,
+            decoration: const InputDecoration(
+              hintText: 'Find an ingredient',
+              prefixIcon: Icon(Icons.search_rounded, size: 21),
+              isDense: true,
             ),
-          ],
-          onChanged: (zone) =>
-              pantry.setZoneFilter(zone == 'All' ? null : zone),
-        ),
-        const SizedBox(height: 12),
-        _buildExpiryChips(pantry),
-      ],
-    ),
-  );
+          ),
+          Visibility(
+            visible: !keyboardOpen,
+            maintainState: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('pantry-zone-${pantry.selectedZone ?? 'all'}'),
+                  initialValue: pantry.selectedZone ?? 'All',
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'Storage zone',
+                    prefixIcon: Icon(
+                      _zoneMeta[pantry.selectedZone]?.icon ??
+                          Icons.grid_view_rounded,
+                      size: 20,
+                    ),
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: 'All',
+                      child: Text('All Zones'),
+                    ),
+                    ...PantryProvider.zones.map(
+                      (zone) => DropdownMenuItem(
+                        value: zone,
+                        child: Text(_zoneMeta[zone]!.label),
+                      ),
+                    ),
+                  ],
+                  onChanged: (zone) =>
+                      pantry.setZoneFilter(zone == 'All' ? null : zone),
+                ),
+                const SizedBox(height: 12),
+                _buildExpiryChips(pantry),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildExpiryChips(PantryProvider pantry) {
     final entries = <(PantryExpiryFilter, String, IconData, int?)>[
