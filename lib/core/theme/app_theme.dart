@@ -2,59 +2,60 @@ import 'package:flutter/material.dart';
 
 /// Shared colors, typography and controls for every CulinaryAI screen.
 class AppTheme {
-  static const primaryFlame = Color(0xFF2D654F);
-  static const primaryFlameLight = Color(0xFF82AF95);
-  static const primaryFlameDark = Color(0xFF1C4434);
-  static const freshHerb = Color(0xFF548268);
-  static const freshHerbLight = Color(0xFFA5C6AB);
-  static const freshHerbDark = Color(0xFF31543D);
-  static const warmSaffron = Color(0xFFA47A32);
-  static const warmSaffronLight = Color(0xFFECD9AF);
-  static const errorRed = Color(0xFFBA5146);
+  static const primaryFlame = Color(0xFF263B58);
+  static const primaryFlameLight = Color(0xFFAFC3DF);
+  static const primaryFlameDark = Color(0xFF192A42);
+  static const freshHerb = Color(0xFF2D7B56);
+  static const freshHerbLight = Color(0xFFA9D4B9);
+  static const freshHerbDark = Color(0xFF205B3D);
+  static const warmSaffron = Color(0xFFA76B20);
+  static const warmSaffronLight = Color(0xFFF5DCAD);
+  static const errorRed = Color(0xFFBA2F3D);
   static const successGreen = freshHerb;
   static const primaryEmerald = primaryFlame;
   static const primaryLight = primaryFlameLight;
   static const primaryDark = primaryFlameDark;
-  static const terracottaAccent = Color(0xFFB66D50);
+  static const terracottaAccent = Color(0xFFA2643F);
+  static const copperLight = Color(0xFFE3BB9F);
   static const warmAmber = warmSaffron;
-  static const zoneFridge = Color(0xFF5D8290);
-  static const zoneFreezer = Color(0xFF7B7D9E);
-  static const zonePantry = Color(0xFFA47A32);
-  static const zoneSpice = Color(0xFFB66D50);
-  static const creamWarm = Color(0xFFFAFAF6);
-  static const creamBeige = Color(0xFFEDEEE5);
-  static const creamSurface = Color(0xFFF3F4ED);
-  static const creamBorder = Color(0xFFE3E7DE);
-  static const creamAccent = Color(0xFFEBF1E8);
+  static const zoneFridge = Color(0xFF3E7C9C);
+  static const zoneFreezer = Color(0xFF7B70B1);
+  static const zonePantry = Color(0xFFA76B20);
+  static const zoneSpice = Color(0xFFA2643F);
+  static const creamWarm = Color(0xFFF7F8FA);
+  static const creamBeige = Color(0xFFEFF0F3);
+  static const creamSurface = Color(0xFFF3F4F6);
+  static const creamBorder = Color(0xFFE3E5EA);
+  static const creamAccent = Color(0xFFEBF0F6);
   static const bgLight = creamWarm;
   static const surfaceLight = Colors.white;
   static const surfaceLight2 = creamSurface;
   static const cardLight = surfaceLight;
   static const borderLight = creamBorder;
-  static const borderLightSubtle = Color(0xFFF0F1EB);
-  static const textLightPrimary = Color(0xFF22332A);
-  static const textLightSecondary = Color(0xFF68766C);
-  static const textLightMuted = Color(0xFF78847B);
-  static const bgDark = Color(0xFF131C17);
-  static const surfaceDark = Color(0xFF1B2720);
+  static const borderLightSubtle = Color(0xFFF0F1F4);
+  static const textLightPrimary = Color(0xFF23252A);
+  static const textLightSecondary = Color(0xFF62666F);
+  static const textLightMuted = Color(0xFF70747D);
+  static const bgDark = Color(0xFF141518);
+  static const surfaceDark = Color(0xFF1E2025);
   static const cardDark = surfaceDark;
-  static const surfaceDark2 = Color(0xFF25332A);
-  static const surfaceDark3 = Color(0xFF304135);
-  static const borderDark = Color(0xFF36443A);
-  static const borderDarkSubtle = Color(0xFF26332B);
-  static const textDarkPrimary = Color(0xFFF0F3EB);
-  static const textDarkSecondary = Color(0xFFB2BFB2);
-  static const textDarkMuted = Color(0xFF94A695);
+  static const surfaceDark2 = Color(0xFF292C32);
+  static const surfaceDark3 = Color(0xFF33363D);
+  static const borderDark = Color(0xFF41454D);
+  static const borderDarkSubtle = Color(0xFF2D3036);
+  static const textDarkPrimary = Color(0xFFF6F7FA);
+  static const textDarkSecondary = Color(0xFFBEC1CB);
+  static const textDarkMuted = Color(0xFF9DA2AD);
   static const textPrimary = textLightPrimary;
   static const textSecondary = textLightSecondary;
   static const primaryGradient = LinearGradient(
     colors: [primaryFlame, primaryFlameDark],
   );
   static const heroGradient = LinearGradient(
-    colors: [Color(0xFF2C5743), Color(0xFF1F3C30)],
+    colors: [Color(0xFF30323A), Color(0xFF191B21)],
   );
   static const heroDarkGradient = LinearGradient(
-    colors: [Color(0xFF2C4635), Color(0xFF22372A)],
+    colors: [Color(0xFF34363E), Color(0xFF202229)],
   );
   static const herbGradient = primaryGradient;
 
@@ -67,7 +68,7 @@ class AppTheme {
     final border = dark ? borderDark : borderLight;
     final surface = dark ? surfaceDark : surfaceLight;
     final background = dark ? bgDark : bgLight;
-    final accent = dark ? const Color(0xFFA7C9AC) : primaryFlame;
+    final accent = dark ? primaryFlameLight : primaryFlame;
     final base = ThemeData(
       useMaterial3: true,
       fontFamily: 'PlusJakartaSans',
@@ -88,7 +89,12 @@ class AppTheme {
         ).copyWith(
           primary: accent,
           onPrimary: dark ? bgDark : Colors.white,
-          secondary: dark ? primaryFlameLight : freshHerb,
+          secondary: dark ? copperLight : terracottaAccent,
+          onSecondary: dark ? bgDark : Colors.white,
+          secondaryContainer: dark ? surfaceDark3 : const Color(0xFFF4EAE3),
+          onSecondaryContainer: ink,
+          tertiary: dark ? copperLight : terracottaAccent,
+          onTertiary: dark ? bgDark : Colors.white,
           surface: surface,
           onSurface: ink,
           onSurfaceVariant: muted,
@@ -98,6 +104,7 @@ class AppTheme {
           outline: border,
           outlineVariant: border,
           error: dark ? const Color(0xFFE9A095) : errorRed,
+          onError: dark ? bgDark : Colors.white,
         );
     return base.copyWith(
       colorScheme: scheme,
@@ -276,8 +283,8 @@ class AppTheme {
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: primaryFlame,
-        foregroundColor: Colors.white,
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
@@ -315,6 +322,17 @@ class AppTheme {
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: accent,
         strokeWidth: 2,
+      ),
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: accent,
+        selectionColor: accent.withValues(alpha: .2),
+        selectionHandleColor: accent,
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: surface,
+        surfaceTintColor: Colors.transparent,
+        textStyle: typography.bodyMedium,
+        shape: shape,
       ),
     );
   }

@@ -20,7 +20,7 @@ class DashboardPlaceholderScreen extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorRed),
             onPressed: () {
               Navigator.pop(ctx);
               Provider.of<AuthProvider>(context, listen: false).logout();
@@ -140,7 +140,7 @@ class DashboardPlaceholderScreen extends StatelessWidget {
                       user?.email ?? '',
                       style: const TextStyle(
                         fontSize: 14,
-                        color: Color(0xFFD1FAE5),
+                        color: AppTheme.primaryFlameLight,
                       ),
                     ),
                   ],
@@ -240,8 +240,8 @@ class DashboardPlaceholderScreen extends StatelessWidget {
               // Sign Out Button
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.redAccent,
-                  side: const BorderSide(color: Color(0xFFEF4444)),
+                  foregroundColor: AppTheme.errorRed,
+                  side: const BorderSide(color: AppTheme.errorRed),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),

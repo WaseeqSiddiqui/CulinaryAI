@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/recipe_discovery.dart';
 import 'app_ui.dart';
+import 'food_photo.dart';
 
 class LiveRecipeCard extends StatelessWidget {
   const LiveRecipeCard({super.key, required this.recipe});
@@ -48,13 +49,12 @@ class LiveRecipeCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (recipe.imageUrl.isNotEmpty)
-              Image.network(
-                recipe.imageUrl,
-                height: 150,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
-              ),
+            FoodPhoto(
+              name: recipe.name,
+              url: recipe.imageUrl,
+              height: 176,
+              width: double.infinity,
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Column(

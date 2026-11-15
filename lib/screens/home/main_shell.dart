@@ -13,6 +13,7 @@ import '../../services/recipe_recommendation_service.dart';
 import '../../services/nutrition_calculator_service.dart';
 import '../../widgets/recipe_nutrition_panel.dart';
 import '../../widgets/app_ui.dart';
+import '../../widgets/food_photo.dart';
 import '../chat/chatbot_screen.dart';
 import '../cooking/guided_cooking_screen.dart';
 import '../pantry/pantry_screen.dart';
@@ -340,11 +341,15 @@ class _DashboardTabState extends State<_DashboardTab> {
             ),
             const SizedBox(height: 6),
             Text(
-              'What would you like to do?',
+              'What’s cooking today?',
               style: Theme.of(context).textTheme.headlineSmall
                   ?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 18),
+            _HeroRecipeCard(isDark: dark, pantry: pantry),
+            const SizedBox(height: 22),
+            _HomeSectionHeader(title: 'Your kitchen tools'),
+            const SizedBox(height: 12),
             KitchenTaskGrid(
               tasks: [
                 KitchenTask(
@@ -394,13 +399,6 @@ class _DashboardTabState extends State<_DashboardTab> {
             const SizedBox(height: 12),
             _KitchenPulse(pantry: pantry, isDark: dark),
             const SizedBox(height: 28),
-            _HomeSectionHeader(
-              title: 'A recipe to try',
-              action: 'Browse recipes',
-              onAction: () => shell?.showRecipes(),
-            ),
-            const SizedBox(height: 12),
-            _HeroRecipeCard(isDark: dark, pantry: pantry),
             const SizedBox(height: 24),
             SurfacePanel(
               child: Column(
@@ -498,120 +496,116 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
     final match = recipe.matchPercentage(widget.pantry.allItems);
     return Material(
       color: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
+      borderRadius: BorderRadius.circular(22),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _showRecipeDetails(context, recipe),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              height: MediaQuery.sizeOf(context).width < 600 ? 180 : 218,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
-                    recipe.imageUrl,
-                    fit: BoxFit.cover,
-                    frameBuilder:
-                        (context, child, frame, synchronouslyLoaded) =>
-                            frame == null
-                            ? Image.asset(
-                                'assets/images/hero_dish.jpg',
-                                fit: BoxFit.cover,
-                              )
-                            : child,
-                    errorBuilder: (_, _, _) => Image.asset(
-                      'assets/images/hero_dish.jpg',
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  Positioned(
-                    top: 16,
-                    left: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(9),
-                      ),
-                      child: Text(
-                        '$match% pantry match',
-                        style: const TextStyle(
-                          color: AppTheme.primaryDark,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: IconButton.filled(
-                      tooltip: 'Show another recipe idea',
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: AppTheme.primaryDark,
-                      ),
-                      onPressed: () =>
-                          setState(() => _cycleOffset = (_cycleOffset + 1) % 6),
-                      icon: const Icon(Icons.refresh_rounded, size: 20),
-                    ),
-                  ),
-                ],
+        child: SizedBox(
+          height: 220,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              FoodPhoto(
+                name: recipe.title,
+                recipeId: recipe.id,
+                url: recipe.imageUrl,
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(22),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    recipe.cuisine.toUpperCase(),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x100E1014), Color(0xE6101216)],
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 14,
+                left: 16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'TODAY’S RECIPE',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      letterSpacing: 1.6,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: const Color(0xFF23252A),
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    recipe.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.headlineMedium
-                        ?.copyWith(fontSize: 25),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      _RecipeMetaChip(
-                        icon: Icons.schedule_outlined,
-                        label: '${recipe.cookTimeMinutes} min',
-                      ),
-                      const SizedBox(width: 14),
-                      _RecipeMetaChip(
-                        icon: Icons.local_fire_department_outlined,
-                        label: '${recipe.calories} kcal',
-                      ),
-                      const Spacer(),
-                      Icon(
-                        Icons.arrow_forward_rounded,
-                        color: Theme.of(context).colorScheme.primary,
-                        size: 21,
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
-            ),
-          ],
+              Positioned(
+                top: 6,
+                right: 6,
+                child: IconButton.filled(
+                  tooltip: 'Show another recipe idea',
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF23252A),
+                  ),
+                  onPressed: () =>
+                      setState(() => _cycleOffset = (_cycleOffset + 1) % 6),
+                  icon: const Icon(Icons.refresh_rounded, size: 20),
+                ),
+              ),
+              Positioned(
+                left: 18,
+                right: 18,
+                bottom: 16,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      recipe.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        height: 1.2,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${recipe.cookTimeMinutes} min · $match% pantry match',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'View recipe',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.arrow_forward,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -702,8 +696,10 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                     ),
                     child: Text(
                       '${recipe.cuisine} • ${recipe.difficulty}',
-                      style: const TextStyle(
-                        color: AppTheme.primaryFlame,
+                      style: TextStyle(
+                        color: isDark
+                            ? AppTheme.primaryFlameLight
+                            : AppTheme.primaryFlame,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
@@ -730,24 +726,12 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                     borderRadius: BorderRadius.circular(20),
                     child: Stack(
                       children: [
-                        Image.network(
-                          recipe.imageUrl,
+                        FoodPhoto(
+                          name: recipe.title,
+                          recipeId: recipe.id,
+                          url: recipe.imageUrl,
                           height: 200,
                           width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Container(
-                            height: 200,
-                            color: isDark
-                                ? AppTheme.cardDark
-                                : AppTheme.creamBeige,
-                            child: const Center(
-                              child: Icon(
-                                Icons.restaurant_rounded,
-                                size: 48,
-                                color: AppTheme.primaryFlame,
-                              ),
-                            ),
-                          ),
                         ),
                         Positioned(
                           top: 12,
@@ -768,7 +752,7 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                                       ? Icons.check_circle
                                       : Icons.pie_chart,
                                   color: matchPct >= 80
-                                      ? const Color(0xFF6EE7B7)
+                                      ? AppTheme.freshHerbLight
                                       : AppTheme.warmSaffron,
                                   size: 14,
                                 ),
@@ -866,9 +850,11 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.auto_awesome_rounded,
-                          color: AppTheme.primaryFlame,
+                          color: isDark
+                              ? AppTheme.primaryFlameLight
+                              : AppTheme.primaryFlame,
                           size: 20,
                         ),
                         const SizedBox(width: 10),
@@ -922,11 +908,10 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.08),
+                        color: AppTheme.successGreen.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: const Color(0xFF10B981)
-                              .withValues(alpha: 0.25),
+                          color: AppTheme.successGreen.withValues(alpha: 0.25),
                         ),
                       ),
                       child: Column(
@@ -936,16 +921,18 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                             children: [
                               const Icon(
                                 Icons.check_circle_rounded,
-                                color: Color(0xFF10B981),
+                                color: AppTheme.successGreen,
                                 size: 16,
                               ),
                               const SizedBox(width: 6),
                               Text(
                                 'Ready in Your Pantry (${inPantry.length})',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF059669),
+                                  color: isDark
+                                      ? AppTheme.freshHerbLight
+                                      : AppTheme.successGreen,
                                 ),
                               ),
                             ],
@@ -967,8 +954,9 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                                           : Colors.white,
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
-                                        color: const Color(0xFF10B981)
-                                            .withValues(alpha: 0.3),
+                                        color: AppTheme.successGreen.withValues(
+                                          alpha: 0.3,
+                                        ),
                                       ),
                                     ),
                                     child: Text(
@@ -1125,8 +1113,6 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                   ElevatedButton(
                     onPressed: () => widget.onStartCooking(recipe),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryFlame,
-                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
@@ -1178,7 +1164,13 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
         ),
         child: Column(
           children: [
-            Icon(icon, color: AppTheme.primaryFlame, size: 20),
+            Icon(
+              icon,
+              color: isDark
+                  ? AppTheme.primaryFlameLight
+                  : AppTheme.primaryFlame,
+              size: 20,
+            ),
             const SizedBox(height: 4),
             Text(
               value,
@@ -1205,25 +1197,6 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
       ),
     );
   }
-}
-
-class _RecipeMetaChip extends StatelessWidget {
-  const _RecipeMetaChip({required this.icon, required this.label});
-  final IconData icon;
-  final String label;
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Icon(
-        icon,
-        size: 15,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-      const SizedBox(width: 5),
-      Text(label, style: Theme.of(context).textTheme.bodySmall),
-    ],
-  );
 }
 
 class _HomeSectionHeader extends StatelessWidget {
@@ -1256,7 +1229,7 @@ class _HomeSectionHeader extends StatelessWidget {
         TextButton(
           onPressed: onAction,
           style: TextButton.styleFrom(
-            foregroundColor: AppTheme.primaryFlame,
+            foregroundColor: Theme.of(context).colorScheme.primary,
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             textStyle: const TextStyle(
               fontSize: 12,

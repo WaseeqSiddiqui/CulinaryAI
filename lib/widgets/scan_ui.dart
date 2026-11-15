@@ -152,7 +152,7 @@ class _ScanIllustration extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Color(0x11132D20), Color(0x99132D20)],
+                  colors: [Color(0x1120252E), Color(0x9920252E)],
                 ),
               ),
             ),

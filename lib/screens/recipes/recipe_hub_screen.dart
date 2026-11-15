@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../widgets/app_ui.dart';
+import '../../widgets/food_photo.dart';
 import '../../models/backend_meal_recommendation.dart';
 import '../../models/pantry_item_model.dart';
 import '../../models/recipe_recommendation_model.dart';
@@ -380,30 +381,30 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              PageIntro(
-                eyebrow: switch (_mode) {
-                  RecipeSection.pantry => 'FROM YOUR PANTRY',
-                  RecipeSection.create => 'YOUR OWN INSPIRATION',
-                  RecipeSection.macros => 'NUTRITION, IN PERSPECTIVE',
-                  RecipeSection.weekly => 'A LITTLE PLANNING',
-                  RecipeSection.saved => 'YOUR PERSONAL COLLECTION',
-                },
-                title: switch (_mode) {
+              Text(
+                switch (_mode) {
                   RecipeSection.pantry => 'Find a recipe to cook',
                   RecipeSection.create => 'Create a recipe',
                   RecipeSection.macros => 'Your daily nutrition',
                   RecipeSection.weekly => 'Plan your meals',
                   RecipeSection.saved => 'Your saved recipes',
                 },
-                subtitle: switch (_mode) {
-                  RecipeSection.pantry => 'Fresh ideas, built around the ingredients already in your kitchen.',
-                  RecipeSection.create => 'A craving, a cuisine, a little inspiration. Tell us what sounds good.',
-                  RecipeSection.macros => 'Keep your daily targets and the meals you enjoy in one place.',
-                  RecipeSection.weekly => 'Plan good meals around your pantry, your people and your preferences.',
-                  RecipeSection.saved => 'Your saved recipes, ready for the next time you need a good idea.',
-                },
+                style: Theme.of(context).textTheme.headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.w700),
               ),
-              const SizedBox(height: 26),
+              const SizedBox(height: 6),
+              Text(switch (_mode) {
+                RecipeSection.pantry =>
+                  'Recipes matched to the ingredients in your kitchen.',
+                RecipeSection.create =>
+                  'Tell us the dish or flavours you have in mind.',
+                RecipeSection.macros =>
+                  'Your meals and daily calorie and macro targets.',
+                RecipeSection.weekly =>
+                  'Plan the next seven days around your pantry.',
+                RecipeSection.saved => 'The recipes you have saved for later.',
+              }, style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 18),
               if (_mode == RecipeSection.macros) ...[
                 _NutritionTodayCard(
                   calories: today.calories,
@@ -774,107 +775,106 @@ class _RecipeOverviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final placeholder = Container(
-      color: colors.primaryContainer,
-      child: Icon(Icons.restaurant_outlined, color: colors.primary, size: 30),
-    );
     return Card(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 18),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: SizedBox(
-                  width: 84,
-                  height: 104,
-                  child: Image.network(
-                    recipe.imageUrl,
-                    fit: BoxFit.cover,
-                    frameBuilder: (_, child, frame, _) =>
-                        frame == null ? placeholder : child,
-                    errorBuilder: (_, _, _) => placeholder,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  FoodPhoto(
+                    name: recipe.title,
+                    recipeId: recipe.id,
+                    url: recipe.imageUrl,
                   ),
-                ),
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: IconButton.filled(
+                      tooltip: favorite ? 'Remove saved recipe' : 'Save recipe',
+                      onPressed: onFavorite,
+                      style: IconButton.styleFrom(
+                        backgroundColor: colors.surface,
+                        foregroundColor: colors.primary,
+                      ),
+                      icon: Icon(
+                        favorite
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            dayNumber == null
-                                ? '$matchPercent% pantry match'
-                                : 'DAY $dayNumber',
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  color: colors.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: favorite
-                              ? 'Remove saved recipe'
-                              : 'Save recipe',
-                          onPressed: onFavorite,
-                          constraints: const BoxConstraints(
-                            minWidth: 32,
-                            minHeight: 32,
-                          ),
-                          padding: EdgeInsets.zero,
-                          icon: Icon(
-                            favorite
-                                ? Icons.favorite_rounded
-                                : Icons.favorite_border_rounded,
-                            size: 20,
-                            color: colors.primary,
-                          ),
-                        ),
-                      ],
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    dayNumber == null
+                        ? '$matchPercent% pantry match'
+                        : 'DAY $dayNumber',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: colors.primary,
+                      fontWeight: FontWeight.w700,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      recipe.title,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium
-                          ?.copyWith(fontSize: 15),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 4,
-                      children: [
-                        Text(
-                          '${recipe.cookTimeMinutes} min',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        Text(
-                          '${recipe.calories} kcal',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        Text(
-                          missingCount == 0
-                              ? 'Ready to cook'
-                              : '$missingCount to pick up',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    recipe.title,
+                    style: Theme.of(context).textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 6,
+                    children: [
+                      Text(
+                        '${recipe.cookTimeMinutes} min',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      Text(
+                        '${recipe.calories} kcal',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      Text(
+                        missingCount == 0
+                            ? 'Ready to cook'
+                            : '$missingCount to pick up',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Text(
+                        'View recipe',
+                        style: Theme.of(context).textTheme.labelLarge
+                            ?.copyWith(color: colors.primary),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        Icons.arrow_forward,
+                        size: 16,
+                        color: colors.primary,
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

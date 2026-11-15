@@ -1283,7 +1283,7 @@ class _VoiceDock extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           side: BorderSide(
             color: session.isListening
-                ? Colors.red.withValues(alpha: 0.7)
+                ? AppTheme.errorRed.withValues(alpha: 0.7)
                 : isDark
                 ? AppTheme.borderDark
                 : AppTheme.creamBorder,
@@ -1301,7 +1301,7 @@ class _VoiceDock extends StatelessWidget {
                   height: 46,
                   decoration: BoxDecoration(
                     color: session.isListening
-                        ? Colors.red
+                        ? AppTheme.errorRed
                         : AppTheme.primaryFlame,
                     shape: BoxShape.circle,
                   ),
@@ -1344,7 +1344,7 @@ class _VoiceDock extends StatelessWidget {
                       ? Icons.graphic_eq_rounded
                       : Icons.refresh_rounded,
                   color: session.isListening
-                      ? Colors.red
+                      ? AppTheme.errorRed
                       : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ],

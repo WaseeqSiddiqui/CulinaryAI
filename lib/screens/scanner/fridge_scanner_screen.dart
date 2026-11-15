@@ -526,7 +526,7 @@ class _FridgeReviewSheetState extends State<FridgeReviewSheet> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.withValues(alpha: 0.4),
+                      color: Theme.of(context).colorScheme.outline,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -633,8 +633,6 @@ class _FridgeReviewSheetState extends State<FridgeReviewSheet> {
                           child: ElevatedButton(
                             onPressed: _saving || _saved ? null : _save,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.zoneFridge,
-                              foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
                             child: Text(
@@ -739,7 +737,7 @@ class _FridgeReviewSheetState extends State<FridgeReviewSheet> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.blueGrey.withValues(alpha: 0.15),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(

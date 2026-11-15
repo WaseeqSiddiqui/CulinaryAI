@@ -830,7 +830,7 @@ class _ReceiptReviewSheetState extends State<ReceiptReviewSheet> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.withValues(alpha: 0.4),
+                      color: Theme.of(context).colorScheme.outline,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -929,17 +929,17 @@ class _ReceiptReviewSheetState extends State<ReceiptReviewSheet> {
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.15),
+                      color: AppTheme.warmSaffron.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Colors.orange.withValues(alpha: 0.4),
+                        color: AppTheme.warmSaffron.withValues(alpha: 0.4),
                       ),
                     ),
                     child: Row(
                       children: [
                         const Icon(
                           Icons.price_change_rounded,
-                          color: Colors.orange,
+                          color: AppTheme.warmSaffron,
                           size: 20,
                         ),
                         const SizedBox(width: 10),
@@ -947,7 +947,7 @@ class _ReceiptReviewSheetState extends State<ReceiptReviewSheet> {
                           child: Text(
                             'Total mismatch: Item sum (${resp.calculatedItemsTotal.toStringAsFixed(0)}) differs from printed total (${resp.receiptTotal?.toStringAsFixed(0)}) by ${resp.totalDifferencePercent.toStringAsFixed(1)}%. Review highlighted items below.',
                             style: const TextStyle(
-                              color: Colors.orange,
+                              color: AppTheme.warmSaffron,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
@@ -1025,8 +1025,6 @@ class _ReceiptReviewSheetState extends State<ReceiptReviewSheet> {
                                   ? null
                                   : _save,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.primaryEmerald,
-                                foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 14,
                                 ),

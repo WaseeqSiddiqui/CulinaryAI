@@ -1,3 +1,5 @@
+import '../../core/theme/app_theme.dart';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -42,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(authProvider.errorMessage!),
-          backgroundColor: Colors.redAccent,
+          backgroundColor: AppTheme.errorRed,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
@@ -62,7 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(authProvider.errorMessage!),
-          backgroundColor: Colors.redAccent,
+          backgroundColor: AppTheme.errorRed,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
@@ -270,8 +272,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,
                                   colors: [
-                                    Color(0x44203223),
-                                    Color(0xDD1A3325),
+                                    Color(0x44263B58),
+                                    Color(0xDD192A42),
                                   ],
                                 ),
                               ),
@@ -294,7 +296,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   const Text(
                                     'Less waste. More possibility.',
                                     style: TextStyle(
-                                      color: Color(0xFFE6ECE1),
+                                      color: Color(0xFFEDF1F6),
                                       fontSize: 17,
                                     ),
                                   ),

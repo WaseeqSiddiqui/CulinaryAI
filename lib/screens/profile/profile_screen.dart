@@ -303,10 +303,14 @@ class _DetailRow extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: AppTheme.primaryFlame.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(11),
             ),
-            child: Icon(icon, color: AppTheme.primaryFlame, size: 20),
+            child: Icon(
+              icon,
+              color: Theme.of(context).colorScheme.primary,
+              size: 20,
+            ),
           ),
           title: Text(
             label,

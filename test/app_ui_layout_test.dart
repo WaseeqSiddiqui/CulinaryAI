@@ -60,6 +60,22 @@ void main() {
           const AssetImage('assets/images/pantry_basket.jpg'),
           context,
         );
+        for (final name in [
+          'pasta',
+          'egg_breakfast',
+          'lentils',
+          'salmon',
+          'rice',
+          'milk',
+          'chicken',
+          'eggs',
+          'spinach',
+          'rice_grains',
+          'onions',
+          'tomatoes',
+        ]) {
+          await precacheImage(AssetImage('assets/images/$name.jpg'), context);
+        }
       });
       if (config.$3) {
         tester

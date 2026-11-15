@@ -7,6 +7,7 @@ import '../../models/pantry_item_model.dart';
 import '../../providers/pantry_provider.dart';
 import '../../services/food_image_service.dart';
 import '../../widgets/app_ui.dart';
+import '../../widgets/food_photo.dart';
 import '../../services/expiry_estimation_service.dart';
 import '../scanner/expiry_label_scanner_screen.dart';
 import '../scanner/fridge_scanner_screen.dart';
@@ -295,7 +296,7 @@ class _PantryScreenState extends State<PantryScreen>
           _ZoneChip(
             label: 'All',
             icon: Icons.grid_view_rounded,
-            color: AppTheme.primaryEmerald,
+            color: isDark ? AppTheme.primaryFlameLight : AppTheme.primaryFlame,
             isSelected: pantry.selectedZone == null,
             onTap: () => pantry.setZoneFilter(null),
           ),
@@ -641,21 +642,12 @@ class _PantryItemCard extends StatelessWidget {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        item.displayImageUrl,
-                        width: 52,
-                        height: 52,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
-                          width: 52,
-                          height: 52,
-                          color: colors.primaryContainer,
-                          child: Icon(
-                            Icons.eco_outlined,
-                            color: colors.primary,
-                            size: 24,
-                          ),
-                        ),
+                      child: FoodPhoto(
+                        name: item.name,
+                        url: item.displayImageUrl,
+                        ingredient: true,
+                        width: 64,
+                        height: 64,
                       ),
                     ),
                     const SizedBox(width: 14),
