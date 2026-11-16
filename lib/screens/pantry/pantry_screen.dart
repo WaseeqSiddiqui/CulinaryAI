@@ -900,6 +900,14 @@ class _AddEditSheetState extends State<_AddEditSheet> {
 
   bool get _isEditing => widget.item != null;
 
+  // Presets and older records may use container units such as bottle or loaf.
+  // Keep their exact unit selectable rather than rejecting a valid saved value.
+  List<String> get _unitOptions => {
+    ...PantryProvider.units,
+    ...FoodImageService.popularPresets.map((preset) => preset['unit']!),
+    _selectedUnit,
+  }.toList();
+
   @override
   void initState() {
     super.initState();
@@ -1211,7 +1219,10 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 4,
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -1234,7 +1245,6 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                                   ),
                                 ),
                               ),
-                              const Spacer(),
                               Text(
                                 detectedCategory,
                                 style: TextStyle(
@@ -1284,7 +1294,11 @@ class _AddEditSheetState extends State<_AddEditSheet> {
 
               // Quick Presets (when adding new stock)
               if (!_isEditing) ...[
-                Row(
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 12,
+                  runSpacing: 4,
                   children: [
                     Text(
                       'Popular Ingredients',
@@ -1297,7 +1311,6 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                             : AppTheme.textLightSecondary,
                       ),
                     ),
-                    const Spacer(),
                     const Text(
                       'Tap to auto-fill',
                       style: TextStyle(
@@ -1311,6 +1324,7 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                 SizedBox(
                   height: 32,
                   child: ListView.separated(
+                    key: const Key('popular-pantry-ingredients'),
                     scrollDirection: Axis.horizontal,
                     itemCount: FoodImageService.popularPresets.length,
                     separatorBuilder: (_, _) => const SizedBox(width: 8),
@@ -1318,6 +1332,7 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                       final p = FoodImageService.popularPresets[index];
                       final isCurrent = _nameCtrl.text == p['name'];
                       return GestureDetector(
+                        key: ValueKey('pantry-preset-${p['name']}'),
                         onTap: () => _applyPreset(p),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -1407,9 +1422,10 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                   Expanded(
                     flex: 2,
                     child: DropdownButtonFormField<String>(
+                      key: ValueKey('pantry-item-unit-$_selectedUnit'),
                       initialValue: _selectedUnit,
                       decoration: const InputDecoration(labelText: 'Unit'),
-                      items: PantryProvider.units
+                      items: _unitOptions
                           .map(
                             (u) => DropdownMenuItem(value: u, child: Text(u)),
                           )
@@ -1484,6 +1500,7 @@ class _AddEditSheetState extends State<_AddEditSheet> {
 
               // Storage zone
               DropdownButtonFormField<String>(
+                key: ValueKey('pantry-item-zone-$_selectedLocation'),
                 initialValue: _selectedLocation,
                 decoration: InputDecoration(
                   labelText: 'Storage Zone',
@@ -1663,14 +1680,16 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                         color: AppTheme.primaryFlame,
                       ),
                       const SizedBox(width: 6),
-                      Text(
-                        _showCustomImageField
-                            ? 'Hide Custom Image URL'
-                            : 'Provide Custom Image URL (Optional)',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.primaryFlame,
+                      Expanded(
+                        child: Text(
+                          _showCustomImageField
+                              ? 'Hide Custom Image URL'
+                              : 'Provide Custom Image URL (Optional)',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.primaryFlame,
+                          ),
                         ),
                       ),
                     ],
