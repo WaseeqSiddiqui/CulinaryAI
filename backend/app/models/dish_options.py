@@ -32,7 +32,11 @@ class RestaurantOption(BaseModel):
     name: str
     url: str
     summary: str
-    source: str = "Foodpanda"
+    source: str = "Restaurant website"
+    website_url: str = ""
+    link_type: Literal["order", "menu", "website"] = "website"
+    dish_confirmed: bool = False
+    area_confirmed: bool = False
 
 
 class RestaurantSearchResponse(BaseModel):

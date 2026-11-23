@@ -62,13 +62,15 @@ def test_unrelated_recipe_cannot_replace_requested_dish():
     assert DishOptionsService(Recipes()).check(request(dish='chicken biryani')).status == 'recipe_not_found'
 
 
-def result(title='Biryani House delivery in Lahore | foodpanda', url='https://www.foodpanda.pk/restaurant/abc/biryani-house',
+def result(title='Biryani House delivery in Lahore | Order online', url='https://biryanihouse.pk/order',
            content='Order chicken biryani from Biryani House in Johar Town Lahore.'):
     return dict(title=title, url=url, content=content)
 
 
 def service_with(records, on_request=None):
     def handle(req):
+        if req.url.path == '/extract':
+            return httpx.Response(200, json={'results': []})
         if on_request:
             on_request(req)
         return httpx.Response(200, json={'results': records})
@@ -80,7 +82,8 @@ def test_search_sends_only_dish_and_area_not_inventory_or_generated_answers():
         body = json.loads(req.content)
         assert req.url == 'https://api.tavily.com/search'
         assert req.headers['Authorization'] == 'Bearer test-key'
-        assert body['include_domains'] == ['foodpanda.pk']
+        assert 'include_domains' not in body
+        assert 'foodpanda.pk' in body['exclude_domains']
         assert body['include_answer'] is False and body['include_raw_content'] is False
         assert 'pantry' not in json.dumps(body)
         assert 'chicken biryani' in body['query'] and 'Johar Town, Lahore' in body['query']
@@ -100,11 +103,48 @@ def test_wrong_city_wrong_dish_articles_and_unsafe_links_are_excluded():
         result(url='https://user:pass@www.foodpanda.pk/restaurant/a/biryani'),
         result(url='javascript:alert(1)'),
         result(url='https://www.foodpanda.pk:444/restaurant/a/biryani'),
-        result(url='https://www.foodpanda.pk/restaurant/abc/biryani-house?tracking=1'),
+        result(url='https://biryanihouse.pk/order?utm_source=search'),
     ]
     response = service_with(records).search(RestaurantSearchRequest(dish='chicken biryani', area='Lahore'))
     assert len(response.restaurants) == 1
-    assert response.restaurants[0].url == 'https://www.foodpanda.pk/restaurant/abc/biryani-house'
+    assert response.restaurants[0].url == 'https://biryanihouse.pk/order'
+
+
+def test_ordering_link_is_taken_from_the_restaurant_page_and_preserves_branch():
+    def handle(req):
+        if req.url.path == '/search':
+            return httpx.Response(200, json={'results': [result(url='https://biryanihouse.pk/')]})
+        return httpx.Response(200, json={'results': [{'url': 'https://biryanihouse.pk/',
+            'raw_content': '[Order Online](https://order.biryanihouse.pk/menu?branch=lahore&utm_source=web) [Foodpanda](https://www.foodpanda.pk/restaurant/a/biryani)'}]})
+    service = RestaurantSearchService(httpx.Client(transport=httpx.MockTransport(handle)), api_key='test-key')
+    item = service.search(RestaurantSearchRequest(dish='chicken biryani', area='Lahore')).restaurants[0]
+    assert item.url == 'https://order.biryanihouse.pk/menu?branch=lahore'
+    assert item.link_type == 'order'
+    assert item.website_url == 'https://biryanihouse.pk/'
+
+
+def test_markdown_details_are_plain_text_and_aggregator_pages_are_excluded():
+    response = service_with([result(title='**Biryani House** | Order Online',
+        content='## Order **chicken biryani** in Lahore.\\n[Menu](https://biryanihouse.pk/menu) &amp; delivery.'),
+        result(url='https://www.foodpanda.pk/restaurant/abc/biryani-house')]).search(RestaurantSearchRequest(dish='chicken biryani', area='Lahore'))
+    assert len(response.restaurants) == 1
+    assert response.restaurants[0].name == 'Biryani House'
+    assert response.restaurants[0].dish_confirmed is True
+    assert 'chicken biryani' in response.restaurants[0].summary
+    assert '**' not in response.restaurants[0].summary
+
+
+def test_menu_images_do_not_replace_an_ordering_website():
+    from app.services.restaurant_search import order_link, restaurant_url
+    assert restaurant_url('https://biryanihouse.pk/menu.jpg') is None
+    kind, url = order_link('https://biryanihouse.pk/', '[Menu](https://biryanihouse.pk/menu.jpg)')
+    assert kind == 'website' and url == 'https://biryanihouse.pk/'
+
+
+def test_brand_name_wins_over_generic_search_title_fragments():
+    from app.services.restaurant_search import restaurant_name
+    assert restaurant_name("Order Pizza Online - Get the best pizza deals | Domino's ...", 'https://www.dominos.com.pk/') == "Domino's"
+    assert restaurant_name('Best Pizza Offers & Fast Food Deals | Pizza Hut Pakistan', 'https://www.pizzahutpakistan.com/en') == 'Pizza Hut Pakistan'
 
 
 def test_empty_results_are_not_an_outage_and_no_fake_fallback_is_used():
