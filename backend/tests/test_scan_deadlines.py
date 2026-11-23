@@ -9,7 +9,7 @@ from app.services.gemini_service import GeminiVisionService
 
 
 def service():
-    result = GeminiVisionService(api_key="test-key", model_name="first-model")
+    result = GeminiVisionService(api_key="test-key", model_name="first-model", provider="gemini")
     result._client = SimpleNamespace(models=SimpleNamespace(generate_content=MagicMock()))
     return result
 

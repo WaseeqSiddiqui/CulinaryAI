@@ -12,8 +12,8 @@ from app.models.schemas import (
     NormalizeShoppingQueryResponse,
     ProductCandidateInput,
 )
+from app.services.ai_client import DEFAULT_TEXT_MODEL
 from app.services.product_matcher import (
-    DEFAULT_GEMINI_MODEL,
     MATCH_PROMPT,
     MATCH_RESPONSE_SCHEMA,
     ProductMatcher,
@@ -124,7 +124,7 @@ def test_match_uses_zero_based_candidates_and_structured_deterministic_output():
     )
     matcher = ProductMatcher(
         api_key="test-key",
-        model_name=DEFAULT_GEMINI_MODEL,
+        model_name=DEFAULT_TEXT_MODEL,
     )
     matcher._client = SimpleNamespace(models=models)
 
@@ -132,7 +132,7 @@ def test_match_uses_zero_based_candidates_and_structured_deterministic_output():
 
     assert result.chosen_index == 0
     assert result.units_to_buy == 2
-    assert models.call["model"] == DEFAULT_GEMINI_MODEL
+    assert models.call["model"] == DEFAULT_TEXT_MODEL
     assert models.call["contents"][0] == MATCH_PROMPT
     payload = json.loads(models.call["contents"][1])
     assert [candidate["index"] for candidate in payload["candidates"]] == [0, 1]
@@ -143,7 +143,7 @@ def test_match_uses_zero_based_candidates_and_structured_deterministic_output():
     assert config.response_json_schema == MATCH_RESPONSE_SCHEMA
 
 
-def test_match_rejects_mocked_out_of_stock_gemini_choice():
+def test_match_rejects_mocked_out_of_stock_model_choice():
     models = FakeModels(
         {
             "chosen_index": 1,
@@ -162,8 +162,8 @@ def test_match_rejects_mocked_out_of_stock_gemini_choice():
 
 
 def test_model_name_can_be_overridden(monkeypatch):
-    monkeypatch.setenv("GEMINI_MODEL", "gemini-test-model")
-    assert ProductMatcher(api_key="test-key").model_name == "gemini-test-model"
+    monkeypatch.setenv("GROQ_TEXT_MODEL", "openai/gpt-oss-20b")
+    assert ProductMatcher(api_key="test-key").model_name == "openai/gpt-oss-20b"
 
 
 def normalize_request(name: str = "Olpers milkk") -> NormalizeShoppingQueryRequest:

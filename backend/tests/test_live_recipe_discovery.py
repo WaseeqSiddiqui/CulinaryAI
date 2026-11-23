@@ -40,6 +40,56 @@ class Provider:
         return next((record for record in self.records if record["idMeal"] == recipe_id), None)
 
 
+def test_country_prioritizes_familiar_meals_and_explicit_cuisine_can_override():
+    local = {**EGGS, "idMeal": "201", "strMeal": "Pakistani egg bhurji", "strArea": "Pakistani"}
+    italian = {**EGGS, "idMeal": "202", "strMeal": "Italian eggs", "strArea": "Italian"}
+    class RegionalProvider(Provider):
+        def search_name(self, name):
+            self.searches.append(name)
+            return []
+    provider = RegionalProvider([italian, local])
+    service = LiveRecipeDiscoveryService(provider)
+    items = [pantry("Eggs", 6), pantry("Onion", 2), pantry("Olive Oil", 1, "l")]
+    result = service.discover(request(items, country="Pakistan", meal_count=1))
+    assert result.meals[0].name == local["strMeal"]
+    assert "karahi" in provider.searches
+    assert "Pakistani" in result.message
+    result = service.discover(request(items, country="Pakistan", question="Suggest Italian meals", meal_count=1))
+    assert result.meals[0].name == italian["strMeal"]
+
+
+def test_local_preference_preserves_allergies_and_explains_other_cuisine_fallback():
+    local = recipe("201", "Egg karahi", [("Eggs", "2"), ("Peanuts", "1 tbsp")])
+    service = LiveRecipeDiscoveryService(Provider([local, EGGS]))
+    result = service.discover(request([pantry("Eggs", 6), pantry("Onion", 2), pantry("Olive Oil", 1, "l")], country="Pakistan", avoid_ingredients=["nuts"]))
+    assert [meal.name for meal in result.meals] == [EGGS["strMeal"]]
+    assert "No close Pakistani matches" in result.message
+
+
+def test_country_is_forwarded_as_chef_context(monkeypatch):
+    captured = {}
+    def ask_chef(prompt, pantry_items):
+        captured["prompt"] = prompt
+        return "Try a familiar local dish."
+    monkeypatch.setattr(main.vision_service, "ask_chef", ask_chef)
+    result = TestClient(main.app).post("/chef-chat", json={"message": "Hello", "country": "Pakistan"})
+    assert result.status_code == 200
+    assert "Pakistan" in captured["prompt"]
+    assert "Hello" in captured["prompt"]
+
+
+def test_regional_dish_search_retrieves_food_missing_from_ingredient_search():
+    local = {**EGGS, "idMeal": "201", "strMeal": "Egg karahi", "strArea": "Pakistani"}
+    class DishProvider(Provider):
+        def search_name(self, name):
+            return [local] if name == "karahi" else []
+    result = LiveRecipeDiscoveryService(DishProvider([EGGS])).discover(request(
+        [pantry("Eggs", 6), pantry("Onion", 2), pantry("Olive Oil", 1, "l")],
+        country="Pakistan", meal_count=1,
+    ))
+    assert result.meals[0].name == "Egg karahi"
+
+
 def pantry(name, quantity, unit="pcs", expiry=None):
     return PantryItemInput(name=name, quantity=quantity, unit=unit, expiry_date=expiry)
 

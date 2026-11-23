@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import os
 
 from dotenv import load_dotenv
 
@@ -36,7 +35,7 @@ from app.models.vision_schemas import (
     CookingStepChatResponse,
 )
 from app.services.fridge_reconciler import FridgeReconciler
-from app.services.gemini_service import GeminiVisionService
+from app.services.gemini_service import KitchenAIService
 from app.services.ingredient_catalog import IngredientCatalogService
 from app.services.meal_planner import MealPlannerService
 from app.services.product_matcher import ProductMatcher
@@ -54,7 +53,7 @@ logging.basicConfig(level=logging.INFO)
 repository = VerifiedRecipeRepository()
 planner = MealPlannerService(repository)
 catalog_service = IngredientCatalogService()
-vision_service = GeminiVisionService(catalog_service=catalog_service)
+vision_service = KitchenAIService(catalog_service=catalog_service)
 fridge_reconciler = FridgeReconciler(catalog=catalog_service)
 product_matcher = ProductMatcher()
 recipe_discovery = LiveRecipeDiscoveryService()
@@ -70,14 +69,14 @@ app = FastAPI(
 
 @app.on_event("startup")
 async def _startup_check() -> None:
-    key = os.getenv("GEMINI_API_KEY", "")
-    if key and key != "your_gemini_api_key_here":
-        logger.info("✅ GEMINI_API_KEY is configured (model: %s)", os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
+    if vision_service.api_key:
+        logger.info("AI provider: %s; text model: %s; vision model: %s",
+                    vision_service.provider, vision_service.text_model_name, vision_service.model_name)
     else:
+        key_name = "GROQ_API_KEY" if vision_service.provider == "groq" else "GEMINI_API_KEY"
         logger.warning(
-            "⚠️  GEMINI_API_KEY is NOT set. "
-            "Receipt and fridge scanning will return 500 errors. "
-            "Create backend/.env with GEMINI_API_KEY=<your_key>"
+            "%s is not configured. Set it in backend/.env to enable live chat and photo analysis.",
+            key_name,
         )
 
 app.add_middleware(
@@ -139,7 +138,13 @@ async def chef_chat(request: ChefChatRequest) -> ChefChatResponse:
     pantry_dicts = [item.model_dump() for item in request.pantry_items]
     reply = await asyncio.to_thread(
         vision_service.ask_chef,
-        prompt=request.message,
+        prompt=(
+            f"User country (preference context): {request.country}. "
+            "Prioritize familiar dishes and ingredients from this country when suggesting food. "
+            "Respect explicit requests for other cuisines and all stated dietary needs.\n"
+            f"User question: {request.message}"
+            if request.country.strip() else request.message
+        ),
         pantry_items=pantry_dicts,
     )
     return ChefChatResponse(reply=reply)
@@ -218,7 +223,7 @@ async def scan_fridge(
     image_bytes = await file.read()
     mime = file.content_type or "image/jpeg"
 
-    # Detect items using Gemini vision (run sync SDK call off the event loop)
+    # Run the configured vision model off the event loop.
     detected_scan = await asyncio.to_thread(
         vision_service.scan_fridge,
         image_bytes=image_bytes,

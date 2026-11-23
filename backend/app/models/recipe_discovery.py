@@ -7,6 +7,7 @@ from app.models.schemas import GeneratePlanRequest
 
 
 class RecipeDiscoveryRequest(GeneratePlanRequest):
+    country: str = Field(default="", max_length=80)
     reference_date: date = Field(default_factory=date.today)
     requested_date: date | None = None
 

@@ -190,6 +190,7 @@ class NormalizeShoppingQueryResponse(BaseModel):
 
 class ChefChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
+    country: str = Field(default="", max_length=80)
     pantry_items: list[PantryItemInput] = Field(default_factory=list)
 
 

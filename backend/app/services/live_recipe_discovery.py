@@ -28,6 +28,7 @@ from app.services.recipe_inventory import (
     check_ingredients,
     plan_date,
 )
+from app.services.regional_food import regional_match, regional_preference
 
 # Production provider keys live in the URL path. Don't let HTTP debug logging
 # turn them into ordinary application logs.
@@ -106,6 +107,9 @@ class TheMealDBClient:
 
     def search_name(self, name: str) -> list[dict]:
         return self._get("search", s=name)
+
+    def search_area(self, cuisine: str) -> list[dict]:
+        return self._get("filter", a=cuisine)
 
     def lookup(self, recipe_id: str) -> dict | None:
         if not re.fullmatch(r"\d{1,12}", recipe_id):
@@ -198,7 +202,11 @@ class LiveRecipeDiscoveryService:
         requested_foods -= excluded_foods
         effective_request = request.model_copy(update={"avoid_ingredients": [*request.avoid_ingredients, *excluded_foods]})
         tokens = [word for word in re.findall(r"[a-z]+", request.question.lower()) if word not in _QUESTION_WORDS and len(word) > 2]
+        cuisine, local_dishes = regional_preference(request.country, request.question)
         searches = [("ingredient", query) for query in queries]
+        searches += [("name", dish) for dish in local_dishes]
+        if cuisine and callable(getattr(self.provider, "search_area", None)):
+            searches.append(("area", cuisine))
         # Ingredient-filter lists are alphabetical and often favor elaborate
         # dishes. Live title searches also surface meals centered on each food.
         searches += [("name", name) for name in names[:3]]
@@ -220,17 +228,23 @@ class LiveRecipeDiscoveryService:
 
         def search(task):
             try:
-                method = self.provider.search_ingredient if task[0] == "ingredient" else self.provider.search_name
+                method = {
+                    "ingredient": self.provider.search_ingredient,
+                    "name": self.provider.search_name,
+                    "area": getattr(self.provider, "search_area", None),
+                }[task[0]]
                 return method(task[1])
             except RecipeProviderUnavailable:
                 return None
 
         with ThreadPoolExecutor(max_workers=4) as pool:
-            for records in pool.map(search, searches):
+            for task, records in zip(searches, pool.map(search, searches)):
                 if records is None:
                     failures += 1
                     continue
                 for record in records:
+                    if task[0] == "area" and not record.get("strArea"):
+                        record = {**record, "strArea": cuisine}
                     recipe_id = str(record.get("idMeal", ""))
                     if re.fullmatch(r"\d{1,12}", recipe_id):
                         votes[recipe_id] += 1
@@ -239,7 +253,10 @@ class LiveRecipeDiscoveryService:
                             complete[recipe_id] = record
         if failures == len(searches) or (failures and not summaries):
             raise RecipeProviderUnavailable("The live recipe website could not be reached. Please retry; no demo recipes were substituted.")
-        candidates = sorted((key for key in summaries if key not in complete), key=lambda key: (votes[key], sum(word in str(summaries[key].get("strMeal", "")).lower() for word in tokens)), reverse=True)[:18]
+        def local_record(record):
+            return regional_match(str(record.get("strMeal", "")), str(record.get("strArea", "")), cuisine, local_dishes)
+
+        candidates = sorted((key for key in summaries if key not in complete), key=lambda key: (local_record(summaries[key]), votes[key], sum(word in str(summaries[key].get("strMeal", "")).lower() for word in tokens)), reverse=True)[:18]
 
         def lookup(recipe_id):
             try:
@@ -248,7 +265,7 @@ class LiveRecipeDiscoveryService:
                 return None
 
         with ThreadPoolExecutor(max_workers=4) as pool:
-            details = list(complete.values())[:40] + list(pool.map(lookup, candidates))
+            details = sorted(complete.values(), key=local_record, reverse=True)[:40] + list(pool.map(lookup, candidates))
         if candidates and not any(details):
             raise RecipeProviderUnavailable("Recipe search worked, but ingredient details could not be loaded. Please retry.")
         matches = []
@@ -295,10 +312,10 @@ class LiveRecipeDiscoveryService:
                 original_source_url=public_link(record.get("strSource")),
                 ingredients=checks, pantry_match_percent=round(100 * available / len(checks)), can_cook_now=ready,
             )
-            # Prioritize complete recipes, then coverage, missing main foods,
-            # query relevance and using items that expire soon.
+            # Prioritize familiar local meals after inventory/diet checks, then
+            # complete quantities, coverage, relevance and expiring stock.
             urgency = sum(item.expiry_date is not None and (item.expiry_date - day).days <= 3 and any(canonical_name(check.name) == canonical_name(item.name) for check in checks) for item in pantry)
-            score = (ready, available / len(checks), len(present) / len(main), sum(word in recipe.name.lower() for word in tokens), urgency)
+            score = (local_record(record), ready, available / len(checks), len(present) / len(main), sum(word in recipe.name.lower() for word in tokens), urgency)
             matches.append((score, recipe))
         matches.sort(key=lambda item: item[0], reverse=True)
         response.meals = [recipe for _, recipe in matches[:request.meal_count]]
@@ -311,6 +328,11 @@ class LiveRecipeDiscoveryService:
             )
         else:
             response.message = "I searched live recipes, but found no close matches for your usable inventory and dietary restrictions. No unrelated or demo recipes were substituted."
+        if cuisine and response.meals:
+            if any(regional_match(meal.name, meal.cuisine, cuisine, local_dishes) for meal in response.meals):
+                response.message += f" Familiar {cuisine} meals are prioritized."
+            else:
+                response.message += f" No close {cuisine} matches were available; showing other pantry matches."
         if day != request.reference_date:
             response.message += f" This uses your current stock, excluding anything expiring before {day.isoformat()}; future purchases and consumption are not predicted."
         if failures or any(detail is None for detail in details):

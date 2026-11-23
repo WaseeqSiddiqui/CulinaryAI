@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from fastapi import HTTPException
+from app.services.ai_client import ai_provider, configured_key, create_client, text_model
 
 from app.models.schemas import (
     MatchProductRequest,
@@ -86,21 +87,18 @@ _PROTECTED_FORM_PATTERNS: dict[str, re.Pattern[str]] = {
 
 
 class ProductMatcher:
-    def __init__(self, api_key: str | None = None, model_name: str | None = None):
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY", "")
+    def __init__(self, api_key: str | None = None, model_name: str | None = None, provider: str | None = None):
+        self.provider = provider or ai_provider()
+        self.api_key = api_key or configured_key(self.provider)
         self.model_name = (
-            model_name or os.getenv("GEMINI_MODEL", "") or DEFAULT_GEMINI_MODEL
+            model_name or (text_model() if self.provider == "groq" else os.getenv("GEMINI_MODEL", "") or DEFAULT_GEMINI_MODEL)
         )
         self._client: Any = None
 
     def _get_client(self):
         if self._client is not None:
             return self._client
-        if not self.api_key:
-            raise HTTPException(status_code=500, detail="GEMINI_API_KEY is not configured")
-        from google import genai
-
-        self._client = genai.Client(api_key=self.api_key)
+        self._client = create_client(self.provider, self.api_key)
         return self._client
 
     def match(self, request: MatchProductRequest) -> MatchProductResponse:

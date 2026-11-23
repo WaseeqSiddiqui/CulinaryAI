@@ -24,6 +24,9 @@ from app.models.vision_schemas import (
     StepExplanationResponse,
 )
 from app.services.ingredient_catalog import IngredientCatalogService
+from app.services.ai_client import (
+    ai_provider, configured_key, create_client, text_model, vision_model,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,16 +116,20 @@ Never identify people or infer health conditions. Return structured JSON only.
 """
 
 
-class GeminiVisionService:
+class KitchenAIService:
+    """Shared kitchen prompts and validation, with Groq as the default provider."""
     def __init__(
         self,
         api_key: str | None = None,
         model_name: str | None = None,
         catalog_service: IngredientCatalogService | None = None,
         rate_limiter: ScanRateLimiter | None = None,
+        provider: str | None = None,
     ) -> None:
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY", "")
-        self.model_name = model_name or os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL)
+        self.provider = provider or ai_provider()
+        self.api_key = api_key or configured_key(self.provider)
+        self.model_name = model_name or (vision_model() if self.provider == "groq" else os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL))
+        self.text_model_name = text_model() if self.provider == "groq" else self.model_name
         self.catalog = catalog_service or IngredientCatalogService()
         self.rate_limiter = rate_limiter or ScanRateLimiter(max_per_day=20)
         self._client: Any = None
@@ -130,22 +137,8 @@ class GeminiVisionService:
     def _get_client(self) -> Any:
         if self._client is not None:
             return self._client
-        if not self.api_key:
-            raise HTTPException(
-                status_code=500,
-                detail="GEMINI_API_KEY is not configured on the server. Please set the GEMINI_API_KEY environment variable.",
-            )
-        try:
-            from google import genai
-
-            self._client = genai.Client(api_key=self.api_key)
-            return self._client
-        except Exception as err:
-            logger.error("Failed to initialize Google GenAI client: %s", err)
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to initialize Gemini Vision client: {err}",
-            ) from err
+        self._client = create_client(self.provider, self.api_key)
+        return self._client
 
     def parse_receipt(
         self,
@@ -239,7 +232,9 @@ class GeminiVisionService:
                 detail="The provided file is not a valid or readable image. Please upload a clear JPEG or PNG.",
             ) from err
 
-    def _get_candidate_models(self) -> list[str]:
+    def _get_candidate_models(self, *, vision: bool = True) -> list[str]:
+        if self.provider == "groq":
+            return [self.model_name if vision else self.text_model_name]
         candidates = [self.model_name]
         for fallback in FALLBACK_MODELS:
             if fallback not in candidates:
@@ -306,22 +301,22 @@ class GeminiVisionService:
         if "503" in err_msg or "unavailable" in err_msg or "demand" in err_msg:
             raise HTTPException(
                 status_code=503,
-                detail="Gemini Vision models are currently experiencing high demand. Please try again shortly.",
+                detail="The AI vision service is currently busy. Please try again shortly.",
             )
         if "quota" in err_msg or "resource_exhausted" in err_msg or "429" in err_msg:
             raise HTTPException(
                 status_code=429,
-                detail="Gemini API quota exceeded. Please check your API limits or try again later.",
+                detail="AI API quota exceeded. Please check your API limits or try again later.",
             )
         if "deadline" in err_msg or "timeout" in err_msg:
             raise HTTPException(
                 status_code=504,
-                detail="Gemini vision request timed out. Please try again with a clearer or cropped image.",
+                detail="The vision request timed out. Please try again with a clearer or cropped image.",
             )
         if "bad request" in err_msg or "invalid_argument" in err_msg:
             raise HTTPException(
                 status_code=400,
-                detail=f"Gemini API rejected the image request: {err}",
+                detail="The AI service rejected the image request. Please check the image and server configuration.",
             )
 
     def _validate_and_enrich_receipt(
@@ -477,7 +472,7 @@ class GeminiVisionService:
         prompt: str,
         pantry_items: list[dict[str, Any]] | None = None,
     ) -> str:
-        """Provide friendly, expert culinary and meal planning guidance using Gemini."""
+        """Provide friendly culinary guidance using the configured text model."""
         pantry_context = ""
         if pantry_items:
             items_str = ", ".join(
@@ -498,7 +493,7 @@ class GeminiVisionService:
 
         try:
             client = self._get_client()
-            models_to_try = [self.model_name] + [m for m in FALLBACK_MODELS if m != self.model_name]
+            models_to_try = self._get_candidate_models(vision=False)
             for model in models_to_try:
                 try:
                     response = client.models.generate_content(
@@ -507,11 +502,15 @@ class GeminiVisionService:
                     )
                     if response and response.text:
                         return response.text.strip()
+                except HTTPException:
+                    raise
                 except Exception as model_err:
                     logger.warning("Chef chat error on %s: %s", model, model_err)
                     continue
+        except HTTPException:
+            raise
         except Exception as err:
-            logger.error("Failed to query Gemini for chef chat: %s", err)
+            logger.error("Failed to query AI for chef chat: %s", err)
 
         return (
             "I'm Chef CulinaryAI! I can help you choose what to cook, find ingredient substitutes, "
@@ -586,7 +585,7 @@ class GeminiVisionService:
                     logger.warning("Step validation failed on %s: %s", model, model_err)
                     continue
         except Exception as err:
-            logger.error("Failed to query Gemini for step validation: %s", err)
+            logger.error("Failed to query AI for step validation: %s", err)
 
         # A failed model call has not inspected the image. Be explicit rather than
         # fabricating a visual assessment.
@@ -635,7 +634,7 @@ class GeminiVisionService:
             client = self._get_client()
             from google.genai import types
 
-            for model in self._get_candidate_models():
+            for model in self._get_candidate_models(vision=False):
                 try:
                     response = client.models.generate_content(
                         model=model,
@@ -655,7 +654,7 @@ class GeminiVisionService:
                     logger.warning("Step explanation failed on %s: %s", model, model_err)
                     continue
         except Exception as err:
-            logger.error("Failed to query Gemini for step explanation: %s", err)
+            logger.error("Failed to query AI for step explanation: %s", err)
 
         # Heuristic fallback based on step content
         lower = step_instruction.lower()
@@ -746,7 +745,7 @@ class GeminiVisionService:
 
         try:
             client = self._get_client()
-            models_to_try = self._get_candidate_models()
+            models_to_try = self._get_candidate_models(vision=False)
             for model in models_to_try:
                 try:
                     response = client.models.generate_content(
@@ -759,7 +758,7 @@ class GeminiVisionService:
                     logger.warning("Step chat error on %s: %s", model, model_err)
                     continue
         except Exception as err:
-            logger.error("Failed to query Gemini for step chat: %s", err)
+            logger.error("Failed to query AI for step chat: %s", err)
 
         # Fallback response
         msg_lower = message.lower()
@@ -778,3 +777,7 @@ class GeminiVisionService:
             "Take your time, keep flame moderate, and let me know if you want to verify your progress with a quick photo!"
         )
 
+
+
+# Backward-compatible import for existing integrations and fixtures.
+GeminiVisionService = KitchenAIService
