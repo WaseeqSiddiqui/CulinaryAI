@@ -136,6 +136,8 @@ void main() {
       final quantities = {
         for (final item in pantry.allItems) item.id: item.quantity,
       };
+      await tester.tap(find.text('No date'));
+      await tester.pumpAndSettle();
       final firstExpiryItem = find.byWidgetPredicate(
         (widget) =>
             widget is ListTile &&

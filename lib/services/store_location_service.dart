@@ -6,12 +6,14 @@ class StoreLocation {
     required this.latitude,
     required this.longitude,
     required this.accuracy,
+    this.country = '',
   });
 
   final String address;
   final double latitude;
   final double longitude;
   final double accuracy;
+  final String country;
 
   factory StoreLocation.fromMap(Map<Object?, Object?> value) {
     final address = value['address']?.toString().trim() ?? '';
@@ -35,6 +37,7 @@ class StoreLocation {
       latitude: latitude.toDouble(),
       longitude: longitude.toDouble(),
       accuracy: accuracy.toDouble(),
+      country: value['country']?.toString().trim() ?? '',
     );
   }
 }

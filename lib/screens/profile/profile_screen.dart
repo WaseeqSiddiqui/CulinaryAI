@@ -8,6 +8,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/household_provider.dart';
 import '../household/household_screen.dart';
 import 'personal_details_screen.dart';
+import '../subscription/plus_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -80,6 +81,8 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(height: 18),
+          const PlusPlanBanner(),
           const SizedBox(height: 18),
           _ProfileSection(
             title: 'Contact information',

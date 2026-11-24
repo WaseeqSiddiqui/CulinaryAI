@@ -15,6 +15,7 @@ import 'screens/home/main_shell.dart';
 import 'screens/startup/splash_screen.dart';
 import 'services/firebase_service.dart';
 import 'services/server_config_service.dart';
+import 'widgets/subscription_notifications.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +31,7 @@ void main() async {
 
 class CulinaryAiApp extends StatelessWidget {
   const CulinaryAiApp({super.key});
+  static final _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +78,11 @@ class CulinaryAiApp extends StatelessWidget {
       child: Consumer<AuthProvider>(
         builder: (context, authProvider, _) {
           return MaterialApp(
+            navigatorKey: _navigatorKey,
+            builder: (_, child) => SubscriptionNotifications(
+              navigatorKey: _navigatorKey,
+              child: child!,
+            ),
             title: 'CulinaryAI',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,

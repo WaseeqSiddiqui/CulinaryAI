@@ -140,6 +140,12 @@ class KitchenAIService:
         self._client = create_client(self.provider, self.api_key)
         return self._client
 
+    def _check_scan_rate(self, user_id):
+        # Monthly quotas are enforced atomically at the API boundary. Keep the
+        # legacy daily cap only when running without subscription enforcement.
+        if os.getenv("USAGE_LIMITS_ENABLED", "true").strip().lower() == "false":
+            self.rate_limiter.check_and_record(user_id)
+
     def parse_receipt(
         self,
         image_bytes: bytes,
@@ -148,7 +154,7 @@ class KitchenAIService:
         household_aliases: dict[str, str] | None = None,
     ) -> ValidatedReceiptResponse:
         # 1. Rate Limit
-        self.rate_limiter.check_and_record(user_id)
+        self._check_scan_rate(user_id)
 
         # 2. Validate image format
         self._validate_image_bytes(image_bytes)
@@ -173,7 +179,7 @@ class KitchenAIService:
         user_id: str = "default_user",
     ) -> GeminiFridgeScan:
         # 1. Rate Limit
-        self.rate_limiter.check_and_record(user_id)
+        self._check_scan_rate(user_id)
 
         # 2. Validate image format
         self._validate_image_bytes(image_bytes)
@@ -187,7 +193,7 @@ class KitchenAIService:
         mime_type: str = "image/jpeg",
         user_id: str = "default_user",
     ) -> MealNutritionEstimate:
-        self.rate_limiter.check_and_record(user_id)
+        self._check_scan_rate(user_id)
         self._validate_image_bytes(image_bytes)
         client = self._get_client()
         from google.genai import types
@@ -527,7 +533,7 @@ class KitchenAIService:
         user_question: str | None = None,
         user_id: str = "default_user",
     ) -> CookingStepValidationResponse:
-        self.rate_limiter.check_and_record(user_id)
+        self._check_scan_rate(user_id)
         self._validate_image_bytes(image_bytes)
         image_hash = hashlib.sha256(image_bytes).hexdigest()
 
@@ -650,9 +656,13 @@ class KitchenAIService:
                         return response.parsed  # type: ignore
                     if response.text:
                         return StepExplanationResponse.model_validate_json(response.text)
+                except HTTPException:
+                    raise
                 except Exception as model_err:
                     logger.warning("Step explanation failed on %s: %s", model, model_err)
                     continue
+        except HTTPException:
+            raise
         except Exception as err:
             logger.error("Failed to query AI for step explanation: %s", err)
 
@@ -754,9 +764,13 @@ class KitchenAIService:
                     )
                     if response and response.text:
                         return response.text.strip()
+                except HTTPException:
+                    raise
                 except Exception as model_err:
                     logger.warning("Step chat error on %s: %s", model, model_err)
                     continue
+        except HTTPException:
+            raise
         except Exception as err:
             logger.error("Failed to query AI for step chat: %s", err)
 

@@ -8,8 +8,8 @@ below the first screen. The existing color palette is unchanged.
 | Add an ingredient | Home → Add food → Enter an ingredient |
 | Scan groceries | Home → Add food → Scan a receipt or Scan your fridge |
 | Scan a receipt | Home → Scan receipt |
-| Check or edit expiry | Home → Check expiry → select an ingredient |
-| Scan an expiry label | Home → Check expiry → ingredient → Scan label |
+| Check or edit expiry | Home → Check expiry → calendar date → ingredient |
+| Scan an expiry label | Home → Check expiry → calendar date → ingredient → Scan label |
 | Pantry quantities and zones | My Pantry tab |
 | Find or create recipes | Recipes tab → Find recipes or Create recipe |
 | Request a dish and check restaurant alternatives | Recipes → Request a dish |
@@ -20,6 +20,8 @@ below the first screen. The existing color palette is unchanged.
 | Saved recipes | Recipes tab → Saved recipes |
 | Cooking preferences | Recipes → Portions and dietary preferences |
 | Chef Chat | Home → Ask Chef |
+| Local food suggestions | Chef Chat → country control → select country or use current location (Android) |
+| Free / Plus plans and usage | Profile → View Plus, or Request a dish → View Plus |
 | Groceries to buy | Shopping tab |
 | Recorded orders | Shopping → Order history |
 | Profile and household | Profile tab |

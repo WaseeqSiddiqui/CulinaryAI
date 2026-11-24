@@ -7,13 +7,14 @@ import 'package:http_parser/http_parser.dart';
 
 import '../models/meal_nutrition_estimate.dart';
 import 'vision_api_service.dart';
+import 'authenticated_api_client.dart';
 
 class MealNutritionService {
   final http.Client _client;
   final Uri baseUri;
 
   MealNutritionService({http.Client? client, String? baseUrl})
-    : _client = client ?? http.Client(),
+    : _client = AuthenticatedApiClient(client: client),
       baseUri = Uri.parse(
         (baseUrl ?? VisionApiService.defaultBaseUrl).replaceFirst(
           RegExp(r'/$'),
@@ -43,8 +44,7 @@ class MealNutritionService {
         await _client.send(request).timeout(const Duration(seconds: 45)),
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        final decoded = jsonDecode(response.body);
-        final message = decoded is Map ? decoded['detail']?.toString() : null;
+        final message = backendErrorMessage(response.body);
         throw Exception(
           message ?? 'Meal scan failed (${response.statusCode}).',
         );

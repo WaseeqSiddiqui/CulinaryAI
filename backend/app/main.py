@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 # Load .env from the backend directory (one level up from app/)
 load_dotenv()
 
-from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.models.schemas import (
@@ -46,6 +46,8 @@ from app.models.dish_options import DishOptionsRequest, DishOptionsResponse, Res
 from app.services.dish_options import DishOptionsService
 from app.services.restaurant_search import RestaurantSearchService, RestaurantSearchUnavailable
 from app.services.dish_recipe_lookup import DishRecipeLookup
+from app.services.subscription_service import PLAN_LIMITS, SubscriptionService, usage_limits_enabled
+from app.services.usage_middleware import UsageLimitMiddleware
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -59,16 +61,21 @@ product_matcher = ProductMatcher()
 recipe_discovery = LiveRecipeDiscoveryService()
 dish_options = DishOptionsService(recipe_discovery.provider, fallback=DishRecipeLookup())
 restaurant_search = RestaurantSearchService()
+subscriptions = SubscriptionService()
 
 app = FastAPI(
     title="CulinaryAI API",
     version="0.3.0",
     description="Pantry-aware planning and vision AI API for the CulinaryAI platform.",
 )
+app.add_middleware(UsageLimitMiddleware, service=subscriptions)
 
 
 @app.on_event("startup")
 async def _startup_check() -> None:
+    if usage_limits_enabled():
+        await asyncio.to_thread(subscriptions.check_ready)
+        logger.info("Monthly usage limits: enabled; Firebase Auth and Firestore checks passed")
     if vision_service.api_key:
         logger.info("AI provider: %s; text model: %s; vision model: %s",
                     vision_service.provider, vision_service.text_model_name, vision_service.model_name)
@@ -85,6 +92,7 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
+    expose_headers=["X-Usage-Limit", "X-Usage-Updated"],
 )
 
 
@@ -102,6 +110,19 @@ def root() -> dict:
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse(status="ok", indexed_recipes=len(repository.recipes))
+
+
+@app.get("/subscription/plans")
+def subscription_plans():
+    return {"plans": [
+        {"id": "free", "name": "Free", "price_pkr": 0, "limits": PLAN_LIMITS["free"]},
+        {"id": "plus", "name": "CulinaryAI Plus", "price_pkr": 999, "limits": PLAN_LIMITS["plus"]},
+    ], "checkout_enabled": False}
+
+
+@app.get("/subscription/me")
+def subscription_status(authorization: str | None = Header(default=None)):
+    return subscriptions.view(subscriptions.verify_user(authorization))
 
 
 @app.post("/dish-options", response_model=DishOptionsResponse)
@@ -256,6 +277,7 @@ async def analyze_meal(
 
 @app.post("/validate-cooking-step", response_model=CookingStepValidationResponse)
 async def validate_cooking_step(
+    response: Response,
     file: UploadFile = File(..., description="Photo of cooking progress in pan/pot"),
     recipe_title: str = Form(..., description="Title of the recipe being cooked"),
     step_number: int = Form(..., description="Current step index or number"),
@@ -267,7 +289,7 @@ async def validate_cooking_step(
     effective_user = user_id or user_id_form or "default_user"
     image_bytes = await file.read()
     mime = file.content_type or "image/jpeg"
-    return await asyncio.to_thread(
+    result = await asyncio.to_thread(
         vision_service.validate_cooking_step,
         image_bytes=image_bytes,
         mime_type=mime,
@@ -277,6 +299,9 @@ async def validate_cooking_step(
         user_question=user_question,
         user_id=effective_user,
     )
+    if result.status == "unable_to_assess":
+        response.headers["X-AI-Usage-Refund"] = "1"
+    return result
 
 
 @app.post("/step-explanation", response_model=StepExplanationResponse)

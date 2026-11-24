@@ -21,12 +21,14 @@ void main() {
         'longitude': 74.3,
         'accuracy': 25.0,
         'address': 'Gulberg, Lahore',
+        'country': 'Pakistan',
       };
     });
     final location = await StoreLocationService().currentAddress();
     expect(location.address, 'Gulberg, Lahore');
     expect(location.latitude, 31.5);
     expect(location.accuracy, 25);
+    expect(location.country, 'Pakistan');
   });
 
   test('does not invent an address when GPS is disabled', () async {

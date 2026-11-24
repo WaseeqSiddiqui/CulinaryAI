@@ -12,6 +12,7 @@ import '../models/fridge_vision_models.dart';
 import '../models/pantry_item_model.dart';
 import '../models/receipt_vision_models.dart';
 import 'server_config_service.dart';
+import 'authenticated_api_client.dart';
 
 class VisionApiException implements Exception {
   final String message;
@@ -35,7 +36,7 @@ class VisionApiService {
     http.Client? client,
     String? baseUrl,
     this.timeout = const Duration(seconds: 45),
-  }) : _client = client ?? http.Client(),
+  }) : _client = AuthenticatedApiClient(client: client),
        baseUri = Uri.parse(
          (baseUrl ?? defaultBaseUrl).replaceFirst(RegExp(r'/$'), ''),
        );
@@ -186,7 +187,7 @@ class VisionApiService {
       if (response.statusCode == 429) {
         final detail = _extractDetail(response.body);
         throw VisionApiException(
-          detail ?? 'Daily receipt scanning limit reached (max 20 scans/day). Please try again tomorrow.',
+          detail ?? 'The AI service is busy. Please try again shortly.',
           statusCode: 429,
         );
       }
@@ -279,7 +280,7 @@ class VisionApiService {
       if (response.statusCode == 429) {
         final detail = _extractDetail(response.body);
         throw VisionApiException(
-          detail ?? 'Daily fridge scanning limit reached (max 20 scans/day). Please try again tomorrow.',
+          detail ?? 'The AI service is busy. Please try again shortly.',
           statusCode: 429,
         );
       }
@@ -311,13 +312,7 @@ class VisionApiService {
   }
 
   String? _extractDetail(String responseBody) {
-    try {
-      final data = jsonDecode(responseBody);
-      if (data is Map && data['detail'] != null) {
-        return data['detail'].toString();
-      }
-    } catch (_) {}
-    return null;
+    return backendErrorMessage(responseBody);
   }
 
   void close() => _client.close();

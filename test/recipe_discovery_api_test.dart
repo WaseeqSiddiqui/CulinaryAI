@@ -41,9 +41,11 @@ void main() {
         referenceDate: DateTime(2026, 10, 30, 23, 50),
         dietaryPreferences: ['Vegetarian'],
         avoidIngredients: ['Peanuts'],
+        country: 'Pakistan',
       );
       expect(url.path, '/discover-recipes');
       expect(body['reference_date'], '2026-10-30');
+      expect(body['country'], 'Pakistan');
       expect(body['dietary_preferences'], ['vegetarian']);
       expect(body['avoid_ingredients'], ['Peanuts']);
       expect((body['pantry_items'] as List).single, {

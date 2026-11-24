@@ -114,6 +114,7 @@ class CurrentLocationResolver(private val context: Context) {
                             "accuracy" to location.accuracy.toDouble(),
                             "address" to text,
                             "locality" to address?.locality,
+                            "country" to address?.countryName,
                         ))
                     }
                 }

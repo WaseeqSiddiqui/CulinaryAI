@@ -7,6 +7,7 @@ import '../models/pantry_item_model.dart';
 import '../models/recipe_recommendation_model.dart';
 import 'recipe_recommendation_service.dart';
 import 'server_config_service.dart';
+import 'authenticated_api_client.dart';
 
 class ChefChatService {
   ChefChatService._();
@@ -35,14 +36,17 @@ class ChefChatService {
     String question,
     List<PantryItemModel> pantryItems, {
     http.Client? client,
+    String? country,
   }) async {
-    final httpClient = client ?? http.Client();
+    final httpClient = AuthenticatedApiClient(client: client);
     final baseUrl = ServerConfigService.currentBaseUrl;
     final uri = Uri.parse('$baseUrl/chef-chat');
 
     try {
       final body = jsonEncode({
         'message': question.trim(),
+        if (country != null && country.trim().isNotEmpty)
+          'country': country.trim(),
         'pantry_items': [
           for (final item in pantryItems)
             {'name': item.name, 'quantity': item.quantity, 'unit': item.unit},

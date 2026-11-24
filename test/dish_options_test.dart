@@ -48,14 +48,45 @@ Map<String, dynamic> menuResponse() => {
     {
       'name': 'Menu House',
       'summary': 'Rice bowl menu in Lahore.',
-      'source': 'Foodpanda',
-      'url': 'https://www.foodpanda.pk/restaurant/abc/menu-house',
+      'source': 'Restaurant website',
+      'link_type': 'order',
+      'url': 'https://menuhouse.pk/order?branch=lahore',
     },
   ],
 };
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  test('one malformed restaurant entry cannot break the other direct ordering links', () {
+    final data = menuResponse();
+    data['restaurants'] = <dynamic>[
+      ...(data['restaurants'] as List),
+      {'name': 'Bad', 'url': 42},
+      {
+        'name': 'Marketplace',
+        'url': 'https://www.foodpanda.pk/restaurant/abc/menu-house',
+      },
+      null,
+    ];
+    final restaurants = RestaurantResults.fromJson(data).restaurants;
+    expect(restaurants, hasLength(1));
+    expect(
+      restaurants.single.url.toString(),
+      'https://menuhouse.pk/order?branch=lahore',
+    );
+  });
+
+  test('restaurant details strip HTML and Markdown formatting', () {
+    final restaurant = RestaurantOption.fromJson({
+      'name': '**Menu House**',
+      'url': 'https://menuhouse.pk/order',
+      'summary':
+          '<p>Rice &amp; curry</p>\\n[Order](https://menuhouse.pk/order)',
+    });
+    expect(restaurant.name, 'Menu House');
+    expect(restaurant.summary, 'Rice & curry Order');
+  });
 
   test(
     'explicit dish requests are separated from general pantry questions',
@@ -196,7 +227,7 @@ void main() {
         final searchBody = jsonDecode(requests.last.body) as Map;
         expect(searchBody.keys.toSet(), {'dish', 'area'});
         expect(find.text('Need: Rice'), findsOneWidget);
-        final order = find.text('View menu and order');
+        final order = find.text('Order on restaurant website');
         await tester.scrollUntilVisible(
           order,
           220,
@@ -207,7 +238,8 @@ void main() {
         expect(order.hitTestable(), findsOneWidget);
         await tester.tap(order);
         await tester.pumpAndSettle();
-        expect(opened?.host, 'www.foodpanda.pk');
+        expect(opened?.host, 'menuhouse.pk');
+        expect(opened?.queryParameters['branch'], 'lahore');
         expect(tester.takeException(), isNull);
       },
     );

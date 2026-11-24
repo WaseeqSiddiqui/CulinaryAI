@@ -9,6 +9,7 @@ import '../../providers/pantry_provider.dart';
 import '../../services/dish_options_service.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/live_recipe_card.dart';
+import '../subscription/plus_screen.dart';
 
 class DishRequestScreen extends StatefulWidget {
   const DishRequestScreen({
@@ -229,6 +230,8 @@ class _DishRequestScreenState extends State<DishRequestScreen> {
                 'Choose a dish. We will check your pantry and show what is missing. Add your area to find restaurant menus if you need ingredients.',
               ),
               const SizedBox(height: 20),
+              const PlusPlanBanner(),
+              const SizedBox(height: 20),
               TextField(
                 controller: _dish,
                 onChanged: _invalidate,
@@ -350,16 +353,31 @@ class _DishRequestScreenState extends State<DishRequestScreen> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                '${option.source} · ${_restaurants!.area}',
+                                [
+                                      option.url.host,
+                                      if (_restaurants!.area.isNotEmpty)
+                                        'Search area: ${_restaurants!.area}',
+                                    ]
+                                    .where((value) => value.isNotEmpty)
+                                    .join(' · '),
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                               const SizedBox(height: 8),
-                              Text(option.summary),
+                              if (option.summary.isNotEmpty)
+                                Text(option.summary),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Check current prices and delivery coverage on the restaurant website.',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
                               const SizedBox(height: 12),
                               FilledButton.icon(
                                 onPressed: () => _open(option),
                                 icon: const Icon(Icons.open_in_new, size: 18),
-                                label: const Text('View menu and order'),
+                                label: Text(
+                                  option.orderLabel,
+                                  textAlign: TextAlign.center,
+                                ),
                               ),
                             ],
                           ),

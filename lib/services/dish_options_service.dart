@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../models/dish_options.dart';
 import '../models/pantry_item_model.dart';
 import 'server_config_service.dart';
+import 'authenticated_api_client.dart';
 
 class DishOptionsException implements Exception {
   const DishOptionsException(this.message);
@@ -16,7 +17,7 @@ class DishOptionsException implements Exception {
 
 class DishOptionsService {
   DishOptionsService({http.Client? client, String? baseUrl})
-    : _client = client ?? http.Client(),
+    : _client = AuthenticatedApiClient(client: client),
       _base = Uri.parse(baseUrl ?? ServerConfigService.currentBaseUrl);
   final http.Client _client;
   final Uri _base;

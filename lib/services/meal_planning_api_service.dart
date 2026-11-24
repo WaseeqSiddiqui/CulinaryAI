@@ -8,6 +8,7 @@ import '../models/pantry_item_model.dart';
 import '../models/recipe_discovery.dart';
 
 import 'server_config_service.dart';
+import 'authenticated_api_client.dart';
 
 class MealPlanningApiException implements Exception {
   final String message;
@@ -30,7 +31,7 @@ class MealPlanningApiService {
     http.Client? client,
     String? baseUrl,
     this.timeout = const Duration(seconds: 8),
-  }) : _client = client ?? http.Client(),
+  }) : _client = AuthenticatedApiClient(client: client),
        baseUri = Uri.parse(
          (baseUrl ?? defaultBaseUrl).replaceFirst(RegExp(r'/$'), ''),
        );
@@ -47,6 +48,7 @@ class MealPlanningApiService {
     List<String> avoidIngredients = const [],
     DateTime? referenceDate,
     DateTime? requestedDate,
+    String? country,
   }) async {
     String dateOnly(DateTime value) => value.toIso8601String().split('T').first;
     try {
@@ -56,6 +58,8 @@ class MealPlanningApiService {
             headers: const {'Content-Type': 'application/json'},
             body: jsonEncode({
               'question': question,
+              if (country != null && country.trim().isNotEmpty)
+                'country': country.trim(),
               'reference_date': dateOnly(referenceDate ?? DateTime.now()),
               if (requestedDate != null)
                 'requested_date': dateOnly(requestedDate),

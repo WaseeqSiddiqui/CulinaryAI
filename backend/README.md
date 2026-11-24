@@ -66,7 +66,56 @@ path and the shared content/schema types. Some internal schema names retain
 their historic `Gemini` prefix for compatibility; Groq mode sends their data to
 Groq only.
 
-## API
+## Free / Plus allowances (payment setup pending)
+
+The app exposes plan details from Profile and Request a dish. Free includes
+20 Chef requests and 3 photo scans per UTC calendar month. Plus is displayed as
+PKR 999/month with 500 Chef requests and 50 photo scans. Checkout is disabled;
+no endpoint lets a client grant itself Plus or submit an unverified payment.
+
+Chef requests include chat, detailed cooking guidance, shopping normalization
+and AI product matching. All four photo endpoints share one pool. Manual pantry
+tracking and source-based recipe/restaurant searches do not spend these credits.
+
+The backend verifies Firebase ID tokens, reads server-owned entitlements, and
+reserves credits with Firestore transactions before model calls. Normal request
+errors and unassessable photo checks refund the reservation. Refund finalization
+is idempotent. Pending reservations retained after a worker crash or database
+outage must be reconciled by an operator; do not delete usage documents to reset
+an account. Usage survives restarts and is shared across backend instances.
+
+Before deploying the new quota-enforced API:
+
+1. Configure Firebase server credentials on Render, using a service-account
+   secret file and `GOOGLE_APPLICATION_CREDENTIALS` pointing to its path, or the
+   server-only `FIREBASE_SERVICE_ACCOUNT_JSON` environment variable. Use the
+   `culinaryai-518b3` project and permissions for Auth verification and Firestore.
+   Do not copy a service-account file into Flutter or commit it to Git.
+2. Set `FIREBASE_PROJECT_ID=culinaryai-518b3` and `USAGE_LIMITS_ENABLED=true`.
+   Firestore billing collections are backend-only in `firestore.rules`.
+3. Release the updated Flutter client, which sends Firebase Bearer tokens,
+   together with the updated API. Older clients that send only `X-User-Id`
+   cannot call quota-enforced AI endpoints. Without Firebase credentials the API
+   fails closed; it does not silently provide unlimited usage.
+   Startup checks Auth access and performs a refunded Firestore reservation for
+   the reserved `__culinary_subscription_readiness__` service identity. An invalid
+   setup prevents the new worker from accepting traffic; no real user's credits
+   are used by this check.
+4. Verify `/subscription/me` with a signed-in account and check free/expired Plus
+   limits before public release. `USAGE_LIMITS_ENABLED=false` is a temporary
+   local/staging compatibility switch, not production subscription enforcement.
+
+`GET /subscription/plans` is public. `GET /subscription/me` requires Firebase
+authentication. User quota exhaustion returns HTTP 429 with
+`detail.code=quota_exceeded` and `X-Usage-Limit: exceeded`; provider rate limits
+remain retryable provider errors and never trigger an upgrade prompt.
+
+Future payment verification can write `billing_entitlements/{uid}` with `plan`
+`plus`, `status` `active`, and a future `expires_at` timestamp. Only trusted
+payment verification or an administrator may write this document. No payment
+processing or production quota activation is implied by the plan preview.
+
+## API examples
 
 `POST /generate-plan`
 

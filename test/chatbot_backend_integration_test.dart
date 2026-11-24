@@ -59,6 +59,52 @@ void main() {
   }
 
   testWidgets(
+    'country selection updates quick prompts and live recipe requests',
+    (tester) async {
+      final requests = <Map<String, dynamic>>[];
+      final api = MealPlanningApiService(
+        baseUrl: 'https://test.local',
+        client: MockClient((request) async {
+          requests.add(jsonDecode(request.body) as Map<String, dynamic>);
+          return http.Response(jsonEncode(liveRecipeFixture()), 200);
+        }),
+      );
+      await open(tester, api, small: true);
+      await tester.tap(find.byIcon(Icons.public));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('foodCountryInput')),
+        'Pakistan',
+      );
+      await tester.tap(find.text('Save country'));
+      await tester.pumpAndSettle();
+      expect(find.text('Suggest popular meals in Pakistan'), findsOneWidget);
+      expect(find.text('I want chicken biryani'), findsNothing);
+      await tester.tap(find.text('What can I cook?'));
+      await tester.pumpAndSettle();
+      expect(requests.single['country'], 'Pakistan');
+      expect(requests.single['meal_count'], 3);
+      await tester.tap(find.byIcon(Icons.public));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('foodCountryInput')),
+        'Italy',
+      );
+      await tester.tap(find.text('Save country'));
+      await tester.pumpAndSettle();
+      expect(find.text('Suggest popular meals in Italy'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const Key('chefChatInput')),
+        'Suggest dinner',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(requests.last['country'], 'Italy');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'named dish requests open the actual inventory check without general chat search',
     (tester) async {
       final dishApi = DishOptionsService(

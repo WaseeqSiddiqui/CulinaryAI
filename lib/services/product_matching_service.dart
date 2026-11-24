@@ -5,10 +5,11 @@ import 'package:http/http.dart' as http;
 import '../models/shopping_models.dart';
 import '../models/store_models.dart';
 import 'meal_planning_api_service.dart';
+import 'authenticated_api_client.dart';
 
 class ProductMatchingService {
   ProductMatchingService({http.Client? client, String? baseUrl})
-    : _client = client ?? http.Client(),
+    : _client = AuthenticatedApiClient(client: client),
       _baseUri = Uri.parse(baseUrl ?? MealPlanningApiService.defaultBaseUrl);
 
   final http.Client _client;
@@ -27,7 +28,10 @@ class ProductMatchingService {
         )
         .timeout(const Duration(seconds: 12));
     if (response.statusCode != 200) {
-      throw StateError('Query normalizer returned ${response.statusCode}');
+      throw StateError(
+        backendErrorMessage(response.body) ??
+            'Query normalizer returned ${response.statusCode}',
+      );
     }
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     final query = body['search_query']?.toString().trim() ?? '';

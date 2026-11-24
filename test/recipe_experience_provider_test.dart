@@ -13,6 +13,20 @@ void main() {
     }
   }
 
+  test('food country persists independently of cooking preferences', () async {
+    final provider = RecipeExperienceProvider();
+    await ready(provider);
+    await provider.setFoodCountry('pk');
+    await provider.updatePreferences(const CookingPreferences(servings: 2));
+    final restored = RecipeExperienceProvider();
+    await ready(restored);
+    expect(restored.foodCountry, 'Pakistan');
+    expect(restored.hasSavedCountry, isTrue);
+    expect(restored.preferences.servings, 2);
+    provider.dispose();
+    restored.dispose();
+  });
+
   test(
     'concurrent meal saves retain both meals and nutrition after restart',
     () async {

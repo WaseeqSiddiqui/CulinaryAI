@@ -13,6 +13,8 @@ import '../../providers/recipe_experience_provider.dart';
 import '../../services/chef_chat_service.dart';
 import '../../services/meal_planning_api_service.dart';
 import '../../services/dish_options_service.dart';
+import '../../services/regional_food_service.dart';
+import '../../services/store_location_service.dart';
 import '../recipes/dish_request_screen.dart';
 
 class ChatbotScreen extends StatefulWidget {
@@ -39,13 +41,18 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final List<_ChatMessage> _messages = [];
   bool _isReplying = false;
 
-  static const _suggestions = [
-    'What can I cook?',
-    'What is low stock?',
-    'What do I have in my pantry?',
-    'How do I cook tomato pasta?',
-    'I want chicken biryani',
-  ];
+  List<String> get _suggestions => RegionalFoodService.suggestions(
+    context.read<RecipeExperienceProvider>().foodCountry,
+  );
+
+  Future<void> _chooseCountry() async {
+    final provider = context.read<RecipeExperienceProvider>();
+    final country = await showDialog<String>(
+      context: context,
+      builder: (_) => _CountryDialog(initialCountry: provider.foodCountry),
+    );
+    if (country != null) await provider.setFoodCountry(country);
+  }
 
   @override
   void initState() {
@@ -117,7 +124,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         final plan = await _mealPlanningApi.discoverRecipes(
           question: question,
           pantryItems: pantryItems,
-          resultCount: 5,
+          resultCount: 3,
+          country: context.read<RecipeExperienceProvider>().foodCountry,
           dietaryPreferences: [
             ...preferences.dietaryNeeds,
             if (dietaryPreference != null && dietaryPreference.isNotEmpty)
@@ -145,7 +153,11 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         serviceError = true;
       }
     } else {
-      final result = await ChefChatService.askChefApi(question, pantryItems);
+      final result = await ChefChatService.askChefApi(
+        question,
+        pantryItems,
+        country: context.read<RecipeExperienceProvider>().foodCountry,
+      );
       answer = result.reply;
       if (!result.isLiveAi) {
         serviceNotice = 'Offline Chef · Connect backend for live AI';
@@ -192,6 +204,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final region = context.watch<RecipeExperienceProvider>();
     final chefName = ChefNameFormatter.fromUser(
       context.watch<AuthProvider>().currentUser,
     );
@@ -214,6 +227,23 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _chooseCountry,
+                  icon: const Icon(Icons.public, size: 18),
+                  label: Text(
+                    region.foodCountry.isEmpty
+                        ? 'Choose your food country'
+                        : '${region.foodCountry}${region.hasSavedCountry ? '' : ' · device region'}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ),
             Expanded(
               child: _messages.isEmpty
                   ? _EmptyChat(
@@ -316,6 +346,122 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   }
 }
 
+class _CountryDialog extends StatefulWidget {
+  const _CountryDialog({required this.initialCountry});
+  final String initialCountry;
+
+  @override
+  State<_CountryDialog> createState() => _CountryDialogState();
+}
+
+class _CountryDialogState extends State<_CountryDialog> {
+  late final _controller = TextEditingController(text: widget.initialCountry);
+  bool _locating = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _useLocation() async {
+    setState(() {
+      _locating = true;
+      _error = null;
+    });
+    try {
+      final location = await StoreLocationService().currentAddress();
+      if (!mounted) return;
+      if (location.country.isEmpty) {
+        throw const FormatException();
+      }
+      setState(() => _controller.text = location.country);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error = 'Could not detect your country. Enter it below.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Food near home'),
+    content: SizedBox(
+      width: 360,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Prioritize familiar local meals. You can still ask for any cuisine.',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              key: const Key('foodCountryInput'),
+              controller: _controller,
+              maxLength: 80,
+              textCapitalization: TextCapitalization.words,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                labelText: 'Country',
+                hintText: 'e.g. Pakistan',
+              ),
+            ),
+            Wrap(
+              spacing: 6,
+              children: [
+                for (final country in [
+                  'Pakistan',
+                  'India',
+                  'United Kingdom',
+                  'United States',
+                ])
+                  ActionChip(
+                    label: Text(country),
+                    onPressed: () => setState(() => _controller.text = country),
+                  ),
+              ],
+            ),
+            if (Theme.of(context).platform == TargetPlatform.android) ...[
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: _locating ? null : _useLocation,
+                icon: const Icon(Icons.my_location),
+                label: Text(
+                  _locating ? 'Finding country…' : 'Use current location',
+                ),
+              ),
+            ],
+            if (_error != null)
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        onPressed: _controller.text.trim().isEmpty || _locating
+            ? null
+            : () => Navigator.pop(context, _controller.text.trim()),
+        child: const Text('Save country'),
+      ),
+    ],
+  );
+}
+
 class _EmptyChat extends StatelessWidget {
   final String chefName;
   final List<String> suggestions;
@@ -338,7 +484,7 @@ class _EmptyChat extends StatelessWidget {
     ];
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
@@ -346,10 +492,10 @@ class _EmptyChat extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const BrandMark(showName: false),
-                const SizedBox(height: 26),
+                const SizedBox(height: 18),
                 Text(
                   'A little inspiration,\nChef $chefName?',
-                  style: Theme.of(context).textTheme.headlineLarge,
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -357,7 +503,7 @@ class _EmptyChat extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodyLarge
                       ?.copyWith(color: colors.onSurfaceVariant),
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 20),
                 Text(
                   'LET’S MAKE SOMETHING GOOD',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(

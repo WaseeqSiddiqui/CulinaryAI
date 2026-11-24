@@ -19,6 +19,17 @@ service cloud.firestore {
           || household.member_roles[request.auth.uid] == 'admin');
     }
 
+    // Only the trusted backend may grant Plus or change usage counters.
+    match /billing_entitlements/{userId} {
+      allow read, write: if false;
+    }
+    match /billing_usage/{userId}/{document=**} {
+      allow read, write: if false;
+    }
+    match /billing_reservations/{reservationId} {
+      allow read, write: if false;
+    }
+
     match /users/{userId} {
       allow read, create: if signedIn() && request.auth.uid == userId;
       allow update: if signedIn() && (

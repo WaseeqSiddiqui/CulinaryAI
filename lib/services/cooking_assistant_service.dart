@@ -7,6 +7,7 @@ import 'package:http_parser/http_parser.dart';
 
 import '../models/cooking_session.dart';
 import 'server_config_service.dart';
+import 'authenticated_api_client.dart';
 
 class CookingAssistantException implements Exception {
   final String message;
@@ -21,7 +22,7 @@ class CookingAssistantService {
     http.Client? client,
     String? baseUrl,
     this.timeout = const Duration(seconds: 20),
-  }) : _client = client ?? http.Client(),
+  }) : _client = AuthenticatedApiClient(client: client),
        _ownsClient = client == null,
        baseUri = Uri.parse(
          (baseUrl ?? ServerConfigService.currentBaseUrl).replaceFirst(
@@ -144,7 +145,8 @@ class CookingAssistantService {
       }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw CookingAssistantException(
-          'Visual check failed with status ${response.statusCode}.',
+          backendErrorMessage(response.body) ??
+              'Visual check failed with status ${response.statusCode}.',
         );
       }
       return CookingVisionResult.fromJson(
@@ -177,7 +179,8 @@ class CookingAssistantService {
           .timeout(timeout);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw CookingAssistantException(
-          'Cooking assistant returned status ${response.statusCode}.',
+          backendErrorMessage(response.body) ??
+              'Cooking assistant returned status ${response.statusCode}.',
           statusCode: response.statusCode,
         );
       }

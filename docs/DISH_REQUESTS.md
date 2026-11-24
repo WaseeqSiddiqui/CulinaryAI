@@ -19,17 +19,30 @@ recipes produce an explicit unknown result. Portions are not inferred from the
 user's household; users must check the source recipe's portions.
 
 When ingredients are missing and an area is supplied, the app automatically
-searches Tavily for Foodpanda restaurant menu pages. If no area was entered,
+searches Tavily for restaurant-owned ordering/menu websites. If no area was entered,
 users can add one and choose Find restaurants. Unknown recipe or quantity
 results also allow an explicit restaurant search. Ready-to-cook results do not
 automatically invoke restaurant search.
 
-Restaurant results must have a real HTTPS Foodpanda restaurant URL and source
-text mentioning the requested dish and entered locality. Listings, darkstores,
-other cities and unrelated dishes are filtered out. The app shows at most five
-matching menu links. It does not claim exact distance, opening hours, live stock,
-prices or delivery eligibility. The user opens the menu and completes ordering
-on the merchant site; no purchase is submitted by this feature.
+Restaurant results use HTTPS restaurant websites. Delivery marketplaces,
+directories, social pages, private/network URLs, and static menu images are
+excluded. Tavily extraction reads candidate sites and finds real ordering/menu
+links on those pages, including same-site ordering subdomains. Essential query
+parameters such as branch IDs are preserved, while tracking parameters are
+removed. No ordering URL is invented by appending a guessed path.
+
+The app labels each action as ordering, a menu, or a website visit according to
+the source. Country-wide chains may appear when their menu matches; delivery to
+the requested search area still needs confirmation on the restaurant website.
+If the source confirms only the dish family, the card explicitly says the exact
+dish is unconfirmed. The app shows at most five results, cleans HTML/Markdown
+formatting, and skips malformed entries without breaking the entire result list.
+It does not claim exact distance, opening hours, live stock, prices or delivery
+eligibility. No purchase is submitted by this feature.
+
+A View Plus entry on this page opens the same Free/Plus allowance screen as
+Profile. Payment collection is intentionally disabled until a billing provider
+is connected. See the backend README for the Firebase quota rollout steps.
 
 ## Backend configuration
 
@@ -55,7 +68,7 @@ Backend tests cover empty inventory, shortages, expired food, uncertain units,
 named-dish identity, structured recipe lookup, redirect restrictions, provider
 failures, location/dish filtering and link validation. Flutter tests cover the
 ready and missing paths, no restaurant request for ready inventory, small-screen
-menu actions, partial failure recovery and stale area responses. Live checks
-retrieved a Chicken Biryani recipe with twelve ingredients, three biryani menu
-links in Lahore and five pizza menu links for Johar Town Lahore. These checks
-did not place an order or share device location.
+menu actions, partial failure recovery and stale area responses. Live development
+checks use example dishes and cities without placing orders or sharing device
+location. Result availability depends on indexed restaurant websites and does
+not imply that a venue delivers to the user.

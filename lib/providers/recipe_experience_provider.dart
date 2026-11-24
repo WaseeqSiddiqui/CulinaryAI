@@ -7,6 +7,7 @@ import '../models/nutrition_facts.dart';
 import '../models/recipe_recommendation_model.dart';
 import '../models/recipe_ingredient.dart';
 import '../services/nutrition_calculator_service.dart';
+import '../services/regional_food_service.dart';
 
 class CookingPreferences {
   final List<String> dietaryNeeds;
@@ -115,6 +116,7 @@ class RecipeExperienceProvider extends ChangeNotifier {
   static const _favoritesKey = 'culinary_recipe_favorites_v1';
   static const _historyKey = 'culinary_cooked_history_v1';
   static const _savedRecipesKey = 'culinary_saved_recipes_v1';
+  static const _countryKey = 'culinary_food_country_v1';
 
   RecipeExperienceProvider() {
     _load();
@@ -125,6 +127,7 @@ class RecipeExperienceProvider extends ChangeNotifier {
   final Map<String, RecipeRecommendationModel> _savedRecipes = {};
   final List<CookedMealEntry> _history = [];
   bool _ready = false;
+  String? _country;
 
   CookingPreferences get preferences => _preferences;
   Set<String> get favoriteIds => Set.unmodifiable(_favoriteIds);
@@ -132,9 +135,20 @@ class RecipeExperienceProvider extends ChangeNotifier {
       List.unmodifiable(_savedRecipes.values);
   List<CookedMealEntry> get history => List.unmodifiable(_history);
   bool get ready => _ready;
+  String get foodCountry => _country ?? RegionalFoodService.deviceCountry();
+  bool get hasSavedCountry => _country != null;
+
+  Future<void> setFoodCountry(String value) async {
+    final country = RegionalFoodService.normalizeCountry(value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_countryKey, country);
+    _country = country;
+    notifyListeners();
+  }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
+    _country = prefs.getString(_countryKey);
     try {
       final raw = prefs.getString(_preferencesKey);
       if (raw != null) {

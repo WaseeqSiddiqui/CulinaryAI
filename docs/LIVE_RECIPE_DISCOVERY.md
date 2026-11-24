@@ -2,14 +2,27 @@
 
 Chef Chat now routes recipe questions to `POST /discover-recipes`. This path
 does not read `verified_recipes.json`, the Flutter recipe catalog, or a generated
-recipe from Gemini. General chat and the separate curated recipe library retain
-their existing behavior.
+recipe from a language model. General chat uses the separately configured Groq
+text model, while this discovery path retrieves actual recipe sources.
 
 The backend calls TheMealDB's live ingredient-filter and name-search tools,
 then retrieves full ingredient details for candidate recipes. Ingredient names
 in the current pantry determine the searches. Title searches also surface meals
 centered on those foods. Every displayed recipe comes from an actual provider
 record and links to its recipe page.
+
+Chef Chat shows three quick prompts and requests at most three recipes. Its
+country control defaults to the device region (labelled as such), remembers a
+manually selected country, and offers **Use current location** on Android.
+Country detection uses the existing location permission flow; if it fails,
+the user can enter any country. Only the country is sent with chat and recipe
+requests, not the GPS coordinates or street address.
+
+Country-specific dish searches and cuisine filters bring familiar meals into
+the candidate set. Pakistani preferences include biryani, karahi, dal and
+chapati; other supported countries use their own cuisine and dish searches.
+Explicit cuisine requests override this default. Suitable local matches rank
+first, and the response explains when only other cuisines match the pantry.
 
 ## Inventory decisions
 
@@ -27,7 +40,8 @@ record and links to its recipe page.
   `check_quantity`. Stock is reserved while evaluating duplicate ingredient rows,
   so the same eggs cannot be counted twice within one recipe.
 - A result needs its main food in stock and at least half of its principal
-  ingredient names present. Complete quantity matches rank first. Alternatives
+  ingredient names present. Within the preferred cuisine, complete quantity
+  matches rank first. Alternatives
   explicitly list shortages and uncertain amounts; a shared spice alone never
   qualifies a recipe.
 - Dietary and allergen filters inspect the complete external ingredient list.
@@ -52,9 +66,8 @@ documented development key `1`. Public app-store distribution requires a
 supporter production key under the provider's terms:
 https://www.themealdb.com/api.php
 
-No Gemini key is needed for this feature. The configured Gemini key returned
-quota exhaustion during verification, so live recipe discovery deliberately
-works independently of it.
+No Groq or Gemini key is needed for this feature. Live recipe discovery works
+independently of the text and vision models.
 
 Ingredient searches are cached for 10 minutes and full recipe records for one
 hour, with a bounded 256-entry cache. Network concurrency is limited to four.
