@@ -121,7 +121,7 @@ class _ServerSettingsModalState extends State<ServerSettingsModal> {
                       'AI Server Configuration',
                       style: TextStyle(
                         fontSize: 17,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                         color: isDark ? Colors.white : AppTheme.textLightPrimary,
                       ),
                     ),
@@ -142,7 +142,7 @@ class _ServerSettingsModalState extends State<ServerSettingsModal> {
             'Quick Presets:',
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               color: isDark ? Colors.white70 : Colors.black87,
             ),
           ),

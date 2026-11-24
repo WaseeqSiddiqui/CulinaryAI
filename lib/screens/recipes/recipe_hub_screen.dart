@@ -229,7 +229,7 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
                 children: [
                   const Text(
                     'Portions',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const Spacer(),
                   IconButton(
@@ -240,7 +240,7 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
                   ),
                   Text(
                     '$selectedServings',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   IconButton(
                     onPressed: selectedServings >= 12
@@ -253,7 +253,7 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
               const SizedBox(height: 20),
               const Text(
                 'Ingredients',
-                style: TextStyle(fontWeight: FontWeight.w800),
+                style: TextStyle(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               ..._scaledRecipe(recipe, selectedServings).ingredientDetails.map(
@@ -436,7 +436,7 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
                   RecipeSection.saved => 'Your saved recipes',
                 },
                 style: Theme.of(context).textTheme.headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.w700),
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 6),
               Text(switch (_mode) {
@@ -908,14 +908,14 @@ class _RecipeOverviewCard extends StatelessWidget {
                         : 'DAY $dayNumber',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: colors.primary,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     recipe.title,
                     style: Theme.of(context).textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
+                        ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 10),
                   Wrap(

@@ -182,7 +182,7 @@ class _MacroColumn extends StatelessWidget {
         children: [
           Text(
             title,
-            style: TextStyle(color: color, fontWeight: FontWeight.w700),
+            style: TextStyle(color: color, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           Text('${facts.calories.round()} kcal'),

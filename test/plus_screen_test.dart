@@ -9,21 +9,16 @@ import 'package:culinary_ai/services/subscription_api_service.dart';
 import 'package:culinary_ai/widgets/subscription_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'support/load_ui_fonts.dart';
+
 void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
-    await (FontLoader('PlusJakartaSans')..addFont(
-          rootBundle.load('assets/fonts/PlusJakartaSans-Variable.ttf'),
-        ))
-        .load();
-    await (FontLoader(
-      'MaterialIcons',
-    )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    await loadUiFonts();
   });
   for (final width in [320.0, 390.0, 1280.0]) {
     testWidgets('Free and Plus plans show accurate usage at width $width', (

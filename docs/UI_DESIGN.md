@@ -1,9 +1,7 @@
 # CulinaryAI interface
 
-The app uses a shared ivory and forest-green theme, locally bundled Plus Jakarta
-Sans typography, quiet surface borders, and consistent form and button styles.
-Light mode is the initial appearance; the appearance control also exposes a
-matching dark theme.
+The app uses a warm cream palette with tomato red and herb green accents,
+locally bundled Inter typography, and consistent form and button styles.
 
 Home, sign-in, pantry, shopping, chat and profile use the same visual system.
 The secondary routes also share this system: recipe discovery and creation,
@@ -20,9 +18,8 @@ pixels. Content stops growing at 1200 pixels. Sign-in and sign-up forms keep a
 readable maximum width. Pantry search remains visible, and quantity controls
 have tooltips and 44-pixel touch targets.
 
-The font is bundled at `assets/fonts/PlusJakartaSans-Variable.ttf` and does not
-require a network font download. Its original SIL Open Font License is retained
-beside it and registered in Flutter's license registry.
+Inter's regular, medium and semibold files are bundled in `assets/fonts`.
+The app registers the original SIL Open Font License in its license registry.
 
 ## Verification and screenshots
 

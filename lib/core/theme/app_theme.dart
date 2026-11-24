@@ -74,11 +74,11 @@ class AppTheme {
     final navIndicator = dark ? primaryFlameDark : creamAccent;
     final base = ThemeData(
       useMaterial3: true,
-      fontFamily: 'PlusJakartaSans',
+      fontFamily: 'Inter',
       brightness: dark ? Brightness.dark : Brightness.light,
     );
     final typography = base.textTheme.apply(
-      fontFamily: 'PlusJakartaSans',
+      fontFamily: 'Inter',
       bodyColor: ink,
       displayColor: ink,
     );
@@ -118,25 +118,30 @@ class AppTheme {
         displaySmall: typography.displaySmall?.copyWith(
           fontSize: 38,
           fontWeight: FontWeight.w600,
-          letterSpacing: -1.5,
+          letterSpacing: -1.1,
           height: 1.16,
         ),
         headlineLarge: typography.headlineLarge?.copyWith(
           fontSize: 32,
           fontWeight: FontWeight.w600,
-          letterSpacing: -1.1,
+          letterSpacing: -.8,
           height: 1.2,
         ),
         headlineMedium: typography.headlineMedium?.copyWith(
           fontSize: 28,
           fontWeight: FontWeight.w600,
-          letterSpacing: -.9,
+          letterSpacing: -.7,
           height: 1.22,
+        ),
+        headlineSmall: typography.headlineSmall?.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: -.45,
+          height: 1.25,
         ),
         titleLarge: typography.titleLarge?.copyWith(
           fontSize: 21,
           fontWeight: FontWeight.w600,
-          letterSpacing: -.5,
+          letterSpacing: -.35,
         ),
         titleMedium: typography.titleMedium?.copyWith(
           fontSize: 16,
@@ -146,13 +151,13 @@ class AppTheme {
         bodyLarge: typography.bodyLarge?.copyWith(fontSize: 15, height: 1.6),
         bodyMedium: typography.bodyMedium?.copyWith(fontSize: 14, height: 1.5),
         bodySmall: typography.bodySmall?.copyWith(
-          fontSize: 12,
+          fontSize: 13,
           height: 1.5,
           color: muted,
         ),
         labelLarge: typography.labelLarge?.copyWith(
           fontSize: 14,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
         ),
       ),
       appBarTheme: AppBarTheme(
@@ -168,8 +173,8 @@ class AppTheme {
         titleSpacing: 24,
         titleTextStyle: typography.titleLarge?.copyWith(
           fontSize: 21,
-          fontWeight: FontWeight.w600,
-          letterSpacing: -.6,
+          fontWeight: FontWeight.w500,
+          letterSpacing: -.35,
           color: Colors.white,
         ),
       ),
@@ -188,7 +193,7 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
           shape: shape,
           textStyle: typography.labelLarge?.copyWith(
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ),
@@ -201,7 +206,7 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
           shape: shape,
           textStyle: typography.labelLarge?.copyWith(
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ),
@@ -218,7 +223,7 @@ class AppTheme {
         style: TextButton.styleFrom(
           foregroundColor: accent,
           textStyle: typography.labelLarge?.copyWith(
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ),
@@ -287,7 +292,7 @@ class AppTheme {
           (states) => typography.labelSmall?.copyWith(
             fontSize: 11,
             fontWeight: states.contains(WidgetState.selected)
-                ? FontWeight.w700
+                ? FontWeight.w600
                 : FontWeight.w500,
             color: states.contains(WidgetState.selected) ? navSelected : muted,
           ),

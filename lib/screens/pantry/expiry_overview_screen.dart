@@ -283,7 +283,7 @@ class _ExpiryCalendar extends StatelessWidget {
                                     '$dayNumber',
                                     style: TextStyle(
                                       fontWeight: selected || isToday
-                                          ? FontWeight.bold
+                                          ? FontWeight.w600
                                           : null,
                                       color: selected
                                           ? colors.onPrimaryContainer

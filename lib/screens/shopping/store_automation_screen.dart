@@ -1119,7 +1119,7 @@ class _StoreAutomationScreenState extends State<StoreAutomationScreen> {
               const SizedBox(height: 8),
               Text(
                 'Final total including fees: Rs ${summary.total.toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               const Text('Place this order with PandaMart?'),

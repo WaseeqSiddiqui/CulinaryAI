@@ -29,7 +29,7 @@ class AboutScreen extends StatelessWidget {
                     'CulinaryAI',
                     style: theme.textTheme.headlineMedium?.copyWith(
                       color: colors.onPrimaryContainer,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 8),

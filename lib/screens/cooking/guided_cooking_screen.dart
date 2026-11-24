@@ -73,7 +73,7 @@ class _GuidedCookingViewState extends State<_GuidedCookingView> {
             children: [
               const Text(
                 'Step timer',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
               const Text(
@@ -271,7 +271,7 @@ class _GuidedCookingViewState extends State<_GuidedCookingView> {
           children: [
             const Text(
               'Full step guidance',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             Text(
@@ -311,7 +311,7 @@ class _GuidedCookingViewState extends State<_GuidedCookingView> {
           children: [
             const Text(
               'Complete ingredient checklist',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 4),
             Text('${widget.recipe.servings} servings'),
@@ -323,7 +323,7 @@ class _GuidedCookingViewState extends State<_GuidedCookingView> {
                 title: Text(ingredient.name),
                 trailing: Text(
                   '${_formatIngredientQuantity(ingredient.quantity)} ${ingredient.unit}',
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
           ],
@@ -609,7 +609,7 @@ class _ConsumptionConfirmationDialogState
                                 Text(
                                   ingredient.name,
                                   style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 if (_included[index] && check != null)
@@ -845,14 +845,14 @@ class _StepHeader extends StatelessWidget {
             style: TextStyle(
               fontSize: 10,
               letterSpacing: 0.9,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const Spacer(),
           Text(
             '${session.stepNumber} of ${recipe.instructions.length}',
-            style: const TextStyle(fontWeight: FontWeight.w700),
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -996,7 +996,7 @@ class _StepIngredientPanel extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10,
                   letterSpacing: 0.6,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -1027,7 +1027,7 @@ class _StepIngredientPanel extends StatelessWidget {
                     '${_formatIngredientQuantity(ingredient.quantity)} ${ingredient.unit}',
                     style: const TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -1078,7 +1078,7 @@ class _MetricTile extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 9,
                     letterSpacing: 0.7,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
@@ -1089,7 +1089,7 @@ class _MetricTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -1231,7 +1231,7 @@ class _CookingMessageBubble extends StatelessWidget {
             if (message.visionResult != null) ...[
               Text(
                 message.visionResult!.headline,
-                style: const TextStyle(fontWeight: FontWeight.w800),
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 5),
             ],
@@ -1250,7 +1250,7 @@ class _CookingMessageBubble extends StatelessWidget {
                     : 'Image insufficient — retake in good light',
                 style: const TextStyle(
                   fontSize: 10,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -1326,7 +1326,7 @@ class _VoiceDock extends StatelessWidget {
                         title,
                         style: const TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 2),

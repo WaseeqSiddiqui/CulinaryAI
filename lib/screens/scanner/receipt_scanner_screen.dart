@@ -855,7 +855,7 @@ class _ReceiptReviewSheetState extends State<ReceiptReviewSheet> {
                               resp.storeName ?? 'Review your groceries',
                               style: const TextStyle(
                                 fontSize: 18,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w600,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -1048,7 +1048,7 @@ class _ReceiptReviewSheetState extends State<ReceiptReviewSheet> {
                                     ? 'Add 1 item'
                                     : 'Add $_selectedCount items',
                                 style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
@@ -1253,7 +1253,7 @@ class _ReviewItemTile extends StatelessWidget {
         style: TextStyle(
           color: isDark ? AppTheme.textDarkPrimary : color,
           fontSize: 10,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

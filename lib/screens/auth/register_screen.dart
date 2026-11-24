@@ -225,7 +225,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 onPressed: auth.isLoading ? null : _handleGoogleSignUp,
                 icon: const Text(
                   'G',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                 ),
                 label: const Text('Continue with Google'),
               ),

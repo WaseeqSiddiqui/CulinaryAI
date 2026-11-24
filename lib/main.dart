@@ -22,8 +22,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   LicenseRegistry.addLicense(() async* {
     yield LicenseEntryWithLineBreaks([
-      'Plus Jakarta Sans',
-    ], await rootBundle.loadString('assets/fonts/OFL-PlusJakartaSans.txt'));
+      'Inter',
+    ], await rootBundle.loadString('assets/fonts/OFL-Inter.txt'));
   });
   await FirebaseService.initialize();
   await ServerConfigService.init();

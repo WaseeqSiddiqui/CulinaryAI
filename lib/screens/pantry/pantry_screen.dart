@@ -173,7 +173,7 @@ class _PantryScreenState extends State<PantryScreen>
           icon: const Icon(Icons.add_rounded),
           label: const Text(
             'Add Item',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
           ),
         ),
       ),
@@ -404,7 +404,7 @@ class _PantryScreenState extends State<PantryScreen>
               Text(
                 'Filter by Zone',
                 style: Theme.of(context).textTheme.titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w700),
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 16),
               ListTile(
@@ -477,7 +477,7 @@ class _ExpiryReminderCard extends StatelessWidget {
           urgent
               ? '$expired expired item${expired == 1 ? '' : 's'} need review'
               : '$useSoon item${useSoon == 1 ? '' : 's'} should be used soon',
-          style: const TextStyle(fontWeight: FontWeight.w800),
+          style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
           urgent
@@ -540,7 +540,7 @@ class _ZoneSectionState extends State<_ZoneSection> {
                 meta.label,
                 style: TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                   color: meta.color,
                   letterSpacing: 0.3,
                 ),
@@ -556,7 +556,7 @@ class _ZoneSectionState extends State<_ZoneSection> {
                   '${widget.items.length}',
                   style: TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     color: meta.color,
                   ),
                 ),
@@ -1181,7 +1181,7 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                   Text(
                     _isEditing ? 'Edit Item' : 'Add to Pantry',
                     style: Theme.of(context).textTheme.titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w800),
+                        ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -1239,7 +1239,7 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                                   'DYNAMIC PHOTO',
                                   style: TextStyle(
                                     fontSize: 9,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w600,
                                     letterSpacing: 0.5,
                                     color: AppTheme.freshHerb,
                                   ),
@@ -1266,7 +1266,7 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w600,
                               color: isDark
                                   ? AppTheme.textDarkPrimary
                                   : AppTheme.textLightPrimary,
@@ -1304,7 +1304,7 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                       'Popular Ingredients',
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                         letterSpacing: 0.3,
                         color: isDark
                             ? AppTheme.textDarkSecondary
@@ -1357,7 +1357,7 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: isCurrent
-                                  ? FontWeight.w700
+                                  ? FontWeight.w600
                                   : FontWeight.w500,
                               color: isCurrent
                                   ? AppTheme.primaryFlame
@@ -1538,7 +1538,7 @@ class _AddEditSheetState extends State<_AddEditSheet> {
                   children: [
                     const Text(
                       'Freshness & expiry',
-                      style: TextStyle(fontWeight: FontWeight.w800),
+                      style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 10),
                     InkWell(
@@ -1851,7 +1851,7 @@ class _ItemDetailModal extends StatelessWidget {
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 11,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
@@ -1879,7 +1879,7 @@ class _ItemDetailModal extends StatelessWidget {
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 11,
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
@@ -1893,7 +1893,7 @@ class _ItemDetailModal extends StatelessWidget {
                       item.name,
                       style: const TextStyle(
                         fontSize: 22,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                         color: Colors.white,
                         letterSpacing: -0.4,
                       ),
@@ -1941,7 +1941,7 @@ class _ItemDetailModal extends StatelessWidget {
                             '${item.quantity.toStringAsFixed(item.quantity.truncateToDouble() == item.quantity ? 0 : 1)} ${item.unit}',
                             style: TextStyle(
                               fontSize: 22,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w600,
                               color: item.isLowStock
                                   ? AppTheme.warmAmber
                                   : (isDark
@@ -2029,7 +2029,7 @@ class _ItemDetailModal extends StatelessWidget {
                                     ? 'Use soon'
                                     : 'Freshness date',
                                 style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                               Text(
@@ -2051,7 +2051,7 @@ class _ItemDetailModal extends StatelessWidget {
                   'Recipes You Can Cook With ${item.name}',
                   style: TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     color: isDark
                         ? AppTheme.textDarkPrimary
                         : AppTheme.textLightPrimary,
@@ -2169,7 +2169,7 @@ class _RecipeMiniChip extends StatelessWidget {
                   title,
                   style: TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     color: isDark
                         ? AppTheme.textDarkPrimary
                         : AppTheme.textLightPrimary,

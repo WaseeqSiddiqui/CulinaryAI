@@ -131,7 +131,7 @@ class DashboardPlaceholderScreen extends StatelessWidget {
                       'Welcome back, ${user?.name ?? 'Chef'}!',
                       style: const TextStyle(
                         fontSize: 22,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w600,
                         color: Colors.white,
                       ),
                     ),
@@ -177,7 +177,7 @@ class DashboardPlaceholderScreen extends StatelessWidget {
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(
                                 fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w600,
                               ),
                         ),
                       ],
@@ -221,7 +221,7 @@ class DashboardPlaceholderScreen extends StatelessWidget {
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(
                                 fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w600,
                               ),
                         ),
                       ],

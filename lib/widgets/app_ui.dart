@@ -39,7 +39,7 @@ class BrandMark extends StatelessWidget {
                 'CulinaryAI',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontSize: 21,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                   letterSpacing: -.7,
                   color: light ? Colors.white : colors.onSurface,
                 ),

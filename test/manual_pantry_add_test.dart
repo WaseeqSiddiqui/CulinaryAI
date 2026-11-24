@@ -6,21 +6,16 @@ import 'package:culinary_ai/screens/pantry/pantry_screen.dart';
 import 'package:culinary_ai/services/food_image_service.dart';
 import 'package:culinary_ai/services/pantry_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'support/load_ui_fonts.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
-    await (FontLoader('PlusJakartaSans')..addFont(
-          rootBundle.load('assets/fonts/PlusJakartaSans-Variable.ttf'),
-        ))
-        .load();
-    await (FontLoader(
-      'MaterialIcons',
-    )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    await loadUiFonts();
   });
   setUp(() => SharedPreferences.setMockInitialValues({}));
 

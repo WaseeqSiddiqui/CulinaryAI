@@ -31,6 +31,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'support/load_ui_fonts.dart';
+
 // The native store page is deliberately inert. These tests exercise the app's
 // surrounding controls and never connect to a merchant or place an order.
 class _TestStorePlatform extends InAppWebViewPlatform {
@@ -57,13 +59,7 @@ class _TestStoreWidget extends PlatformInAppWebViewWidget {
 void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
-    await (FontLoader('PlusJakartaSans')..addFont(
-          rootBundle.load('assets/fonts/PlusJakartaSans-Variable.ttf'),
-        ))
-        .load();
-    await (FontLoader(
-      'MaterialIcons',
-    )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    await loadUiFonts();
     InAppWebViewPlatform.instance = _TestStorePlatform();
     await rootBundle.loadString('assets/store_selectors.json');
   });

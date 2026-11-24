@@ -162,7 +162,7 @@ class _MainShellState extends State<MainShell> {
                                           _navItems[i].label,
                                           style: TextStyle(
                                             fontWeight: i == _currentIndex
-                                                ? FontWeight.w700
+                                                ? FontWeight.w600
                                                 : FontWeight.w500,
                                             color: i == _currentIndex
                                                 ? colors.primary
@@ -357,14 +357,14 @@ class _DashboardTabState extends State<_DashboardTab> {
               'Hi, ${ChefNameFormatter.fromUser(user)}',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colors.secondary,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 6),
             Text(
               'What’s cooking today?',
               style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 18),
@@ -570,7 +570,7 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                     'TODAY’S RECIPE',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: AppTheme.textLightPrimary,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -604,7 +604,7 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                         color: Colors.white,
                         fontSize: 22,
                         height: 1.2,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -638,7 +638,7 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                                   style: TextStyle(
                                     color: AppTheme.primaryFlameDark,
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 SizedBox(width: 4),
@@ -753,7 +753,7 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                             ? AppTheme.primaryFlameLight
                             : AppTheme.primaryFlame,
                         fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -814,7 +814,7 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
@@ -829,7 +829,7 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                     recipe.title,
                     style: TextStyle(
                       fontSize: 22,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                       letterSpacing: -0.4,
                       color: isDark
                           ? AppTheme.textDarkPrimary
@@ -918,7 +918,7 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                                 'How AI Picked This Today',
                                 style: TextStyle(
                                   fontSize: 13,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w600,
                                   color: isDark
                                       ? AppTheme.textDarkPrimary
                                       : AppTheme.textLightPrimary,
@@ -948,7 +948,7 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                     'Ingredients Breakdown',
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                       color: isDark
                           ? AppTheme.textDarkPrimary
                           : AppTheme.textLightPrimary,
@@ -981,7 +981,7 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                                 'Ready in Your Pantry (${inPantry.length})',
                                 style: TextStyle(
                                   fontSize: 13,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w600,
                                   color: isDark
                                       ? AppTheme.freshHerbLight
                                       : AppTheme.successGreen,
@@ -1057,7 +1057,7 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                                 'Missing Ingredients (${missing.length})',
                                 style: const TextStyle(
                                   fontSize: 13,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w600,
                                   color: AppTheme.warmSaffron,
                                 ),
                               ),
@@ -1110,7 +1110,7 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                     'Step-by-Step Method',
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                       color: isDark
                           ? AppTheme.textDarkPrimary
                           : AppTheme.textLightPrimary,
@@ -1138,7 +1138,7 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 12,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -1180,7 +1180,7 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
                           'Start Guided Cooking',
                           style: TextStyle(
                             fontSize: 15,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -1228,7 +1228,7 @@ class _RecipeDetailModalState extends State<_RecipeDetailModal> {
               value,
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
                 color: isDark
                     ? AppTheme.textDarkPrimary
                     : AppTheme.textLightPrimary,
@@ -1285,7 +1285,7 @@ class _HomeSectionHeader extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             textStyle: const TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
           child: Text(
@@ -1420,7 +1420,7 @@ class _KitchenPulse extends StatelessWidget {
                               : '${pantry.useSoonCount} item(s) need attention soon',
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w600,
                             color: isDark
                                 ? AppTheme.textDarkPrimary
                                 : AppTheme.textLightPrimary,
@@ -1453,7 +1453,7 @@ class _KitchenPulse extends StatelessWidget {
                       'Use Food',
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                         color: Colors.white,
                       ),
                     ),
@@ -1530,7 +1530,7 @@ class _PulseStat extends StatelessWidget {
                     ? AppTheme.textDarkPrimary
                     : AppTheme.textLightPrimary,
                 fontSize: 18,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w600,
                 letterSpacing: -0.5,
               ),
             ),
@@ -1653,7 +1653,7 @@ class _KitchenDrawer extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w600,
                                 color: itemColor,
                               ),
                             ),
@@ -1695,7 +1695,7 @@ class _KitchenDrawer extends StatelessWidget {
                               '${pantry.totalCount} items stocked',
                               style: const TextStyle(
                                 fontSize: 11,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w600,
                                 color: AppTheme.freshHerb,
                               ),
                             ),
@@ -1717,7 +1717,7 @@ class _KitchenDrawer extends StatelessWidget {
                             '${pantry.lowStockCount} low',
                             style: const TextStyle(
                               fontSize: 11,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w600,
                               color: AppTheme.warmAmber,
                             ),
                           ),
@@ -1775,7 +1775,7 @@ class _KitchenDrawer extends StatelessWidget {
                     leading: const Icon(Icons.restaurant_menu_rounded),
                     title: const Text(
                       'Cooking tools',
-                      style: TextStyle(fontWeight: FontWeight.w700),
+                      style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                     subtitle: const Text('Recipes, goals and weekly plan'),
                     children: [
@@ -1851,7 +1851,7 @@ class _KitchenDrawer extends StatelessWidget {
                     leading: const Icon(Icons.inventory_2_rounded),
                     title: const Text(
                       'Stock & shopping',
-                      style: TextStyle(fontWeight: FontWeight.w700),
+                      style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                     subtitle: const Text('List, fridge and receipt scans'),
                     children: [
@@ -1962,7 +1962,7 @@ class _KitchenDrawer extends StatelessWidget {
                             'Sign out',
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w600,
                               color: AppTheme.errorRed,
                             ),
                           ),

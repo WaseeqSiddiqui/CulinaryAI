@@ -546,7 +546,7 @@ class _FridgeReviewSheetState extends State<FridgeReviewSheet> {
                         'Review your fridge',
                         style: TextStyle(
                           fontSize: 18,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -645,7 +645,7 @@ class _FridgeReviewSheetState extends State<FridgeReviewSheet> {
                                   ? 'Saved'
                                   : 'Save changes',
                               style: const TextStyle(
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -706,7 +706,7 @@ class _FridgeReviewSheetState extends State<FridgeReviewSheet> {
                     Text(
                       item.matchedName ?? item.detectedName,
                       style: const TextStyle(
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                         fontSize: 14,
                       ),
                     ),
@@ -749,7 +749,7 @@ class _FridgeReviewSheetState extends State<FridgeReviewSheet> {
                   : 'Detected quantity',
               style: TextStyle(
                 fontSize: 10,
-                fontFamily: 'PlusJakartaSans',
+                fontFamily: 'Inter',
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
@@ -791,7 +791,7 @@ class _FridgeReviewSheetState extends State<FridgeReviewSheet> {
                 Text(
                   item.matchedName ?? item.detectedName,
                   style: const TextStyle(
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
                 ),
@@ -841,7 +841,7 @@ class _FridgeReviewSheetState extends State<FridgeReviewSheet> {
             'Verified',
             style: TextStyle(
               color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               fontSize: 11,
             ),
           ),
@@ -864,7 +864,7 @@ class _FridgeReviewSheetState extends State<FridgeReviewSheet> {
               ? Theme.of(context).colorScheme.onSurface
               : color,
           fontSize: 11,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

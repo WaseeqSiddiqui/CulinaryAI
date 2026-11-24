@@ -247,7 +247,7 @@ class _ProfileAvatar extends StatelessWidget {
         style: TextStyle(
           color: Theme.of(context).colorScheme.primary,
           fontSize: 25,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -288,7 +288,7 @@ class _ProfileSection extends StatelessWidget {
               style: TextStyle(
                 color: primaryText,
                 fontSize: 15,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),

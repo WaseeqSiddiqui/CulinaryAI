@@ -210,7 +210,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         'G',
                         style: TextStyle(
                           fontSize: 20,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       label: const Text('Continue with Google'),

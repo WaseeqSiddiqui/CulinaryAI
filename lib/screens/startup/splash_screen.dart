@@ -23,7 +23,7 @@ class SplashScreen extends StatelessWidget {
                 'CulinaryAI',
                 style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                   color: Colors.white,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 10),
