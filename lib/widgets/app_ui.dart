@@ -1,5 +1,22 @@
 import 'package:flutter/material.dart';
 
+class BrandIcon extends StatelessWidget {
+  const BrandIcon({super.key, this.size = 36});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(size * .26),
+    child: Image.asset(
+      'assets/images/culinary_ai_app_icon.png',
+      width: size,
+      height: size,
+      cacheWidth: (size * 3).round(),
+      excludeFromSemantics: true,
+    ),
+  );
+}
+
 class BrandMark extends StatelessWidget {
   const BrandMark({super.key, this.showName = true, this.light = false});
   final bool showName;
@@ -11,16 +28,7 @@ class BrandMark extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Image.asset(
-            'assets/images/culinary_ai_app_icon.png',
-            width: 36,
-            height: 36,
-            cacheWidth: 108,
-            excludeFromSemantics: true,
-          ),
-        ),
+        const BrandIcon(),
         if (showName) ...[
           const SizedBox(width: 10),
           Flexible(

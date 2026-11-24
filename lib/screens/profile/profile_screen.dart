@@ -6,7 +6,9 @@ import '../../core/theme/app_theme.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/household_provider.dart';
+import '../../widgets/app_ui.dart';
 import '../household/household_screen.dart';
+import 'about_screen.dart';
 import 'personal_details_screen.dart';
 import '../subscription/plus_screen.dart';
 
@@ -83,6 +85,18 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           const PlusPlanBanner(),
+          const SizedBox(height: 18),
+          SurfacePanel(
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              leading: const Icon(Icons.info_outline_rounded),
+              title: const Text('About CulinaryAI'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(builder: (_) => const AboutScreen()),
+              ),
+            ),
+          ),
           const SizedBox(height: 18),
           _ProfileSection(
             title: 'Contact information',

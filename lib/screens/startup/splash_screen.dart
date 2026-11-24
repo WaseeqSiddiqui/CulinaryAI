@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../widgets/app_ui.dart';
 
 /// Branded first frame while the saved sign-in session is restored.
 class SplashScreen extends StatelessWidget {
@@ -16,16 +17,7 @@ class SplashScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(32),
-                child: Image.asset(
-                  'assets/images/culinary_ai_app_icon.png',
-                  width: 120,
-                  height: 120,
-                  cacheWidth: 360,
-                  excludeFromSemantics: true,
-                ),
-              ),
+              const BrandIcon(size: 120),
               const SizedBox(height: 28),
               Text(
                 'CulinaryAI',

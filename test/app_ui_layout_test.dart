@@ -111,6 +111,18 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('CulinaryAI').hitTestable(), findsOneWidget);
       await capture('home');
+      if (config.$1 == 'phone') {
+        await tester.tap(find.byTooltip('Account menu'));
+        await tester.pumpAndSettle();
+        final aboutInMenu = find.widgetWithText(ListTile, 'About CulinaryAI');
+        await tester.ensureVisible(aboutInMenu);
+        await tester.pumpAndSettle();
+        await tester.tap(aboutInMenu);
+        await tester.pumpAndSettle();
+        expect(find.text('Waseeq Ahmed Siddiqui'), findsOneWidget);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+      }
       // The feature directory must lead to the real expiry editor, including
       // when pantry search/zone filters would otherwise hide an ingredient.
       final featureLabel = find.text('All features');
@@ -182,6 +194,22 @@ void main() {
           reason: '${config.$1}: ${tab.$2}',
         );
         await capture(tab.$2);
+        if (tab.$2 == 'profile') {
+          final about = find.widgetWithText(ListTile, 'About CulinaryAI');
+          await tester.ensureVisible(about);
+          await tester.pumpAndSettle();
+          await tester.tap(about);
+          await tester.pumpAndSettle();
+          expect(
+            find.text('Waseeq Ahmed Siddiqui').hitTestable(),
+            findsOneWidget,
+          );
+          expect(find.text('Developer'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          await capture('about');
+          await tester.pageBack();
+          await tester.pumpAndSettle();
+        }
         if (tab.$2 == 'pantry' && config.$1 == 'phone') {
           final pantry = tester
               .element(find.byType(Scaffold).first)

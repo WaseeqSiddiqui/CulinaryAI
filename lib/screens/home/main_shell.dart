@@ -19,6 +19,7 @@ import '../pantry/pantry_screen.dart';
 import '../pantry/expiry_overview_screen.dart';
 import 'kitchen_features_screen.dart';
 import '../profile/profile_screen.dart';
+import '../profile/about_screen.dart';
 import '../scanner/fridge_scanner_screen.dart';
 import '../scanner/receipt_scanner_screen.dart';
 import '../shopping/shopping_list_screen.dart';
@@ -1906,6 +1907,19 @@ class _KitchenDrawer extends StatelessWidget {
                       shell?.switchToTab(4);
                     },
                   ),
+                  _DrawerNavTile(
+                    icon: Icons.info_outline_rounded,
+                    title: 'About CulinaryAI',
+                    subtitle: 'App information and developer credit',
+                    isDark: isDark,
+                    onTap: () {
+                      final navigator = Navigator.of(context);
+                      navigator.pop();
+                      navigator.push<void>(
+                        MaterialPageRoute(builder: (_) => const AboutScreen()),
+                      );
+                    },
+                  ),
 
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 8),
@@ -1954,15 +1968,6 @@ class _KitchenDrawer extends StatelessWidget {
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'CulinaryAI Pro • v2.4 Smart Kitchen',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: subColor.withValues(alpha: 0.6),
-                      letterSpacing: 0.5,
                     ),
                   ),
                 ],
