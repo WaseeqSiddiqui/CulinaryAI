@@ -52,5 +52,39 @@ class SubscriptionApiService {
     );
   }
 
+  Future<Map<String, dynamic>> billingConfiguration() async {
+    final response = await _client
+        .get(_base.resolve('/subscription/plans'))
+        .timeout(const Duration(seconds: 12));
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Subscription checkout is unavailable. Please try again.',
+      );
+    }
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  Future<SubscriptionStatus> verifyPlayPurchase(String purchaseToken) async {
+    final response = await _client
+        .post(
+          _base.resolve('/subscription/google-play/verify'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'purchase_token': purchaseToken}),
+        )
+        .timeout(const Duration(seconds: 35));
+    if (response.statusCode != 200) {
+      throw Exception(
+        backendErrorMessage(response.body) ?? 'Payment verification could not finish. Please try Restore purchases.',
+      );
+    }
+    final decoded = jsonDecode(response.body) as Map;
+    if (decoded['verified'] != true) {
+      throw Exception('Payment has not been verified yet.');
+    }
+    return SubscriptionStatus.fromJson(
+      Map<String, dynamic>.from(decoded['subscription'] as Map),
+    );
+  }
+
   void close() => _client.close();
 }

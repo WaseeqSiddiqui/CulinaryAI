@@ -66,12 +66,14 @@ path and the shared content/schema types. Some internal schema names retain
 their historic `Gemini` prefix for compatibility; Groq mode sends their data to
 Groq only.
 
-## Free / Plus allowances (payment setup pending)
+## Free / Plus allowances and Google Play subscriptions
 
 The app exposes plan details from Profile and Request a dish. Free includes
 20 Chef requests and 3 photo scans per UTC calendar month. Plus is displayed as
-PKR 999/month with 500 Chef requests and 50 photo scans. Checkout is disabled;
-no endpoint lets a client grant itself Plus or submit an unverified payment.
+PKR 999/month with 500 Chef requests and 50 photo scans. The app displays Google's
+actual localized monthly price when the product is available. Checkout stays
+disabled until `GOOGLE_PLAY_BILLING_ENABLED=true` is configured after store setup.
+No endpoint lets a client grant itself Plus or submit an unverified payment.
 
 Chef requests include chat, detailed cooking guidance, shopping normalization
 and AI product matching. All four photo endpoints share one pool. Manual pantry
@@ -110,10 +112,62 @@ authentication. User quota exhaustion returns HTTP 429 with
 `detail.code=quota_exceeded` and `X-Usage-Limit: exceeded`; provider rate limits
 remain retryable provider errors and never trigger an upgrade prompt.
 
-Future payment verification can write `billing_entitlements/{uid}` with `plan`
-`plus`, `status` `active`, and a future `expires_at` timestamp. Only trusted
-payment verification or an administrator may write this document. No payment
-processing or production quota activation is implied by the plan preview.
+`POST /subscription/google-play/verify` accepts only a purchase token with a
+verified Firebase bearer token. The server queries Google's subscriptionsv2 API,
+checks the product/base plan and SHA-256 Firebase account binding, writes a
+server-owned entitlement transactionally, then acknowledges the purchase. Replays
+do not add usage credits or duplicate subscription periods. A purchase token cannot
+move between accounts. Replacements supersede linked old tokens. Raw purchase
+tokens remain in backend-only `billing_play_purchases` documents and never appear
+in public status responses or application error messages.
+
+Before every metered request and every `/subscription/me` read, Google Play
+entitlements are reverified. Canceled subscriptions keep paid access until expiry;
+grace periods retain access; pending, expired, paused, refunded/revoked or on-hold
+purchases do not grant Plus. Provider outages fail closed for paid access. Very
+old expired tokens returning HTTP 410 fall back to Free rather than blocking the
+account permanently. Background notifications are not required by this flow:
+renewal/refund changes are applied on the next server access check. No user-facing
+code trusts an Android purchase success callback to grant access.
+
+### Play Console setup (required before real payments)
+
+1. The owner creates/verifies their [Play Console account](https://play.google.com/console/signup),
+   accepts the agreement and pays Google's registration fee themselves. Create the
+   app with package `com.enterprise.culinaryAI`, configure the payments profile,
+   and complete the required store privacy/subscription information.
+2. Configure a private upload signing key and Play App Signing before uploading a
+   release AAB. The repository's existing release build currently uses the debug
+   signing key; it is not a production upload-signing setup. Test APKs provided
+   locally are not Play Store releases. Billing requires Android API 24+ with the
+   selected official Flutter plugin.
+3. Under **Monetize with Play → Products → Subscriptions**, create product
+   `culinary_plus_monthly`, auto-renewing base plan `monthly`, billing period one
+   month, and PKR 999 Pakistan pricing. Set other regional prices and activate the
+   base plan. The app deliberately selects the ordinary monthly base plan, not
+   introductory offers. Do not rename these IDs without updating client/server.
+4. Enable the Google Play Android Developer API in the service account's Cloud
+   project. In Play Console Users and permissions, grant the existing backend
+   service-account email app-specific access to **View financial data, orders,
+   and cancellation survey responses** and **Manage orders and subscriptions**.
+   The server uses its existing Firebase/Google service-account credential with
+   the Android Publisher scope. No Play API key belongs in Flutter.
+5. Deploy backend code and Firestore rules. Set
+   `GOOGLE_PLAY_BILLING_ENABLED=true` only for license testing once API permissions
+   and the active product are ready. Free usage and restaurant search do not
+   require this flag. Checkout remains disabled by default.
+6. Upload an appropriately signed AAB to an internal testing track. Add license
+   testers, install through the Play test link, and use Google's test payment
+   methods. Verify successful/pending/declined checkout, cancel, restore after
+   reinstall, renewal, refund/revoke, account switching and server outage retry.
+   The app must show the store price and Plus only after server verification.
+   Public paid release requires completion of this real store test, which is
+   not covered by unit tests or a sideloaded debug APK.
+
+References: [API setup](https://developers.google.com/android-publisher/getting_started),
+[subscription lifecycle](https://developer.android.com/google/play/billing/lifecycle/subscriptions),
+[purchase verification](https://developer.android.com/google/play/billing/security),
+[subscription products](https://support.google.com/googleplay/android-developer/answer/140504).
 
 ## API examples
 

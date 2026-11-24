@@ -84,14 +84,17 @@ void main() {
           image.dispose();
         });
       }
-      await tester.scrollUntilVisible(find.text('Payments coming soon'), 220);
-      expect(find.text('PKR 999 / month'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Subscribe with Google Play'),
+        220,
+      );
+      expect(find.text('Price available on Google Play'), findsOneWidget);
       expect(find.text('500 Chef requests / month'), findsOneWidget);
       expect(find.text('50 photo scans / month'), findsOneWidget);
       expect(
         tester
             .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Payments coming soon'),
+              find.widgetWithText(FilledButton, 'Subscribe with Google Play'),
             )
             .onPressed,
         isNull,
@@ -122,7 +125,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Monthly allowance reached'), findsOneWidget);
-    expect(find.textContaining('Payments are coming soon'), findsOneWidget);
+    expect(find.textContaining('subscription availability'), findsOneWidget);
     await tester.tap(find.text('Close'));
     await tester.pumpAndSettle();
     expect(find.text('Kitchen'), findsOneWidget);

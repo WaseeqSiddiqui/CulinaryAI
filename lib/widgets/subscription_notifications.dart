@@ -37,7 +37,7 @@ class _SubscriptionNotificationsState extends State<SubscriptionNotifications> {
       builder: (context) => AlertDialog(
         title: const Text('Monthly allowance reached'),
         content: Text(
-          '${notice.message}${notice.resetsAt == null ? '' : '\n\nResets ${DateFormat('d MMM yyyy').format(notice.resetsAt!.toLocal())}.'}${notice.plan == 'free' ? '\n\nPlus includes a larger monthly allowance. Payments are coming soon.' : ''}',
+          '${notice.message}${notice.resetsAt == null ? '' : '\n\nResets ${DateFormat('d MMM yyyy').format(notice.resetsAt!.toLocal())}.'}${notice.plan == 'free' ? '\n\nView Plus for a larger monthly allowance and subscription availability.' : ''}',
         ),
         actions: [
           TextButton(

@@ -29,6 +29,9 @@ service cloud.firestore {
     match /billing_reservations/{reservationId} {
       allow read, write: if false;
     }
+    match /billing_play_purchases/{purchaseId} {
+      allow read, write: if false;
+    }
 
     match /users/{userId} {
       allow read, create: if signedIn() && request.auth.uid == userId;

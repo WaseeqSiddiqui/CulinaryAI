@@ -15,6 +15,7 @@ import 'screens/home/main_shell.dart';
 import 'screens/startup/splash_screen.dart';
 import 'services/firebase_service.dart';
 import 'services/server_config_service.dart';
+import 'services/play_billing_service.dart';
 import 'widgets/subscription_notifications.dart';
 
 void main() async {
@@ -37,6 +38,10 @@ class CulinaryAiApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(
+          create: (_) => PlayBillingController(),
+          lazy: false,
+        ),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => RecipeExperienceProvider()),
         ChangeNotifierProxyProvider<AuthProvider, HouseholdProvider>(

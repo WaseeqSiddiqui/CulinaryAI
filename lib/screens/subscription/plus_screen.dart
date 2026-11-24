@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/subscription_api_service.dart';
+import '../../services/play_billing_service.dart';
 import '../../widgets/app_ui.dart';
 
 class PlusScreen extends StatefulWidget {
-  const PlusScreen({super.key, this.service});
+  const PlusScreen({super.key, this.service, this.billing});
   final SubscriptionApiService? service;
+  final PlayBillingController? billing;
   @override
   State<PlusScreen> createState() => _PlusScreenState();
 }
@@ -16,11 +20,25 @@ class _PlusScreenState extends State<PlusScreen> {
   SubscriptionStatus? _status;
   bool _loading = true;
   bool _failed = false;
+  late final PlayBillingController _billing;
+  late final bool _ownsBilling;
 
   @override
   void initState() {
     super.initState();
+    final shared = context.read<PlayBillingController?>();
+    _billing = widget.billing ?? shared ?? PlayBillingController();
+    _ownsBilling = widget.billing == null && shared == null;
+    _billing.addListener(_billingChanged);
+    _billing.load();
     _load();
+  }
+
+  void _billingChanged() {
+    if (!mounted) return;
+    setState(() {
+      if (_billing.verifiedStatus != null) _status = _billing.verifiedStatus;
+    });
   }
 
   Future<void> _load() async {
@@ -41,6 +59,8 @@ class _PlusScreenState extends State<PlusScreen> {
   @override
   void dispose() {
     if (widget.service == null) _service.close();
+    _billing.removeListener(_billingChanged);
+    if (_ownsBilling) _billing.dispose();
     super.dispose();
   }
 
@@ -118,9 +138,11 @@ class _PlusScreenState extends State<PlusScreen> {
           const SizedBox(height: 20),
           const _PlanCard(name: 'Free', price: 'PKR 0', chat: 20, photos: 3),
           const SizedBox(height: 14),
-          const _PlanCard(
+          _PlanCard(
             name: 'CulinaryAI Plus',
-            price: 'PKR 999 / month',
+            price: _billing.product == null
+                ? 'Price available on Google Play'
+                : '${_billing.product!.price} / month',
             chat: 500,
             photos: 50,
             plus: true,
@@ -134,13 +156,57 @@ class _PlusScreenState extends State<PlusScreen> {
             'Failed AI requests do not use your allowance. Pantry tracking and manual updates remain available when your AI allowance is used up.',
           ),
           const SizedBox(height: 20),
-          const FilledButton(
-            onPressed: null,
-            child: Text('Payments coming soon'),
+          FilledButton(
+            onPressed:
+                _billing.canBuy && _status != null && _status!.plan != 'plus'
+                ? _billing.purchase
+                : null,
+            child: Text(
+              _billing.busy
+                  ? 'Checking payment...'
+                  : _status?.plan == 'plus'
+                  ? 'Plus is active'
+                  : 'Subscribe with Google Play',
+            ),
           ),
           const SizedBox(height: 8),
+          if (_billing.message != null)
+            Text(_billing.message!, textAlign: TextAlign.center),
+          TextButton(
+            onPressed: _billing.canRestore ? _billing.restore : null,
+            child: const Text('Restore purchases'),
+          ),
+          if (_billing.canRetry)
+            TextButton(
+              onPressed: _billing.retryVerification,
+              child: const Text('Retry payment verification'),
+            ),
+          if (_status?.plan == 'plus')
+            TextButton(
+              onPressed: () async {
+                final opened = await launchUrl(
+                  Uri.https('play.google.com', '/store/account/subscriptions', {
+                    'sku': plusProductId,
+                    'package': 'com.enterprise.culinaryAI',
+                  }),
+                  mode: LaunchMode.externalApplication,
+                );
+                if (!opened && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Open Google Play → Payments & subscriptions to manage Plus.',
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: const Text('Manage Google Play subscription'),
+            ),
           Text(
-            'No payment will be collected here yet.',
+            'Monthly subscription. Google Play shows the final local price before you confirm. '
+            'Renews automatically until canceled in Google Play. Cancellation stops the next renewal; '
+            'access continues until the paid period ends. Monthly AI allowances reset on the 1st (UTC); unused allowance does not roll over.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall,
           ),
@@ -204,7 +270,6 @@ class _PlanCard extends StatelessWidget {
         Text('$chat Chef requests / month'),
         const SizedBox(height: 6),
         Text('$photos photo scans / month'),
-        if (plus) ...[const SizedBox(height: 10), const Text('Coming soon')],
       ],
     ),
   );

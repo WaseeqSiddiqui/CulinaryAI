@@ -49,12 +49,15 @@ def active_plan(entitlement, now):
 
 
 def usage_snapshot(entitlement, usage, now):
+    from app.services.play_billing import checkout_enabled
     plan = active_plan(entitlement, now)
     return {
         "plan": plan, "period": period_at(now), "resets_at": next_reset(now).isoformat(),
         "limits": PLAN_LIMITS[plan],
         "used": {kind: max(0, int(usage.get(kind, 0))) for kind in ("chat", "photo")},
-        "checkout_enabled": False,
+        "checkout_enabled": checkout_enabled(),
+        "billing_provider": entitlement.get("provider"),
+        "subscription_expires_at": entitlement.get("expires_at"),
     }
 
 
@@ -203,6 +206,7 @@ class SubscriptionService:
     def __init__(self, store=None, clock=None):
         self.store = store or FirestoreUsageStore()
         self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.entitlement_refresher = None
 
     def verify_user(self, authorization):
         return self.store.verify_user(authorization)
@@ -219,6 +223,8 @@ class SubscriptionService:
 
     def view(self, uid):
         try:
+            if self.entitlement_refresher:
+                self.entitlement_refresher(uid)
             return self.store.view(uid, self.clock())
         except HTTPException:
             raise
@@ -227,6 +233,8 @@ class SubscriptionService:
 
     def reserve(self, uid, kind):
         try:
+            if self.entitlement_refresher:
+                self.entitlement_refresher(uid)
             return self.store.reserve(uid, kind, self.clock())
         except HTTPException:
             raise

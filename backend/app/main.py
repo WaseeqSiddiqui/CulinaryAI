@@ -9,6 +9,7 @@ load_dotenv()
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.schemas import (
     GeneratePlanRequest,
@@ -48,6 +49,7 @@ from app.services.restaurant_search import RestaurantSearchService, RestaurantSe
 from app.services.dish_recipe_lookup import DishRecipeLookup
 from app.services.subscription_service import PLAN_LIMITS, SubscriptionService, usage_limits_enabled
 from app.services.usage_middleware import UsageLimitMiddleware
+from app.services.play_billing import PlayBillingService, checkout_enabled, PRODUCT_ID, BASE_PLAN_ID
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -62,6 +64,8 @@ recipe_discovery = LiveRecipeDiscoveryService()
 dish_options = DishOptionsService(recipe_discovery.provider, fallback=DishRecipeLookup())
 restaurant_search = RestaurantSearchService()
 subscriptions = SubscriptionService()
+play_billing = PlayBillingService(subscriptions.store)
+subscriptions.entitlement_refresher = play_billing.refresh
 
 app = FastAPI(
     title="CulinaryAI API",
@@ -117,12 +121,26 @@ def subscription_plans():
     return {"plans": [
         {"id": "free", "name": "Free", "price_pkr": 0, "limits": PLAN_LIMITS["free"]},
         {"id": "plus", "name": "CulinaryAI Plus", "price_pkr": 999, "limits": PLAN_LIMITS["plus"]},
-    ], "checkout_enabled": False}
+    ], "checkout_enabled": checkout_enabled(), "billing_provider": "google_play",
+        "product_id": PRODUCT_ID, "base_plan_id": BASE_PLAN_ID}
 
 
 @app.get("/subscription/me")
 def subscription_status(authorization: str | None = Header(default=None)):
     return subscriptions.view(subscriptions.verify_user(authorization))
+
+
+class PlayPurchaseRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    purchase_token: str = Field(min_length=1, max_length=4096, repr=False)
+
+
+@app.post("/subscription/google-play/verify")
+def verify_play_purchase(request: PlayPurchaseRequest, authorization: str | None = Header(default=None)):
+    uid = subscriptions.verify_user(authorization)
+    purchase = play_billing.verify(uid, request.purchase_token)
+    return {"verified": True, "subscription_state": purchase.state,
+            "subscription": subscriptions.store.view(uid, subscriptions.clock())}
 
 
 @app.post("/dish-options", response_model=DishOptionsResponse)
