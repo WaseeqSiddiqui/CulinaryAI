@@ -61,7 +61,7 @@ vision_service = KitchenAIService(catalog_service=catalog_service)
 fridge_reconciler = FridgeReconciler(catalog=catalog_service)
 product_matcher = ProductMatcher()
 recipe_discovery = LiveRecipeDiscoveryService()
-dish_options = DishOptionsService(recipe_discovery.provider, fallback=DishRecipeLookup())
+dish_options = DishOptionsService(recipe_discovery.provider, fallback=DishRecipeLookup(), production=recipe_discovery.production)
 restaurant_search = RestaurantSearchService()
 subscriptions = SubscriptionService()
 play_billing = PlayBillingService(subscriptions.store)
@@ -144,8 +144,10 @@ def verify_play_purchase(request: PlayPurchaseRequest, authorization: str | None
 
 
 @app.post("/dish-options", response_model=DishOptionsResponse)
-async def check_dish(request: DishOptionsRequest) -> DishOptionsResponse:
+async def check_dish(request: DishOptionsRequest, authorization: str | None = Header(default=None)) -> DishOptionsResponse:
     try:
+        if dish_options.production_enabled:
+            await asyncio.to_thread(subscriptions.verify_user, authorization)
         return await asyncio.to_thread(dish_options.check, request)
     except RecipeProviderUnavailable:
         raise HTTPException(status_code=503, detail="The recipe source could not be reached. Please retry the pantry check.") from None
@@ -195,8 +197,10 @@ def generate_plan(request: GeneratePlanRequest) -> GeneratePlanResponse:
 
 
 @app.post("/discover-recipes", response_model=RecipeDiscoveryResponse)
-def discover_recipes(request: RecipeDiscoveryRequest) -> RecipeDiscoveryResponse:
+def discover_recipes(request: RecipeDiscoveryRequest, authorization: str | None = Header(default=None)) -> RecipeDiscoveryResponse:
     try:
+        if recipe_discovery.production_enabled:
+            subscriptions.verify_user(authorization)
         return recipe_discovery.discover(request)
     except RecipeProviderUnavailable as error:
         raise HTTPException(status_code=503, detail=str(error)) from None

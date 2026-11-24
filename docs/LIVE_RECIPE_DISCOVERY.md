@@ -5,11 +5,12 @@ does not read `verified_recipes.json`, the Flutter recipe catalog, or a generate
 recipe from a language model. General chat uses the separately configured Groq
 text model, while this discovery path retrieves actual recipe sources.
 
-The backend calls TheMealDB's live ingredient-filter and name-search tools,
-then retrieves full ingredient details for candidate recipes. Ingredient names
-in the current pantry determine the searches. Title searches also surface meals
-centered on those foods. Every displayed recipe comes from an actual provider
-record and links to its recipe page.
+The Recipes tab also offers publisher search. Set the backend's
+`SPOONACULAR_API_KEY` to use Spoonacular for both pantry discovery and **Request
+a dish**. Search results use the publisher's name, recipe URL, ingredients,
+servings and available time estimate. Spoonacular search calls are bounded and
+require a signed-in user. Without that key, the backend uses the existing
+TheMealDB configuration.
 
 Chef Chat shows three quick prompts and requests at most three recipes. Its
 country control defaults to the device region (labelled as such), remembers a
@@ -19,8 +20,9 @@ the user can enter any country. Only the country is sent with chat and recipe
 requests, not the GPS coordinates or street address.
 
 Country-specific dish searches and cuisine filters bring familiar meals into
-the candidate set. Pakistani preferences include biryani, karahi, dal and
-chapati; other supported countries use their own cuisine and dish searches.
+the candidate set. Spoonacular does not list Pakistani as a cuisine filter, so
+the backend searches for dish names such as karahi, biryani and masoor dal based
+on the pantry. Coverage depends on the upstream catalog.
 Explicit cuisine requests override this default. Suitable local matches rank
 first, and the response explains when only other cuisines match the pantry.
 
@@ -50,10 +52,10 @@ first, and the response explains when only other cuisines match the pantry.
 - No staples are silently assumed. Unknown amounts, ranges, pack weights,
   count-to-weight conversions and cup-to-ml conversions remain uncertain.
 
-The provider does not supply reliable serving counts, cooking times or nutrition
-for these records. The UI says so and compares the original listed quantities.
-It opens the actual recipe for cooking instructions instead of inventing a
-serving multiplier or importing unsupported values into guided cooking.
+The UI compares the source's original listed quantities and opens the
+publisher's recipe for instructions. When available, it shows the publisher's
+servings and time estimate. In-app guided recipes and the weekly planner use
+their own catalog.
 
 An empty pantry returns an inventory message without an external search. No
 matching recipes returns an honest empty result. Provider errors produce a
@@ -61,15 +63,27 @@ retry message, with no silent local-demo fallback. Partial failures are identifi
 
 ## Configuration
 
-The API uses `MEALDB_API_KEY` on the backend. With no setting, it uses TheMealDB's
-documented development key `1`. Public app-store distribution requires a
-supporter production key under the provider's terms:
-https://www.themealdb.com/api.php
+1. Use a [Spoonacular plan](https://spoonacular.com/food-api/pricing) suited to
+   your expected traffic and approved app use.
+2. Add `SPOONACULAR_API_KEY` under **Render → Environment**, then deploy the
+   backend. Keep this key server-side.
+3. In a signed-in test account, try a pantry search, **Request a dish** and click
+   through to the credited publisher before shipping. Test Pakistani coverage
+   with dishes your users commonly request.
+
+Spoonacular results are fetched for each search and are not persisted or
+cached by the backend. API cost depends on query volume and the provider plan.
+See [API documentation](https://spoonacular.com/food-api/docs) and
+[provider terms](https://spoonacular.com/food-api/terms).
+
+For legacy TheMealDB mode, `MEALDB_API_KEY=1` is the documented development
+key. A public app-store release using TheMealDB needs its paid supporter key.
+[TheMealDB API guide](https://www.themealdb.com/api.php)
 
 No Groq or Gemini key is needed for this feature. Live recipe discovery works
 independently of the text and vision models.
 
-Ingredient searches are cached for 10 minutes and full recipe records for one
+Legacy TheMealDB ingredient searches are cached for 10 minutes and full recipe records for one
 hour, with a bounded 256-entry cache. Network concurrency is limited to four.
 The client allows 75 seconds for a cold discovery request. These caches contain
 provider data; recipe-to-inventory decisions are never cached.

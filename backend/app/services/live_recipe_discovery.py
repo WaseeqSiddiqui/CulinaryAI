@@ -1,8 +1,4 @@
-"""Live recipe tools: ingredient search -> recipe lookup -> inventory checks.
-
-No local recipe catalog or generative model participates in this path.
-Only provider responses are cached; pantry decisions are recomputed each time.
-"""
+"""Retrieve source recipes and check them against current inventory."""
 
 from collections import Counter, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
@@ -29,14 +25,11 @@ from app.services.recipe_inventory import (
     plan_date,
 )
 from app.services.regional_food import regional_match, regional_preference
+from app.services.spoonacular_recipes import RecipeProviderUnavailable, RecipeSource, SpoonacularRecipes, normalize_dish, public_link
 
 # Production provider keys live in the URL path. Don't let HTTP debug logging
 # turn them into ordinary application logs.
 logging.getLogger("httpx").setLevel(logging.WARNING)
-
-
-class RecipeProviderUnavailable(Exception):
-    pass
 
 
 class TheMealDBClient:
@@ -132,24 +125,10 @@ _QUESTION_WORDS = {
     "pantry", "inventory", "please", "suggest", "recommend", "give", "show", "me", "some",
     "ideas", "idea", "dinner", "lunch", "breakfast", "how", "to", "do", "of", "and",
     "quick", "easy", "healthy", "vegetarian", "vegan", "day", "after", "next", "this",
+    "find", "using", "want", "need", "use", "without", "avoid", "leftover",
+    "something", "fast", "minutes", "mins", "halal", "pescatarian", "or",
     "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
 }
-
-
-def public_link(value: object) -> str | None:
-    if not isinstance(value, str) or len(value) > 2048:
-        return None
-    try:
-        uri = urlparse(value.strip())
-        if uri.scheme != "https" or not uri.hostname or uri.username or uri.password or uri.port not in (None, 443):
-            return None
-        # These links are displayed only, never fetched by this backend.
-        host = uri.hostname.lower()
-        if "." not in host or host.endswith((".local", ".internal", ".localhost")) or re.fullmatch(r"[\d.]+", host) or ":" in host:
-            return None
-        return uri.geturl()
-    except ValueError:
-        return None
 
 
 def raw_ingredients(record: dict) -> list[tuple[str, str]]:
@@ -162,9 +141,28 @@ def raw_ingredients(record: dict) -> list[tuple[str, str]]:
     return result
 
 
+def mealdb_recipe(record):
+    recipe_id = str(record["idMeal"])
+    image = public_link(record.get("strMealThumb"))
+    if image and urlparse(image).hostname not in ("www.themealdb.com", "themealdb.com"):
+        image = None
+    return RecipeSource(
+        id=f"mealdb_{recipe_id}", name=record["strMeal"][:180],
+        ingredients=raw_ingredients(record), publisher="TheMealDB",
+        url=f"https://www.themealdb.com/meal.php?c={recipe_id}",
+        original_url=public_link(record.get("strSource")), image=image or "",
+        cuisine=str(record.get("strArea") or "")[:80], category=str(record.get("strCategory") or "")[:80],
+    )
+
+
 class LiveRecipeDiscoveryService:
-    def __init__(self, provider: TheMealDBClient | None = None):
+    def __init__(self, provider: TheMealDBClient | None = None, production: SpoonacularRecipes | None = None):
         self.provider = provider or TheMealDBClient()
+        self.production = production if production is not None else (SpoonacularRecipes() if provider is None else None)
+
+    @property
+    def production_enabled(self):
+        return bool(self.production and self.production.enabled)
 
     def discover(self, request: RecipeDiscoveryRequest) -> RecipeDiscoveryResponse:
         day = plan_date(request)
@@ -186,12 +184,12 @@ class LiveRecipeDiscoveryService:
         response.searched_ingredients = queries
         vocabulary_method = getattr(self.provider, "ingredient_vocabulary", None)
         vocabulary = []
-        if vocabulary_method:
+        if vocabulary_method and not self.production_enabled:
             try:
                 vocabulary = vocabulary_method()
             except RecipeProviderUnavailable:
                 pass
-        vocabulary += ["egg", "eggs", "rice", "pasta", "chicken", "beef", "tomato", "tomatoes", "potato", "potatoes", "spinach", "milk", "flour", "garlic", "onion", "onions"]
+        vocabulary += names + ["egg", "eggs", "rice", "pasta", "chicken", "beef", "tomato", "tomatoes", "potato", "potatoes", "spinach", "milk", "flour", "garlic", "onion", "onions"]
         query_text = request.question.lower()
         requested_foods = {canonical_name(label) for label in vocabulary if re.search(rf"\b{re.escape(label.lower())}\b", query_text)}
         requested_foods = {food for food in requested_foods if not any(food != other and re.search(rf"\b{re.escape(food)}\b", other) for other in requested_foods)}
@@ -203,6 +201,107 @@ class LiveRecipeDiscoveryService:
         effective_request = request.model_copy(update={"avoid_ingredients": [*request.avoid_ingredients, *excluded_foods]})
         tokens = [word for word in re.findall(r"[a-z]+", request.question.lower()) if word not in _QUESTION_WORDS and len(word) > 2]
         cuisine, local_dishes = regional_preference(request.country, request.question)
+        use_production = self.production_enabled
+        if use_production:
+            terms = re.sub(r"\b(?:without|no|avoid)\b.*", "", query_text)
+            terms = [word for word in re.findall(r"[a-z]+", terms)
+                     if word not in _QUESTION_WORDS and word not in cuisine.lower().split() and len(word) > 2]
+            records, failures = self.production.pantry(names, terms, cuisine, effective_request)
+            response.provider = "Spoonacular"
+            response.provider_url = "https://spoonacular.com/food-api"
+            response.retrieval_method = "spoonacular-recipe-search"
+            response.source_quantities_note = (
+                "Pantry matching uses the publisher's original ingredient amounts and portions. "
+                "Check labels and allergens before cooking. Serving sizes are not rescaled."
+            )
+        else:
+            records, failures = self._mealdb_records(names, queries, tokens, cuisine, local_dishes)
+        matches = []
+        for record in records:
+            raw = record.ingredients
+            response.checked_recipe_count += 1
+            if not allowed_by_diet(raw, effective_request):
+                continue
+            if re.search(r"\b(dinner|lunch|supper)\b", query_text) and record.category.lower() == "dessert":
+                continue
+            if use_production and request.max_cook_time_minutes and (
+                record.minutes is None or record.minutes > request.max_cook_time_minutes
+            ):
+                continue
+            searchable = " ".join([canonical_name(record.name), *(canonical_name(name) for name, _ in raw)])
+            def mentions(food):
+                terms = {food}
+                if food == "pasta":
+                    terms |= {"spaghetti", "penne", "macaroni", "fusilli", "linguine", "fettuccine", "rigatoni"}
+                return any(re.search(rf"\b{re.escape(term)}\b", searchable) for term in terms)
+            if requested_foods:
+                matches_requested = [mentions(food) for food in requested_foods]
+                if not (any(matches_requested) if " or " in query_text else all(matches_requested)):
+                    continue
+            checks = check_ingredients(raw, pantry)
+            main = [item for item in checks if canonical_name(item.name) not in _BASICS | record.seasonings]
+            present = [item for item in main if item.status != "missing"]
+            anchors = [item for item in main if canonical_name(item.name) not in _AROMATICS]
+            title = set(normalize_dish(record.name).split())
+            anchor = next((item for item in anchors if set(canonical_name(item.name).split()) & title),
+                          anchors[0] if anchors else None)
+            # A single shared spice never makes a recipe a pantry suggestion.
+            # The recipe's primary food must also be present: garlic and butter
+            # cannot justify recommending frog legs when there are none in stock.
+            if not main or anchor is None or anchor.status == "missing" or len(present) / len(main) < 0.5:
+                continue
+            available = sum(item.status == "available" for item in checks)
+            ready = available == len(checks)
+            recipe = DiscoveredRecipe(
+                recipe_id=record.id, name=record.name, source=record.publisher,
+                cuisine=record.cuisine, category=record.category, image_url=record.image,
+                source_url=record.url, original_source_url=record.original_url,
+                ingredients=checks, pantry_match_percent=round(100 * available / len(checks)),
+                can_cook_now=ready, servings=record.servings, cook_time_minutes=record.minutes,
+            )
+            # Prioritize familiar local meals after inventory/diet checks, then
+            # complete quantities, coverage, relevance and expiring stock.
+            urgency = sum(item.expiry_date is not None and (item.expiry_date - day).days <= 3 and any(canonical_name(check.name) == canonical_name(item.name) for check in checks) for item in pantry)
+            local = regional_match(recipe.name, recipe.cuisine, cuisine, local_dishes)
+            score = (local, ready, available / len(checks), len(present) / len(main),
+                     sum(word in normalize_dish(recipe.name) for word in tokens), urgency)
+            matches.append((score, recipe))
+        matches.sort(key=lambda item: item[0], reverse=True)
+        if use_production:
+            unique = {}
+            for _, recipe in matches:
+                unique.setdefault(normalize_dish(recipe.name), recipe)
+            response.meals = list(unique.values())[:request.meal_count]
+        else:
+            response.meals = [recipe for _, recipe in matches[:request.meal_count]]
+        ready_count = sum(recipe.can_cook_now for recipe in response.meals)
+        if response.meals:
+            response.message = (
+                f"I found {ready_count} recipe{'s' if ready_count != 1 else ''} whose listed ingredients and quantities are covered by your pantry."
+                if ready_count else
+                "I found recipes close to your pantry, but none has every listed quantity confirmed. Check the missing ingredients and quantities below."
+            )
+        else:
+            response.message = "I searched live recipes, but found no close matches for your usable inventory and dietary restrictions. No unrelated or demo recipes were substituted."
+        if cuisine and response.meals:
+            if any(regional_match(meal.name, meal.cuisine, cuisine, local_dishes) for meal in response.meals):
+                response.message += f" Familiar {cuisine} meals are prioritized."
+            else:
+                response.message += f" No close {cuisine} matches were available; showing other pantry matches."
+        if day != request.reference_date:
+            response.message += f" This uses your current stock, excluding anything expiring before {day.isoformat()}; future purchases and consumption are not predicted."
+        if failures:
+            response.message += " Some recipe searches or details were unavailable, so these results may be incomplete."
+        if "halal" in " ".join(request.dietary_preferences).lower():
+            response.source_quantities_note += " Check meat certification and packaged ingredients for halal suitability."
+        if request.avoid_ingredients:
+            response.source_quantities_note += " Check packaged ingredient labels against your allergies and dietary needs."
+        unsupported = [item for item in request.dietary_preferences if item not in {"vegan", "vegetarian", "pescatarian", "halal", "gluten-free", "gluten free", "dairy-free", "dairy free", "balanced", "none", "omnivore"}]
+        if unsupported:
+            response.source_quantities_note += f" This source does not verify these preferences: {', '.join(unsupported)}."
+        return response
+
+    def _mealdb_records(self, names, queries, tokens, cuisine, local_dishes):
         searches = [("ingredient", query) for query in queries]
         searches += [("name", dish) for dish in local_dishes]
         if cuisine and callable(getattr(self.provider, "search_area", None)):
@@ -268,80 +367,6 @@ class LiveRecipeDiscoveryService:
             details = sorted(complete.values(), key=local_record, reverse=True)[:40] + list(pool.map(lookup, candidates))
         if candidates and not any(details):
             raise RecipeProviderUnavailable("Recipe search worked, but ingredient details could not be loaded. Please retry.")
-        matches = []
-        for record in details:
-            if not record:
-                continue
-            raw = raw_ingredients(record)
-            if not raw or not isinstance(record.get("strMeal"), str):
-                continue
-            response.checked_recipe_count += 1
-            if not allowed_by_diet(raw, effective_request):
-                continue
-            if re.search(r"\b(dinner|lunch|supper)\b", query_text) and record.get("strCategory", "").lower() == "dessert":
-                continue
-            searchable = " ".join([canonical_name(record["strMeal"]), *(canonical_name(name) for name, _ in raw)])
-            def mentions(food):
-                terms = {food}
-                if food == "pasta":
-                    terms |= {"spaghetti", "penne", "macaroni", "fusilli", "linguine", "fettuccine", "rigatoni"}
-                return any(re.search(rf"\b{re.escape(term)}\b", searchable) for term in terms)
-            if requested_foods:
-                matches_requested = [mentions(food) for food in requested_foods]
-                if not (any(matches_requested) if " or " in query_text else all(matches_requested)):
-                    continue
-            checks = check_ingredients(raw, pantry)
-            main = [item for item in checks if canonical_name(item.name) not in _BASICS]
-            present = [item for item in main if item.status != "missing"]
-            anchor = next((item for item in main if canonical_name(item.name) not in _AROMATICS), None)
-            # A single shared spice never makes a recipe a pantry suggestion.
-            # The recipe's primary food must also be present: garlic and butter
-            # cannot justify recommending frog legs when there are none in stock.
-            if not main or anchor is None or anchor.status == "missing" or len(present) / len(main) < 0.5:
-                continue
-            available = sum(item.status == "available" for item in checks)
-            ready = available == len(checks)
-            recipe_id = str(record["idMeal"])
-            image = public_link(record.get("strMealThumb"))
-            if image and urlparse(image).hostname not in ("www.themealdb.com", "themealdb.com"):
-                image = None
-            recipe = DiscoveredRecipe(
-                recipe_id=f"mealdb_{recipe_id}", name=record["strMeal"][:180],
-                cuisine=str(record.get("strArea") or "")[:80], category=str(record.get("strCategory") or "")[:80],
-                image_url=image or "", source_url=f"https://www.themealdb.com/meal.php?c={recipe_id}",
-                original_source_url=public_link(record.get("strSource")),
-                ingredients=checks, pantry_match_percent=round(100 * available / len(checks)), can_cook_now=ready,
-            )
-            # Prioritize familiar local meals after inventory/diet checks, then
-            # complete quantities, coverage, relevance and expiring stock.
-            urgency = sum(item.expiry_date is not None and (item.expiry_date - day).days <= 3 and any(canonical_name(check.name) == canonical_name(item.name) for check in checks) for item in pantry)
-            score = (local_record(record), ready, available / len(checks), len(present) / len(main), sum(word in recipe.name.lower() for word in tokens), urgency)
-            matches.append((score, recipe))
-        matches.sort(key=lambda item: item[0], reverse=True)
-        response.meals = [recipe for _, recipe in matches[:request.meal_count]]
-        ready_count = sum(recipe.can_cook_now for recipe in response.meals)
-        if response.meals:
-            response.message = (
-                f"I found {ready_count} recipe{'s' if ready_count != 1 else ''} whose listed ingredients and quantities are covered by your pantry."
-                if ready_count else
-                "I found recipes close to your pantry, but none has every listed quantity confirmed. Check the missing ingredients and quantities below."
-            )
-        else:
-            response.message = "I searched live recipes, but found no close matches for your usable inventory and dietary restrictions. No unrelated or demo recipes were substituted."
-        if cuisine and response.meals:
-            if any(regional_match(meal.name, meal.cuisine, cuisine, local_dishes) for meal in response.meals):
-                response.message += f" Familiar {cuisine} meals are prioritized."
-            else:
-                response.message += f" No close {cuisine} matches were available; showing other pantry matches."
-        if day != request.reference_date:
-            response.message += f" This uses your current stock, excluding anything expiring before {day.isoformat()}; future purchases and consumption are not predicted."
-        if failures or any(detail is None for detail in details):
-            response.message += " Some recipe searches or details were unavailable, so these results may be incomplete."
-        if "halal" in " ".join(request.dietary_preferences).lower():
-            response.source_quantities_note += " Check meat certification and packaged ingredients for halal suitability."
-        if request.avoid_ingredients:
-            response.source_quantities_note += " Check packaged ingredient labels against your allergies and dietary needs."
-        unsupported = [item for item in request.dietary_preferences if item not in {"vegan", "vegetarian", "pescatarian", "halal", "gluten-free", "gluten free", "dairy-free", "dairy free", "balanced", "none", "omnivore"}]
-        if unsupported:
-            response.source_quantities_note += f" This source does not verify these preferences: {', '.join(unsupported)}."
-        return response
+        records = [mealdb_recipe(record) for record in details
+                   if record and raw_ingredients(record) and isinstance(record.get("strMeal"), str)]
+        return records, failures + sum(detail is None for detail in details)

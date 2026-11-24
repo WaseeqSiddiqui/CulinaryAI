@@ -4,7 +4,7 @@ import re
 
 # Cuisine labels plus familiar dish searches. Searches still need live sources.
 REGIONS = {
-    "pakistan": ("Pakistani", ("biryani", "karahi", "dal", "chapati")),
+    "pakistan": ("Pakistani", ("biryani", "karahi", "dal", "chapati", "pulao", "keema", "chana masala", "aloo gobi", "aloo palak", "bhindi masala", "nihari", "haleem")),
     "india": ("Indian", ("dal", "masala", "idli")),
     "bangladesh": ("Bangladeshi", ("khichuri", "bhuna")),
     "sri lanka": ("Sri Lankan", ("kottu", "dhal")),

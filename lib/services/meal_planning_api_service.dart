@@ -44,6 +44,7 @@ class MealPlanningApiService {
     required String question,
     required List<PantryItemModel> pantryItems,
     int resultCount = 5,
+    int? maxCookTimeMinutes,
     List<String> dietaryPreferences = const [],
     List<String> avoidIngredients = const [],
     DateTime? referenceDate,
@@ -64,6 +65,8 @@ class MealPlanningApiService {
               if (requestedDate != null)
                 'requested_date': dateOnly(requestedDate),
               'meal_count': resultCount.clamp(1, 7),
+              if (maxCookTimeMinutes != null)
+                'max_cook_time_minutes': maxCookTimeMinutes.clamp(5, 240),
               'dietary_preferences': dietaryPreferences
                   .map((item) => item.trim().toLowerCase())
                   .where(

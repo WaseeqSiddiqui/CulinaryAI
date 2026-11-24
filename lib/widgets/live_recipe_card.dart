@@ -77,6 +77,10 @@ class LiveRecipeCard extends StatelessWidget {
                     [
                       recipe.cuisine,
                       recipe.category,
+                      if (recipe.cookTimeMinutes case final minutes?)
+                        '$minutes min',
+                      if (recipe.servings case final servings?)
+                        '$servings servings',
                     ].where((item) => item.isNotEmpty).join(' · '),
                     style: Theme.of(context).textTheme.bodySmall
                         ?.copyWith(color: colors.onSurfaceVariant),

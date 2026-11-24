@@ -34,6 +34,8 @@ class DiscoveredRecipe {
   final List<RecipeIngredientCheck> ingredients;
   final int pantryMatchPercent;
   final bool canCookNow;
+  final int? servings;
+  final int? cookTimeMinutes;
 
   const DiscoveredRecipe({
     required this.id,
@@ -46,6 +48,8 @@ class DiscoveredRecipe {
     required this.ingredients,
     required this.pantryMatchPercent,
     required this.canCookNow,
+    this.servings,
+    this.cookTimeMinutes,
   });
 
   factory DiscoveredRecipe.fromJson(Map<String, dynamic> json) {
@@ -69,6 +73,8 @@ class DiscoveredRecipe {
       source: json['source'] as String? ?? 'Recipe website',
       sourceUrl: uri,
       ingredients: ingredients,
+      servings: (json['servings'] as num?)?.toInt(),
+      cookTimeMinutes: (json['cook_time_minutes'] as num?)?.toInt(),
       pantryMatchPercent: ((json['pantry_match_percent'] as num?)?.toInt() ?? 0)
           .clamp(0, 100),
       // Do not turn an inconsistent provider response into a ready-to-cook claim.

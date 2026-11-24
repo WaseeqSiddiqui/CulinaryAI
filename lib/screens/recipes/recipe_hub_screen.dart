@@ -5,8 +5,10 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/food_photo.dart';
+import '../../widgets/live_recipe_card.dart';
 import '../../models/backend_meal_recommendation.dart';
 import '../../models/pantry_item_model.dart';
+import '../../models/recipe_discovery.dart';
 import '../../models/recipe_recommendation_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/pantry_provider.dart';
@@ -35,6 +37,7 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
   final _api = MealPlanningApiService(timeout: const Duration(seconds: 15));
   late RecipeSection _mode;
   List<BackendMealRecommendation> _generated = const [];
+  RecipeDiscoveryResult? _discovered;
   bool _loading = false;
   String? _error;
 
@@ -49,6 +52,45 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
     _query.dispose();
     _api.close();
     super.dispose();
+  }
+
+  Future<void> _findRecipes() async {
+    final generation = ++_requestGeneration;
+    final experience = context.read<RecipeExperienceProvider>();
+    final profile = experience.preferences;
+    final userDiet = context
+        .read<AuthProvider>()
+        .currentUser
+        ?.dietaryPreference;
+    setState(() {
+      _loading = true;
+      _error = null;
+      _discovered = null;
+    });
+    try {
+      final result = await _api.discoverRecipes(
+        question: _query.text.trim(),
+        pantryItems: context.read<PantryProvider>().allItems,
+        country: experience.foodCountry,
+        maxCookTimeMinutes: profile.maxCookMinutes,
+        dietaryPreferences: [...profile.dietaryNeeds, ?userDiet],
+        avoidIngredients: [
+          ...profile.allergens,
+          ...profile.dislikedIngredients,
+        ],
+      );
+      if (mounted && generation == _requestGeneration) {
+        setState(() => _discovered = result);
+      }
+    } on MealPlanningApiException catch (error) {
+      if (mounted && generation == _requestGeneration) {
+        setState(() => _error = error.message);
+      }
+    } finally {
+      if (mounted && generation == _requestGeneration) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   Future<void> _generate({required bool weekly}) async {
@@ -362,6 +404,7 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
                           _requestGeneration++;
                           _mode = section.$1;
                           _generated = const [];
+                          _discovered = null;
                           _error = null;
                           _loading = false;
                           _query.clear();
@@ -418,12 +461,45 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
                 const SizedBox(height: 18),
               ],
               if (_mode == RecipeSection.pantry) ...[
-                _MessageCard(
-                  icon: Icons.kitchen_outlined,
-                  message:
-                      'Cooking for ${prefs.servings} people. Change portions or preferences to suit your table.',
+                TextField(
+                  controller: _query,
+                  maxLength: 300,
+                  textInputAction: TextInputAction.search,
+                  decoration: const InputDecoration(
+                    hintText:
+                        'Optional dish or ingredient, e.g. chicken karahi',
+                    prefixIcon: Icon(Icons.search_rounded),
+                    counterText: '',
+                  ),
+                  onSubmitted: (_) {
+                    if (!_loading) _findRecipes();
+                  },
+                ),
+                const SizedBox(height: 10),
+                FilledButton.icon(
+                  onPressed: _loading ? null : _findRecipes,
+                  icon: const Icon(Icons.search_rounded),
+                  label: Text(
+                    _loading
+                        ? 'Finding recipes…'
+                        : 'Find recipes from publishers',
+                  ),
                 ),
                 const SizedBox(height: 18),
+                if (_discovered case final result?) ...[
+                  _MessageCard(
+                    icon: Icons.menu_book_outlined,
+                    message: result.message,
+                  ),
+                  for (final recipe in result.recipes)
+                    LiveRecipeCard(recipe: recipe),
+                  if (result.recipes.isNotEmpty)
+                    Text(
+                      result.quantitiesNote,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  const SizedBox(height: 18),
+                ],
               ],
               if (_mode == RecipeSection.create ||
                   _mode == RecipeSection.macros ||
@@ -467,7 +543,9 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
               if (_error != null)
                 _MessageCard(
                   icon: Icons.cloud_off_outlined,
-                  message: '$_error Showing reliable offline recommendations.',
+                  message: _mode == RecipeSection.pantry
+                      ? _error!
+                      : '$_error Showing reliable offline recommendations.',
                 ),
               if (_mode == RecipeSection.pantry && pantry.useSoonCount > 0)
                 _MessageCard(
@@ -480,6 +558,8 @@ class _RecipeHubScreenState extends State<RecipeHubScreen> {
                     ? 'Your week'
                     : _mode == RecipeSection.saved
                     ? 'Your cookbook'
+                    : _mode == RecipeSection.pantry
+                    ? 'In-app guided recipes'
                     : 'Made for your kitchen',
                 style: Theme.of(context).textTheme.titleLarge
                     ?.copyWith(fontWeight: FontWeight.w600),

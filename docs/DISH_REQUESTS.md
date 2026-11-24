@@ -11,7 +11,8 @@ Expired and zero-quantity items do not cover ingredients. Missing and
 insufficient quantities are listed separately from unknown or incompatible
 units. An empty pantry is checked too. Stock is never changed by this feature.
 
-Named recipes are retrieved from TheMealDB. When a dish is absent there, Tavily
+With `SPOONACULAR_API_KEY` configured, named recipes come from Spoonacular and
+link to the original publisher. In legacy mode, recipes come from TheMealDB. When a dish is absent there, Tavily
 searches a small allowlist of recipe sites. The backend reads actual Recipe
 JSON-LD ingredient lists from those sites and validates the requested dish name.
 It does not invent ingredients or replace chicken with a lamb recipe. Unsupported
