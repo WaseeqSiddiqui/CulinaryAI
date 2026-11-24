@@ -2,45 +2,40 @@ import 'package:flutter/material.dart';
 
 /// Shared colors, typography and controls for every CulinaryAI screen.
 class AppTheme {
-  static const primaryFlame = Color(0xFF263B58);
-  static const primaryFlameLight = Color(0xFFAFC3DF);
-  static const primaryFlameDark = Color(0xFF192A42);
-  static const freshHerb = Color(0xFF2D7B56);
-  static const freshHerbLight = Color(0xFFA9D4B9);
-  static const freshHerbDark = Color(0xFF205B3D);
-  static const accentViolet = Color(0xFF7055C6);
-  static const accentVioletLight = Color(0xFFD7CAFF);
-  static const accentVioletBright = Color(0xFFB9A5FF);
-  static const accentVioletSoft = Color(0xFFF0EAFF);
-  // Compatibility aliases keep existing badges and controls on one palette.
-  static const warmSaffron = accentViolet;
-  static const warmSaffronLight = accentVioletSoft;
-  static const errorRed = Color(0xFFBA2F3D);
+  static const primaryFlame = Color(0xFFA63625);
+  static const primaryFlameLight = Color(0xFFFFE0D3);
+  static const primaryFlameDark = Color(0xFF762418);
+  static const freshHerb = Color(0xFF2D624D);
+  static const freshHerbLight = Color(0xFFDCECE0);
+  static const freshHerbDark = Color(0xFF234C3C);
+  static const warmSaffron = Color(0xFF8B5117);
+  static const warmSaffronLight = Color(0xFFFFEBC9);
+  static const errorRed = Color(0xFFB42334);
   static const successGreen = freshHerb;
   static const primaryEmerald = primaryFlame;
   static const primaryLight = primaryFlameLight;
   static const primaryDark = primaryFlameDark;
-  static const terracottaAccent = accentViolet;
-  static const copperLight = accentVioletLight;
+  static const terracottaAccent = primaryFlame;
+  static const copperLight = primaryFlameLight;
   static const warmAmber = warmSaffron;
-  static const zoneFridge = Color(0xFF3E7C9C);
-  static const zoneFreezer = Color(0xFF7B70B1);
-  static const zonePantry = accentViolet;
-  static const zoneSpice = Color(0xFF5E459F);
-  static const creamWarm = Color(0xFFF7F8FA);
-  static const creamBeige = Color(0xFFEFF0F3);
-  static const creamSurface = Color(0xFFF3F4F6);
-  static const creamBorder = Color(0xFFE3E5EA);
-  static const creamAccent = Color(0xFFEBF0F6);
+  static const zoneFridge = Color(0xFF356B68);
+  static const zoneFreezer = Color(0xFF426A81);
+  static const zonePantry = freshHerb;
+  static const zoneSpice = warmSaffron;
+  static const creamWarm = Color(0xFFFFF7EC);
+  static const creamBeige = Color(0xFFF8E9D9);
+  static const creamSurface = Color(0xFFF9EDE0);
+  static const creamBorder = Color(0xFFE9D5C4);
+  static const creamAccent = Color(0xFFF9DDCF);
   static const bgLight = creamWarm;
-  static const surfaceLight = Colors.white;
+  static const surfaceLight = Color(0xFFFFFCF7);
   static const surfaceLight2 = creamSurface;
   static const cardLight = surfaceLight;
   static const borderLight = creamBorder;
-  static const borderLightSubtle = Color(0xFFF0F1F4);
-  static const textLightPrimary = Color(0xFF23252A);
-  static const textLightSecondary = Color(0xFF62666F);
-  static const textLightMuted = Color(0xFF70747D);
+  static const borderLightSubtle = Color(0xFFF3E6D9);
+  static const textLightPrimary = Color(0xFF35251F);
+  static const textLightSecondary = Color(0xFF6C5548);
+  static const textLightMuted = Color(0xFF735C4F);
   static const bgDark = Color(0xFF141518);
   static const surfaceDark = Color(0xFF1E2025);
   static const cardDark = surfaceDark;
@@ -57,10 +52,10 @@ class AppTheme {
     colors: [primaryFlame, primaryFlameDark],
   );
   static const heroGradient = LinearGradient(
-    colors: [Color(0xFF30323A), Color(0xFF191B21)],
+    colors: [Color(0xFF5D3425), Color(0xFF301A14)],
   );
   static const heroDarkGradient = LinearGradient(
-    colors: [Color(0xFF34363E), Color(0xFF202229)],
+    colors: [Color(0xFF65402F), Color(0xFF32201A)],
   );
   static const herbGradient = primaryGradient;
 
@@ -74,6 +69,9 @@ class AppTheme {
     final background = dark ? bgDark : bgLight;
     final accent = dark ? primaryFlameLight : primaryFlame;
     final barBackground = dark ? primaryFlameDark : primaryFlame;
+    final navBackground = dark ? surfaceDark : surfaceLight;
+    final navSelected = dark ? primaryFlameLight : primaryFlameDark;
+    final navIndicator = dark ? primaryFlameDark : creamAccent;
     final base = ThemeData(
       useMaterial3: true,
       fontFamily: 'PlusJakartaSans',
@@ -94,12 +92,14 @@ class AppTheme {
         ).copyWith(
           primary: accent,
           onPrimary: dark ? bgDark : Colors.white,
-          secondary: dark ? accentVioletLight : accentViolet,
+          secondary: dark ? freshHerbLight : freshHerb,
           onSecondary: dark ? bgDark : Colors.white,
-          secondaryContainer: dark ? surfaceDark3 : accentVioletSoft,
+          secondaryContainer: dark ? surfaceDark3 : freshHerbLight,
           onSecondaryContainer: ink,
-          tertiary: dark ? accentVioletLight : accentViolet,
+          tertiary: dark ? warmSaffronLight : warmSaffron,
           onTertiary: dark ? bgDark : Colors.white,
+          tertiaryContainer: dark ? surfaceDark3 : warmSaffronLight,
+          onTertiaryContainer: ink,
           surface: surface,
           onSurface: ink,
           onSurfaceVariant: muted,
@@ -230,7 +230,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: dark ? surfaceDark2 : Colors.white,
+        fillColor: dark ? surfaceDark2 : surfaceLight,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 18,
           vertical: 17,
@@ -270,16 +270,16 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         height: 76,
         elevation: 0,
-        backgroundColor: barBackground,
+        backgroundColor: navBackground,
         surfaceTintColor: Colors.transparent,
-        indicatorColor: accentVioletBright,
+        indicatorColor: navIndicator,
         overlayColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.pressed)) {
-            return Colors.white.withValues(alpha: .16);
+            return navSelected.withValues(alpha: .12);
           }
           if (states.contains(WidgetState.hovered) ||
               states.contains(WidgetState.focused)) {
-            return Colors.white.withValues(alpha: .08);
+            return navSelected.withValues(alpha: .07);
           }
           return null;
         }),
@@ -289,17 +289,13 @@ class AppTheme {
             fontWeight: states.contains(WidgetState.selected)
                 ? FontWeight.w700
                 : FontWeight.w500,
-            color: states.contains(WidgetState.selected)
-                ? accentVioletLight
-                : primaryFlameLight,
+            color: states.contains(WidgetState.selected) ? navSelected : muted,
           ),
         ),
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
             size: 22,
-            color: states.contains(WidgetState.selected)
-                ? primaryFlameDark
-                : primaryFlameLight,
+            color: states.contains(WidgetState.selected) ? navSelected : muted,
           ),
         ),
       ),

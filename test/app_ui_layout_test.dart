@@ -109,10 +109,16 @@ void main() {
       await tester.tap(demo);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
+      expect(find.text('CulinaryAI').hitTestable(), findsOneWidget);
       await capture('home');
       // The feature directory must lead to the real expiry editor, including
       // when pantry search/zone filters would otherwise hide an ingredient.
-      await tester.tap(find.text('All features'));
+      final featureLabel = find.text('All features');
+      await tester.tap(
+        featureLabel.evaluate().isNotEmpty
+            ? featureLabel
+            : find.byTooltip('All features'),
+      );
       await tester.pumpAndSettle();
       await capture('features');
       await tester.enterText(find.byType(TextField), 'not-a-feature');
@@ -207,7 +213,10 @@ void main() {
           expect(find.text('Your saved recipes'), findsOneWidget);
           await tester.tap(find.text('Home').last);
           await tester.pumpAndSettle();
-          await tester.tap(find.text('Find recipes'));
+          final recipesShortcut = find.text('Find recipes');
+          await tester.ensureVisible(recipesShortcut);
+          await tester.pumpAndSettle();
+          await tester.tap(recipesShortcut);
           await tester.pumpAndSettle();
           expect(find.text('Find a recipe to cook'), findsOneWidget);
         }

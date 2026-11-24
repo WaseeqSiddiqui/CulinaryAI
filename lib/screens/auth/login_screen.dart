@@ -271,8 +271,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,
                                   colors: [
-                                    Color(0x44263B58),
-                                    Color(0xDD192A42),
+                                    Color(0x225D3425),
+                                    Color(0xEA301A14),
                                   ],
                                 ),
                               ),
@@ -295,7 +295,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   const Text(
                                     'Less waste. More possibility.',
                                     style: TextStyle(
-                                      color: Color(0xFFEDF1F6),
+                                      color: AppTheme.creamWarm,
                                       fontSize: 17,
                                     ),
                                   ),

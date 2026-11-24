@@ -16,17 +16,14 @@ class SplashScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 128,
-                height: 128,
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryFlame,
-                  borderRadius: BorderRadius.circular(36),
-                ),
-                child: const Icon(
-                  Icons.spa_outlined,
-                  size: 80,
-                  color: Colors.white,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(32),
+                child: Image.asset(
+                  'assets/images/culinary_ai_app_icon.png',
+                  width: 120,
+                  height: 120,
+                  cacheWidth: 360,
+                  excludeFromSemantics: true,
                 ),
               ),
               const SizedBox(height: 28),
@@ -48,7 +45,7 @@ class SplashScreen extends StatelessWidget {
                 width: 22,
                 height: 22,
                 child: CircularProgressIndicator(
-                  color: AppTheme.accentVioletLight,
+                  color: AppTheme.warmSaffronLight,
                   strokeWidth: 2,
                 ),
               ),

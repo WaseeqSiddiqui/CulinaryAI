@@ -87,7 +87,7 @@ class _MainShellState extends State<MainShell> {
         final pages = IndexedStack(
           index: _currentIndex,
           children: [
-            const _DashboardTab(),
+            _DashboardTab(showBrand: !wide),
             const PantryScreen(),
             RecipeHubScreen(key: ValueKey('recipes-$_recipesVersion')),
             const ShoppingListScreen(),
@@ -253,7 +253,9 @@ class _NavItem {
 // ── Dashboard Tab (Commercial Food App Architecture) ──────────────────────────
 
 class _DashboardTab extends StatefulWidget {
-  const _DashboardTab();
+  const _DashboardTab({required this.showBrand});
+
+  final bool showBrand;
 
   @override
   State<_DashboardTab> createState() => _DashboardTabState();
@@ -291,7 +293,13 @@ class _DashboardTabState extends State<_DashboardTab> {
   Widget build(BuildContext context) {
     final pantry = context.watch<PantryProvider>();
     final user = context.watch<AuthProvider>().currentUser;
-    final dark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    final width = MediaQuery.sizeOf(context).width;
+    final compactActions =
+        width < 350 ||
+        (width < 430 && MediaQuery.textScalerOf(context).scale(14) > 18);
     final shell = MainShell._of(context);
     return Scaffold(
       drawer: _KitchenDrawer(
@@ -302,16 +310,32 @@ class _DashboardTabState extends State<_DashboardTab> {
       ),
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const Text('Home'),
+        titleSpacing: 16,
+        backgroundColor: colors.surface,
+        foregroundColor: colors.onSurface,
+        iconTheme: IconThemeData(color: colors.onSurface),
+        actionsIconTheme: IconThemeData(color: colors.onSurface),
+        titleTextStyle: theme.textTheme.titleLarge,
+        title: widget.showBrand
+            ? const BrandMark(key: Key('dashboardBrand'))
+            : const Text('Home'),
         actions: [
-          TextButton.icon(
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
+          if (compactActions)
+            IconButton(
+              tooltip: 'All features',
+              color: colors.primary,
+              onPressed: () => _open(const KitchenFeaturesScreen()),
+              icon: const Icon(Icons.grid_view_rounded),
+            )
+          else
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: colors.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              onPressed: () => _open(const KitchenFeaturesScreen()),
+              child: const Text('All features'),
             ),
-            onPressed: () => _open(const KitchenFeaturesScreen()),
-            icon: const Icon(Icons.grid_view_outlined, size: 18),
-            label: const Text('All features'),
-          ),
           Builder(
             builder: (drawer) => IconButton(
               tooltip: 'Account menu',
@@ -324,19 +348,23 @@ class _DashboardTabState extends State<_DashboardTab> {
       ),
       body: SingleChildScrollView(
         key: const PageStorageKey('home-tasks'),
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        padding: const EdgeInsets.fromLTRB(18, 20, 18, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
               'Hi, ${ChefNameFormatter.fromUser(user)}',
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colors.secondary,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
               'What’s cooking today?',
-              style: Theme.of(context).textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.w700),
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 18),
             _HeroRecipeCard(isDark: dark, pantry: pantry),
@@ -355,18 +383,21 @@ class _DashboardTabState extends State<_DashboardTab> {
                   title: 'Check expiry',
                   description: 'View dates and scan labels',
                   icon: Icons.event_outlined,
+                  accent: colors.tertiary,
                   onTap: () => _open(const ExpiryOverviewScreen()),
                 ),
                 KitchenTask(
                   title: 'Find recipes',
                   description: 'Cook with your pantry',
                   icon: Icons.restaurant_menu,
+                  accent: colors.secondary,
                   onTap: () => shell?.showRecipes(),
                 ),
                 KitchenTask(
                   title: 'Shopping list',
                   description: 'See what you need to buy',
                   icon: Icons.shopping_bag_outlined,
+                  accent: colors.secondary,
                   onTap: () => shell?.switchToTab(3),
                 ),
                 KitchenTask(
@@ -379,6 +410,7 @@ class _DashboardTabState extends State<_DashboardTab> {
                   title: 'Ask Chef',
                   description: 'Get help with cooking',
                   icon: Icons.chat_bubble_outline,
+                  accent: colors.tertiary,
                   onTap: () => _open(const ChatbotScreen()),
                 ),
               ],
@@ -392,7 +424,6 @@ class _DashboardTabState extends State<_DashboardTab> {
             const SizedBox(height: 12),
             _KitchenPulse(pantry: pantry, isDark: dark),
             const SizedBox(height: 28),
-            const SizedBox(height: 24),
             SurfacePanel(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -487,6 +518,7 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
       cycleOffset: _cycleOffset,
     );
     final match = recipe.matchPercentage(widget.pantry.allItems);
+    final width = MediaQuery.sizeOf(context).width;
     return Material(
       color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(22),
@@ -494,7 +526,11 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
       child: InkWell(
         onTap: () => _showRecipeDetails(context, recipe),
         child: SizedBox(
-          height: 220,
+          height: width >= 700
+              ? 290
+              : width < 350
+              ? 214
+              : 234,
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -508,7 +544,12 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Color(0x100E1014), Color(0xE6101216)],
+                    colors: [
+                      Color(0x00301A14),
+                      Color(0x38301A14),
+                      Color(0xF2301A14),
+                    ],
+                    stops: [0, .37, 1],
                   ),
                 ),
               ),
@@ -521,13 +562,13 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppTheme.warmSaffronLight,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     'TODAY’S RECIPE',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: const Color(0xFF23252A),
+                      color: AppTheme.textLightPrimary,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -539,8 +580,8 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                 child: IconButton.filled(
                   tooltip: 'Show another recipe idea',
                   style: IconButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF23252A),
+                    backgroundColor: AppTheme.surfaceLight,
+                    foregroundColor: AppTheme.primaryFlameDark,
                   ),
                   onPressed: () =>
                       setState(() => _cycleOffset = (_cycleOffset + 1) % 6),
@@ -560,7 +601,7 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 20,
+                        fontSize: 22,
                         height: 1.2,
                         fontWeight: FontWeight.w700,
                       ),
@@ -578,19 +619,36 @@ class _HeroRecipeCardState extends State<_HeroRecipeCard> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        const Text(
-                          'View recipe',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: AppTheme.surfaceLight,
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.arrow_forward,
-                          color: Colors.white,
-                          size: 16,
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 7,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'View recipe',
+                                  style: TextStyle(
+                                    color: AppTheme.primaryFlameDark,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                SizedBox(width: 4),
+                                Icon(
+                                  Icons.arrow_forward,
+                                  color: AppTheme.primaryFlameDark,
+                                  size: 15,
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     ),

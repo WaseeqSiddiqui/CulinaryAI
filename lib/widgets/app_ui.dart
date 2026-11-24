@@ -11,29 +11,31 @@ class BrandMark extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: light
-                ? Colors.white.withValues(alpha: .14)
-                : colors.primaryContainer,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
-            Icons.spa_outlined,
-            size: 22,
-            color: light ? Colors.white : colors.primary,
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.asset(
+            'assets/images/culinary_ai_app_icon.png',
+            width: 36,
+            height: 36,
+            cacheWidth: 108,
+            excludeFromSemantics: true,
           ),
         ),
         if (showName) ...[
           const SizedBox(width: 10),
-          Text(
-            'CulinaryAI',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontSize: 20,
-              letterSpacing: -.8,
-              color: light ? Colors.white : colors.onSurface,
+          Flexible(
+            child: FittedBox(
+              alignment: Alignment.centerLeft,
+              fit: BoxFit.scaleDown,
+              child: Text(
+                'CulinaryAI',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -.7,
+                  color: light ? Colors.white : colors.onSurface,
+                ),
+              ),
             ),
           ),
         ],

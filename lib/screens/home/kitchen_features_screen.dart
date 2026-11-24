@@ -81,11 +81,13 @@ class KitchenTask {
     required this.description,
     required this.icon,
     required this.onTap,
+    this.accent,
   });
   final String title;
   final String description;
   final IconData icon;
   final VoidCallback onTap;
+  final Color? accent;
 }
 
 /// Each row grows with text rather than clipping labels at larger text sizes.
@@ -135,6 +137,7 @@ class _TaskCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final accent = task.accent ?? colors.primary;
     return Material(
       color: colors.surface,
       shape: RoundedRectangleBorder(
@@ -149,7 +152,16 @@ class _TaskCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(task.icon, color: colors.primary, size: 24),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: .11),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(task.icon, color: accent, size: 22),
+                ),
+              ),
               const SizedBox(height: 10),
               Text(
                 task.title,

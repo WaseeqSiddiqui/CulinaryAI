@@ -16,6 +16,7 @@ void main() {
       final pairs = <String, (Color, Color)>{
         'primary action': (scheme.onPrimary, scheme.primary),
         'secondary action': (scheme.onSecondary, scheme.secondary),
+        'saffron action': (scheme.onTertiary, scheme.tertiary),
         'error action': (scheme.onError, scheme.error),
         'body': (scheme.onSurface, scheme.surface),
         'secondary text': (scheme.onSurfaceVariant, scheme.surface),
