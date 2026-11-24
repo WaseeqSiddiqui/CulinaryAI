@@ -98,7 +98,7 @@ Before deploying the new quota-enforced API:
    cannot call quota-enforced AI endpoints. Without Firebase credentials the API
    fails closed; it does not silently provide unlimited usage.
    Startup checks Auth access and performs a refunded Firestore reservation for
-   the reserved `__culinary_subscription_readiness__` service identity. An invalid
+   the `culinary-subscription-readiness-v1` service identity. An invalid
    setup prevents the new worker from accepting traffic; no real user's credits
    are used by this check.
 4. Verify `/subscription/me` with a signed-in account and check free/expired Plus

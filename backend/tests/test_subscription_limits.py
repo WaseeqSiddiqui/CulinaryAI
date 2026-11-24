@@ -2,13 +2,14 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime, timezone
 from threading import RLock
+import re
 
 from fastapi import Body, FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from starlette.responses import JSONResponse
 import pytest
 
-from app.services.subscription_service import FirestoreUsageStore, PLAN_LIMITS, SubscriptionService, active_plan
+from app.services.subscription_service import FirestoreUsageStore, PLAN_LIMITS, READINESS_UID, SubscriptionService, active_plan
 from app.services.usage_middleware import UsageLimitMiddleware
 
 
@@ -18,6 +19,9 @@ class Reference:
     def collection(self, name):
         return Reference(self.db, self.path + '/' + name)
     def document(self, name):
+        # Model Firestore's real document-ID restrictions, including reserved IDs.
+        if not name or '/' in name or name in ('.', '..') or re.fullmatch(r'__.*__', name):
+            raise ValueError('Invalid Firestore document ID')
         return Reference(self.db, self.path + '/' + name)
     def get(self, **kwargs):
         value = deepcopy(self.db.records.get(self.path))
@@ -206,7 +210,7 @@ def test_readiness_checks_auth_and_refunds_only_the_reserved_service_identity(bi
         raise auth.UserNotFoundError('Readiness identity is not a user')
     monkeypatch.setattr(auth, 'get_user', missing)
     service.check_ready()
-    assert seen == ['__culinary_subscription_readiness__']
+    assert seen == [READINESS_UID]
     assert service.view(seen[0])['used']['chat'] == 0
     reservations = [value for key, value in db.records.items() if key.startswith('billing_reservations/')]
     assert len(reservations) == 1
@@ -222,4 +226,23 @@ def test_readiness_failure_stops_startup_without_exposing_credentials(billing, m
     with pytest.raises(RuntimeError) as error:
         service.check_ready()
     assert 'Monthly usage setup failed' in str(error.value)
+    assert 'private credential contents' not in str(error.value)
+
+
+def test_firestore_rejects_reserved_readiness_id(billing):
+    service, _, _ = billing
+    with pytest.raises(ValueError, match='Invalid Firestore document ID'):
+        service.store.reserve('__culinary_subscription_readiness__', 'chat', service.clock())
+
+
+def test_readiness_reports_auth_failure_without_error_contents(billing, monkeypatch):
+    from firebase_admin import auth
+    service, _, _ = billing
+    monkeypatch.setattr(service.store, '_firebase_app', lambda: object())
+    def denied(*args, **kwargs):
+        raise PermissionError('private credential contents')
+    monkeypatch.setattr(auth, 'get_user', denied)
+    with pytest.raises(RuntimeError) as error:
+        service.check_ready()
+    assert 'Firebase Auth access (PermissionError)' in str(error.value)
     assert 'private credential contents' not in str(error.value)

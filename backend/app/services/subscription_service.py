@@ -13,6 +13,13 @@ from fastapi import HTTPException
 
 log = logging.getLogger(__name__)
 PLAN_LIMITS = {"free": {"chat": 20, "photo": 3}, "plus": {"chat": 500, "photo": 50}}
+READINESS_UID = "culinary-subscription-readiness-v1"
+
+
+class SubscriptionSetupError(RuntimeError):
+    """Only fixed stage names and exception types; never credential contents."""
+    def __init__(self, stage, error_type):
+        super().__init__(f"{stage} ({error_type})")
 
 
 def usage_limits_enabled():
@@ -74,6 +81,7 @@ class FirestoreUsageStore:
         self._app = None
         self._database = None
         self._lock = Lock()
+        self._credential_error_type = None
 
     def _firebase_app(self):
         if self._app is not None:
@@ -93,7 +101,8 @@ class FirestoreUsageStore:
                 self._app = firebase_admin.initialize_app(credential, {
                     "projectId": project, "httpTimeout": 5,
                 }, name="culinary-subscriptions")
-            except Exception:
+            except Exception as error:
+                self._credential_error_type = type(error).__name__
                 raise HTTPException(status_code=503, detail="Account usage is temporarily unavailable. Please try again later.") from None
         return self._app
 
@@ -114,14 +123,26 @@ class FirestoreUsageStore:
     def check_ready(self):
         """Verify Auth access and Firestore transactions before accepting traffic."""
         from firebase_admin import auth
-        # This reserved service identity never grants a real user an entitlement.
-        uid = "__culinary_subscription_readiness__"
+        # Firestore reserves IDs matching __.*__; use an ordinary service ID.
+        # No real user's credits are used by this refunded startup reservation.
         try:
-            auth.get_user(uid, app=self._firebase_app())
+            app = self._firebase_app()
+        except Exception as error:
+            raise SubscriptionSetupError("credentials", self._credential_error_type or type(error).__name__) from None
+        try:
+            auth.get_user(READINESS_UID, app=app)
         except auth.UserNotFoundError:
             pass
-        reservation = self.reserve(uid, "chat", datetime.now(timezone.utc))
-        self.finish(reservation, success=False)
+        except Exception as error:
+            raise SubscriptionSetupError("Firebase Auth access", type(error).__name__) from None
+        try:
+            reservation = self.reserve(READINESS_UID, "chat", datetime.now(timezone.utc))
+        except Exception as error:
+            raise SubscriptionSetupError("Firestore reservation", type(error).__name__) from None
+        try:
+            self.finish(reservation, success=False)
+        except Exception as error:
+            raise SubscriptionSetupError("Firestore refund", type(error).__name__) from None
 
     def db(self):
         if self._database is None:
@@ -189,9 +210,10 @@ class SubscriptionService:
     def check_ready(self):
         try:
             self.store.check_ready()
-        except Exception:
+        except Exception as error:
+            reason = str(error) if isinstance(error, SubscriptionSetupError) else type(error).__name__
             raise RuntimeError(
-                "Monthly usage setup failed. Check Firebase server credentials, project ID, "
+                f"Monthly usage setup failed at {reason}. Check Firebase server credentials, project ID, "
                 "Auth access, and Firestore permissions before deploying."
             ) from None
 
